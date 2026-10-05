@@ -35,6 +35,23 @@ pmset -g | grep SleepDisabled
 
 Thermal cutoff is covered by unit tests only; it cannot be triggered reliably by hand.
 
+## Claude Code Limits Checklist
+
+Watch the snapshot with `cat ~/Library/Application\ Support/Workdeck/claude-usage.json` and the status line config with `grep -A3 statusLine ~/.claude/settings.json`.
+
+| # | Scenario | Steps | Expected |
+|---|---|---|---|
+| L1 | Connect from popover | Turn on Claude Code Limits in the popover. | "Connect Claude Code?" alert appears; Connect adds `statusLine` pointing at `…/Contents/Helpers/workdeck-statusline`; backup file exists. |
+| L2 | Connect from Settings | Disconnect, then click Connect… in Settings. | Same alert and result as L1. |
+| L3 | Data arrives | Run a Claude Code session (Pro/Max) and send a message. | Claude Code's status line shows `5h N%`; the notch shows the same; popover row shows both windows and "updated just now". |
+| L4 | Hover | Hover the compact notch, then move away. | Expands with both windows, reset times and age; collapses on exit. |
+| L5 | Threshold alert | In Settings, set "First alert at" below the current usage. | Notch expands for ~6 s with "5-hour limit at N%", then returns; indicator turns orange. Hovering during or after the alert still expands/collapses correctly. |
+| L6 | Only near limits | Set Show to "Only near limits" with usage below the first threshold. | Notch disappears completely (no empty pill); an alert from L5 still pops and hides again. |
+| L7 | Lid closed | Connect an external display, close the lid. | Usage text appears next to the Workdeck icon; at or above the first threshold the icon becomes a warning triangle. Opening the lid brings the notch back. |
+| L8 | Existing status line | With your own `statusLine` set, connect. | Claude Code shows `5h N% · <your output>`; Disconnect restores your original `statusLine` exactly. |
+| L9 | Reset alert | Wait for (or simulate by editing `resets_at` in the snapshot to the past) a window that was above the first threshold. | "5-hour limit reset" appears once when "Notify when a limit resets" is on; nothing when it is off. |
+| L10 | Moved app | Connect from the Xcode build, then run `make install` and launch from `/Applications`. | `statusLine` command is updated to the `/Applications` path on launch. |
+
 ## Results
 
 Mark each run with the date, build commit, and macOS version. Record only scenarios that were actually executed.

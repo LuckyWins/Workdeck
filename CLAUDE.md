@@ -22,6 +22,8 @@ Workdeck is a macOS menu bar toolbox for developers. Each tool is one row in the
 - `WorkdeckHelper/` — privileged launchd daemon running as root (no default actor isolation). Registered with `SMAppService.daemon`, reached over XPC.
 - `Shared/` — compiled into both targets: the XPC protocol and constants. Types here must be explicitly `nonisolated`.
 - `LaunchDaemons/` — launchd job copied into `Workdeck.app/Contents/Library/LaunchDaemons`.
+- `WorkdeckStatusLine/` — `workdeck-statusline`, the Claude Code status line command embedded in `Contents/Helpers`. Only `main.swift`; its logic is `StatusLineRunner` in `ClaudeUsage/`. It must always exit 0 and stay fast (it runs on every Claude Code message).
+- `ClaudeUsage/` — compiled into the app and `WorkdeckStatusLine` (not the privileged helper): usage model, parser, snapshot file, chained command. Everything here is `nonisolated`.
 - `WorkdeckTests/` — also compiles `WorkdeckHelper/` sources except `main.swift`, `HelperService.swift`, and `HelperListenerDelegate.swift` (exception set in `project.pbxproj`). Fakes live in `WorkdeckTests/Fakes/`.
 - Source folders are Xcode file-system-synchronized groups: new files are picked up automatically. Do not edit `project.pbxproj` to add source files.
 
@@ -30,7 +32,7 @@ Workdeck is a macOS menu bar toolbox for developers. Each tool is one row in the
 - Swift 6 language mode with strict concurrency. Pure value types, and anything called from XPC, IOKit, or other background callbacks, must be explicitly `nonisolated` or `@Sendable`.
 - SwiftUI with native controls, system fonts, colors, and SF Symbols; follow the Apple Human Interface Guidelines; keep the UI minimal.
 - English only: UI strings, code comments, documentation, commit messages.
-- No third-party dependencies without discussing it first.
+- No third-party dependencies without discussing it first. Agreed exception: DynamicNotchKit (MIT, SPM, "Up to Next Minor" from 1.1.0) for the notch UI.
 - Wrap system services (IOKit, `SMAppService`, XPC) behind protocols so controllers can be tested with fakes.
 
 ## Helper Rules

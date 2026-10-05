@@ -14,6 +14,19 @@ Keeps your Mac awake while the lid is closed — for long builds, remote session
 
 > **Note:** While Closed-Lid Mode is on, macOS does not sleep at all — idle sleep and Apple menu → Sleep are disabled too. The display still turns off as usual.
 
+### Claude Code Limits
+
+Shows how much of your Claude Code plan limits you have used — the 5-hour window and the weekly window — in the MacBook notch, Dynamic Island style.
+
+- The compact view shows the window closest to its limit, e.g. `5h 42%`; hover to see both windows and when they reset.
+- Two modes: always visible, or only near limits.
+- Alerts at two configurable thresholds (80 % and 95 % by default) and, optionally, when a limit resets.
+- On a screen without a notch (an external display, or with the lid closed) the usage appears as text next to the Workdeck icon in the menu bar.
+
+**Connecting to Claude Code.** Turn on Claude Code Limits in the popover (or click **Connect…** in Settings). Workdeck adds its status line command to `~/.claude/settings.json` and saves a backup as `~/.claude/settings.json.workdeck-backup`. Only the `statusLine` key changes, but the file is re-written, so key order and formatting may change. If you already had a status line, Workdeck keeps running it and shows its output after the usage, e.g. `5h 42% · main`. **Disconnect** in Settings restores your previous status line.
+
+**Limitations.** Claude Code reports plan usage only for Claude Pro and Max subscriptions, and only while a Claude Code session is running (after the first response). Between sessions Workdeck shows the last known values and how old they are. Workdeck never reads your Claude credentials.
+
 ## Requirements
 
 - macOS 26 or later
@@ -100,6 +113,8 @@ Workdeck/          Menu bar app (SwiftUI)
 WorkdeckHelper/    Privileged launchd helper
 Shared/            Code compiled into both the app and the helper
 LaunchDaemons/     launchd job definition embedded in the app bundle
+ClaudeUsage/       Code shared by the app and the status line command
+WorkdeckStatusLine/ Claude Code status line command (workdeck-statusline)
 WorkdeckTests/     Unit tests (Swift Testing)
 specs/             Design specs
 plans/             Implementation plans
