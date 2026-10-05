@@ -59,8 +59,14 @@ struct LimitsAlertPolicyTests {
     }
 
     @Test func resetAfterReachingFirstThreshold() {
-        let result = evaluate(previous: [window(.fiveHour, 85)], current: [])
+        let result = evaluate(previous: [window(.fiveHour, 85, resetsIn: 0)], current: [])
         #expect(result.alerts == [.reset(.fiveHour)])
+    }
+
+    @Test func windowMissingBeforeItsResetIsNotAReset() {
+        // An idle session can write a snapshot without a window that is still running elsewhere.
+        #expect(evaluate(previous: [window(.fiveHour, 85)], current: []).alerts.isEmpty)
+        #expect(evaluate(previous: [window(.fiveHour, 85), window(.sevenDay, 10)], current: [window(.sevenDay, 10)]).alerts.isEmpty)
     }
 
     @Test func resetWithNewPeriodData() {
@@ -69,11 +75,11 @@ struct LimitsAlertPolicyTests {
     }
 
     @Test func noResetAlertBelowFirstThreshold() {
-        #expect(evaluate(previous: [window(.fiveHour, 60)], current: []).alerts.isEmpty)
+        #expect(evaluate(previous: [window(.fiveHour, 60, resetsIn: 0)], current: []).alerts.isEmpty)
     }
 
     @Test func noResetAlertWhenDisabled() {
-        #expect(evaluate(previous: [window(.fiveHour, 85)], current: [], notifyOnReset: false).alerts.isEmpty)
+        #expect(evaluate(previous: [window(.fiveHour, 85, resetsIn: 0)], current: [], notifyOnReset: false).alerts.isEmpty)
     }
 
     @Test func oldKeysArePruned() {

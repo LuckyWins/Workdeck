@@ -32,8 +32,10 @@ nonisolated enum LimitsAlertPolicy {
 
         if notifyOnReset, let first = sortedThresholds.first {
             for window in previous where window.usedPercent >= Double(first) {
-                let samePeriod = current.contains { $0.kind == window.kind && $0.resetsAt == window.resetsAt }
-                if !samePeriod {
+                // A window only resets when its time passes or a new period arrives; missing data is not a reset.
+                let expired = window.resetsAt <= now
+                let newPeriod = current.contains { $0.kind == window.kind && $0.resetsAt != window.resetsAt }
+                if expired || newPeriod {
                     alerts.append(.reset(window.kind))
                 }
             }
