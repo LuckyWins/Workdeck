@@ -27,4 +27,11 @@ struct SafeguardPolicyTests {
         let decision = SafeguardPolicy.evaluate(power: testCase.power, thermal: testCase.thermal, threshold: testCase.threshold)
         #expect(decision == testCase.expected)
     }
+
+    @Test @MainActor func readsRealPowerSnapshot() {
+        let snapshot = PowerSourceMonitor.readSnapshot()
+        if let percent = snapshot.batteryPercent {
+            #expect((0...100).contains(percent))
+        }
+    }
 }
