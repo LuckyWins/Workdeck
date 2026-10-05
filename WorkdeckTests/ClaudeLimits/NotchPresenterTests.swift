@@ -87,12 +87,16 @@ struct NotchPresenterTests {
         #expect(presenter.appliedTarget == .compact)
     }
 
-    @Test func alertExpandsThenReturnsToRestingState() async throws {
+    @Test(.timeLimit(.minutes(1)))
+    func alertExpandsThenReturnsToRestingState() async throws {
         let (presenter, _) = makePresenter()
         presenter.show(state(.hidden))
         presenter.present(.reset(.fiveHour))
-        try await Task.sleep(for: .milliseconds(60))
-        #expect(presenter.appliedTarget == .expanded)
+        // Wait for the expansion itself rather than a fixed delay, which is flaky under load.
+        while !surface.calls.contains("expand") {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(presenter.model.alert == .reset(.fiveHour))
         await settle(presenter)
         #expect(presenter.appliedTarget == .hidden)
         #expect(surface.calls == ["expand", "hide"])
