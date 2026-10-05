@@ -118,3 +118,37 @@ struct ClaudeCodeConnectorTests {
         #expect((try readSettings()["statusLine"] as? [String: String])?["command"] == binary)
     }
 }
+
+@MainActor
+struct ClaudeCodeConnectorSymlinkTests {
+    let root = makeTemporaryDirectory()
+
+    @Test func symlinkedSettingsStayLinkedAndBackupHoldsContents() throws {
+        // Dotfile managers (stow, chezmoi) keep ~/.claude/settings.json as a symlink.
+        let dotfile = root.appending(path: "dotfiles/claude-settings.json")
+        try FileManager.default.createDirectory(at: dotfile.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(#"{"model":"opus"}"#.utf8).write(to: dotfile)
+        let settingsURL = root.appending(path: ".claude/settings.json")
+        try FileManager.default.createDirectory(at: settingsURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: settingsURL, withDestinationURL: dotfile)
+
+        let binary = root.appending(path: "Fake.app/Contents/Helpers/workdeck-statusline")
+        try FileManager.default.createDirectory(at: binary.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("#!/bin/sh\n".utf8).write(to: binary)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+        let connector = ClaudeCodeConnector(
+            settingsURL: settingsURL,
+            paths: WorkdeckPaths(supportDirectory: root.appending(path: "Workdeck")),
+            binaryPath: binary.path
+        )
+
+        try connector.connect()
+
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: settingsURL.path) == dotfile.path)
+        let target = try JSONSerialization.jsonObject(with: Data(contentsOf: dotfile)) as? [String: Any]
+        #expect(target?["statusLine"] != nil)
+        let backupAttributes = try FileManager.default.attributesOfItem(atPath: connector.backupURL.path)
+        #expect(backupAttributes[.type] as? FileAttributeType == .typeRegular)
+        #expect(try String(contentsOf: connector.backupURL, encoding: .utf8) == #"{"model":"opus"}"#)
+    }
+}
