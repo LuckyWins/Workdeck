@@ -10,18 +10,67 @@ protocol LimitsPresenting: AnyObject {
     func present(_ alert: LimitsAlert)
 }
 
-/// Drives DynamicNotchKit on the screen with a camera housing.
+/// The notch operations the presenter needs; DynamicNotchKit in the app, a fake in tests.
+protocol NotchSurface: AnyObject {
+    var onHoverChange: ((Bool) -> Void)? { get set }
+    func expand(on screen: NSScreen) async
+    func compact(on screen: NSScreen) async
+    func hide() async
+    /// Drops the library's window, including one it re-created on its own after a screen change.
+    func closeWindow()
+}
+
+enum NotchTarget: Equatable {
+    case hidden
+    case compact
+    case expanded
+}
+
+/// Drives the notch on the screen with a camera housing. All notch operations run one at a time
+/// in a single loop that re-reads the desired state after each step, so quick hovers, alerts and
+/// screen changes cannot interleave inside DynamicNotchKit.
 final class NotchPresenter: LimitsPresenting {
-    static let alertDuration: Duration = .seconds(6)
+    let model: LimitsNotchModel
 
-    let model = LimitsNotchModel()
-
-    private typealias Notch = DynamicNotch<LimitsExpandedView, LimitsCompactLeading, LimitsCompactTrailing>
-    private var notch: Notch?
-    private var hoverSubscription: AnyCancellable?
+    private(set) var appliedTarget: NotchTarget = .hidden
+    private let makeSurface: @MainActor (LimitsNotchModel) -> any NotchSurface
+    private let screen: @MainActor () -> NSScreen?
+    private let alertDuration: Duration
+    private let rebuildDelay: Duration
+    private var surface: (any NotchSurface)?
     private var isHovering = false
+    private var isShowingAlert = false
     private var pendingAlerts: [LimitsAlert] = []
     private var alertTask: Task<Void, Never>?
+    private var reconcileTask: Task<Void, Never>?
+    private var rebuildTask: Task<Void, Never>?
+    private var needsReconcile = false
+    private var needsRebuild = false
+    private var screenObserver: (any NSObjectProtocol)?
+
+    init(
+        model: LimitsNotchModel = LimitsNotchModel(),
+        makeSurface: @escaping @MainActor (LimitsNotchModel) -> any NotchSurface = { DynamicNotchSurface(model: $0) },
+        screen: @escaping @MainActor () -> NSScreen? = NotchPresenter.notchScreen,
+        alertDuration: Duration = .seconds(6),
+        rebuildDelay: Duration = .milliseconds(500),
+        observeScreenChanges: Bool = true
+    ) {
+        self.model = model
+        self.makeSurface = makeSurface
+        self.screen = screen
+        self.alertDuration = alertDuration
+        self.rebuildDelay = rebuildDelay
+        if observeScreenChanges {
+            screenObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didChangeScreenParametersNotification,
+                object: nil,
+                queue: .main
+            ) { @Sendable [weak self] _ in
+                MainActor.assumeIsolated { self?.screenParametersChanged() }
+            }
+        }
+    }
 
     /// The built-in display with a notch, if it is connected and on.
     static func notchScreen() -> NSScreen? {
@@ -32,73 +81,162 @@ final class NotchPresenter: LimitsPresenting {
         notchScreen() != nil
     }
 
+    static func target(display: LimitsDisplay, isHovering: Bool, isShowingAlert: Bool, hasScreen: Bool) -> NotchTarget {
+        guard hasScreen else { return .hidden }
+        if isShowingAlert {
+            return .expanded
+        }
+        guard case .notch = display else { return .hidden }
+        return isHovering ? .expanded : .compact
+    }
+
+    /// True while an alert, a rebuild, or notch operations are still pending.
+    var isBusy: Bool {
+        reconcileTask != nil || alertTask != nil || rebuildTask != nil
+    }
+
     func show(_ state: LimitsViewState) {
         model.state = state
-        applyRestingState()
+        requestReconcile()
     }
 
     func present(_ alert: LimitsAlert) {
-        guard Self.notchScreen() != nil else { return }
+        guard screen() != nil else { return }
         pendingAlerts.append(alert)
-        runAlerts()
-    }
-
-    private func runAlerts() {
-        guard alertTask == nil, !pendingAlerts.isEmpty else { return }
+        guard alertTask == nil else { return }
         alertTask = Task {
-            while !pendingAlerts.isEmpty, let screen = Self.notchScreen() {
+            while !pendingAlerts.isEmpty, screen() != nil {
                 model.alert = pendingAlerts.removeFirst()
-                await makeNotch().expand(on: screen)
-                try? await Task.sleep(for: Self.alertDuration)
+                isShowingAlert = true
+                requestReconcile()
+                try? await Task.sleep(for: alertDuration)
             }
             pendingAlerts.removeAll()
             model.alert = nil
+            isShowingAlert = false
             alertTask = nil
-            if isHovering, let screen = Self.notchScreen() {
-                await makeNotch().expand(on: screen)
-            } else {
-                applyRestingState()
-            }
+            requestReconcile()
         }
     }
 
-    private func applyRestingState() {
-        guard alertTask == nil, !isHovering else { return }
-        guard case .notch = model.state.display, let screen = Self.notchScreen() else {
-            Task { await notch?.hide() }
-            return
+    /// DynamicNotchKit rebuilds its window on `NSScreen.screens.first` after a screen change, in any
+    /// state. Once it has, put the notch back where it belongs (or remove the stray window).
+    func screenParametersChanged() {
+        rebuildTask?.cancel()
+        rebuildTask = Task {
+            try? await Task.sleep(for: rebuildDelay)
+            guard !Task.isCancelled else { return }
+            needsRebuild = true
+            rebuildTask = nil
+            requestReconcile()
         }
-        Task { await makeNotch().compact(on: screen) }
     }
 
     private func hoverChanged(_ hovering: Bool) {
         isHovering = hovering
-        guard alertTask == nil else { return }
-        if hovering, let screen = Self.notchScreen() {
-            Task { await makeNotch().expand(on: screen) }
-        } else {
-            applyRestingState()
+        requestReconcile()
+    }
+
+    private func requestReconcile() {
+        needsReconcile = true
+        guard reconcileTask == nil else { return }
+        reconcileTask = Task {
+            while needsReconcile {
+                needsReconcile = false
+                await reconcileOnce()
+            }
+            reconcileTask = nil
         }
     }
 
-    private func makeNotch() -> Notch {
-        if let notch {
-            return notch
+    private func reconcileOnce() async {
+        let screen = screen()
+        let target = Self.target(
+            display: model.state.display,
+            isHovering: isHovering,
+            isShowingAlert: isShowingAlert,
+            hasScreen: screen != nil
+        )
+        let rebuild = needsRebuild
+        needsRebuild = false
+        guard target != appliedTarget || rebuild else { return }
+
+        switch target {
+        case .hidden:
+            guard let surface else { break }
+            await surface.hide()
+            if rebuild {
+                surface.closeWindow()
+            }
+        case .compact, .expanded:
+            guard let screen else { break }
+            let surface = activeSurface()
+            if rebuild {
+                await surface.hide()
+                surface.closeWindow()
+            }
+            if target == .compact {
+                await surface.compact(on: screen)
+            } else {
+                await surface.expand(on: screen)
+            }
         }
-        let model = model
-        let notch = Notch(
-            hoverBehavior: [.keepVisible, .increaseShadow],
+        appliedTarget = target
+    }
+
+    private func activeSurface() -> any NotchSurface {
+        if let surface {
+            return surface
+        }
+        let surface = makeSurface(model)
+        surface.onHoverChange = { [weak self] hovering in
+            self?.hoverChanged(hovering)
+        }
+        self.surface = surface
+        return surface
+    }
+}
+
+/// DynamicNotchKit behind `NotchSurface`.
+final class DynamicNotchSurface: NotchSurface {
+    var onHoverChange: ((Bool) -> Void)?
+
+    private typealias Notch = DynamicNotch<LimitsExpandedView, LimitsCompactLeading, LimitsCompactTrailing>
+    private let notch: Notch
+    private var hoverSubscription: AnyCancellable?
+
+    init(model: LimitsNotchModel) {
+        // No `.keepVisible`: the presenter owns hover, and with it `hide()` would wait forever on a stuck hover.
+        notch = Notch(
+            hoverBehavior: [.increaseShadow],
             style: .notch,
             expanded: { LimitsExpandedView(model: model) },
             compactLeading: { LimitsCompactLeading(model: model) },
             compactTrailing: { LimitsCompactTrailing(model: model) }
         )
+        // Converting compact <-> expanded without an intermediate hide keeps hover exits from being dropped.
+        notch.transitionConfiguration.skipIntermediateHides = true
         hoverSubscription = notch.$isHovering
             .removeDuplicates()
             .sink { [weak self] hovering in
-                self?.hoverChanged(hovering)
+                self?.onHoverChange?(hovering)
             }
-        self.notch = notch
-        return notch
+    }
+
+    func expand(on screen: NSScreen) async {
+        await notch.expand(on: screen)
+    }
+
+    func compact(on screen: NSScreen) async {
+        await notch.compact(on: screen)
+    }
+
+    func hide() async {
+        await notch.hide()
+    }
+
+    func closeWindow() {
+        notch.windowController?.close()
+        notch.windowController = nil
     }
 }

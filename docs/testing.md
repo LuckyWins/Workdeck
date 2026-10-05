@@ -51,6 +51,9 @@ Watch the snapshot with `cat ~/Library/Application\ Support/Workdeck/claude-usag
 | L8 | Existing status line | With your own `statusLine` set, connect. | Claude Code shows `5h N% · <your output>`; Disconnect restores your original `statusLine` exactly. |
 | L9 | Reset alert | Wait for (or simulate by editing `resets_at` in the snapshot to the past) a window that was above the first threshold. | "5-hour limit reset" appears once when "Notify when a limit resets" is on; nothing when it is off. |
 | L10 | Moved app | Connect from the Xcode build, then run `make install` and launch from `/Applications`. | `statusLine` command is updated to the `/Applications` path on launch. |
+| L11 | Quick pass over the notch | Brush the pointer quickly across the compact notch on the way to the menu bar, several times. | The notch never stays expanded after the pointer has left. |
+| L12 | External display as main | With the lid open, make an external display the main display (Displays settings), then change its resolution or sleep/wake. | The compact notch stays on the built-in screen; no black pill appears on the external display. |
+| L13 | Sleep/wake with lid closed | Lid closed on an external display (menu bar fallback active), sleep and wake the Mac. | No black pill at the top of the external display; the menu bar text remains. |
 
 ## Results
 
