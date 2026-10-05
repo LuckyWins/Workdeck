@@ -60,7 +60,7 @@ Two targets plus a shared protocol file.
 |---|---|
 | `WorkdeckApp` | `MenuBarExtra` (`.window` style) scene + `Settings` scene. Menu bar icon reflects mode state. |
 | `LidSleepController` (`@Observable`) | Owns Closed-Lid Mode state; `enable()`, `disable(reason:)`, `refresh()`. Coordinates helper, monitors, and policy. |
-| `SafeguardPolicy` | Pure logic. `canEnable(snapshot:threshold:)` and `evaluate(snapshot:threshold:)` → allow / cutoff(reason). |
+| `SafeguardPolicy` | Pure logic. `evaluate(power:thermal:threshold:)` → allow / cutoff(reason); used both before enabling and while active. |
 | `PowerSourceMonitor` | Battery level + power source via `IOPSCopyPowerSourcesInfo` / `IOPSNotificationCreateRunLoopSource`. Emits `PowerSnapshot`. |
 | `ThermalMonitor` | `ProcessInfo.thermalState` + `thermalStateDidChangeNotification`. |
 | `HelperClient` | `NSXPCConnection` wrapper (async API, 5 s timeout, interruption/invalidation handling). |
@@ -88,12 +88,16 @@ A command-line tool running as root.
 Compiled into both targets:
 
 ```swift
-@objc protocol HelperProtocol {
-    func setSleepDisabled(_ disabled: Bool, reply: @escaping (Error?) -> Void)
-    func isSleepDisabled(reply: @escaping (Bool) -> Void)
-    func version(reply: @escaping (String) -> Void)
+@objc nonisolated protocol HelperProtocol {
+    func setSleepDisabled(_ disabled: Bool, reply: @escaping @Sendable (NSError?) -> Void)
+    func isSleepDisabled(reply: @escaping @Sendable (Bool, NSError?) -> Void)
+    func version(reply: @escaping @Sendable (String) -> Void)
 }
 ```
+
+Errors cross XPC as `NSError` carrying only a localized description string. `nonisolated` is required because the app target defaults to `MainActor` isolation while XPC replies arrive on background queues.
+
+`Shared/HelperConstants.swift` holds the bundle/Mach service identifiers, both code-signing requirement strings, and `version(of:)`.
 
 ### 4.4 Bundle Layout
 
@@ -116,8 +120,9 @@ Workdeck/
 ├── Features/
 │   └── ClosedLidMode/   LidSleepController, SafeguardPolicy, monitors, ClosedLidModeRow
 └── Core/           HelperClient, HelperInstaller, AppSettings
-WorkdeckHelper/     main.swift, HelperService, PowerSettings, CommandRunner, launchd plist
-Shared/             HelperProtocol.swift
+WorkdeckHelper/     main.swift, HelperListenerDelegate, HelperService, PowerSettings, CommandRunner, SleepSessionTracker
+Shared/             HelperProtocol.swift, HelperConstants.swift
+LaunchDaemons/      com.appcreators.workdeck.helper.plist (copied into the app bundle, not compiled)
 WorkdeckTests/
 ```
 
@@ -174,7 +179,7 @@ A cutoff/refusal subtitle persists until the user toggles the mode again.
 ### 6.1 Enabling
 
 1. If helper status is not `.enabled`: call `register()` and show the approval state.
-2. Read current `PowerSnapshot` and thermal state; if `SafeguardPolicy.canEnable` refuses, show the refusal reason and stay off.
+2. Read current `PowerSnapshot` and thermal state; if `SafeguardPolicy.evaluate` returns a cutoff, show the refusal reason and stay off.
 3. Call `helper.setSleepDisabled(true)`. On success set `isActive = true`; on failure set `lastError`.
 
 ### 6.2 Safeguards (while active)
@@ -214,7 +219,7 @@ After connecting, the app calls `version()`. If it differs from the app's bundle
 
 **Unit tests (Swift Testing, `WorkdeckTests`):**
 
-- `SafeguardPolicy` — table-driven: power source × charge × threshold × thermal state, for both `canEnable` and `evaluate`.
+- `SafeguardPolicy` — table-driven: power source × charge × threshold × thermal state, via `evaluate`.
 - `LidSleepController` — with fake helper client, installer, and monitors: enable success, refusal on low battery, battery cutoff, thermal cutoff, XPC error, helper interruption, approval-required state.
 - `PowerSettings` — with fake `CommandRunner`: correct `pmset` arguments, `SleepDisabled` parsing from `pmset -g` output, non-zero exit mapped to error.
 
