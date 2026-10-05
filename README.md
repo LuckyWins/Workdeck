@@ -24,7 +24,8 @@ Keeps your Mac awake while the lid is closed — for long builds, remote session
 ```bash
 make build     # Release build into ./build
 make test      # run the unit tests
-make install   # build, quit a running Workdeck, copy it to /Applications, and launch it
+make install   # build, quit the installed Workdeck, copy it to /Applications, and launch it
+               # (stops with an error if Workdeck is running from Xcode — stop it there first)
 make clean     # remove ./build
 ```
 
