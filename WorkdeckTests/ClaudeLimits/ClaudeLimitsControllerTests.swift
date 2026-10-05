@@ -226,7 +226,7 @@ struct ClaudeLimitsControllerTests {
         let (controller, store) = makeController()
         controller.start()
         store.reload()
-        #expect(controller.rowSubtitle == "5h 42% · 7d — · updated just now")
+        #expect(controller.rowSubtitle == "5h 42% · 7d 0% · updated just now")
     }
 }
 

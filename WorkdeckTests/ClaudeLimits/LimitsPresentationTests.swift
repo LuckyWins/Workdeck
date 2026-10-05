@@ -8,7 +8,8 @@ struct LimitsPresentationTests {
         connected: Bool = true,
         mode: LimitsDisplayMode = .always,
         notch: Bool = true,
-        pressing: UsageWindow?
+        pressing: UsageWindow?,
+        hasData: Bool = false
     ) -> LimitsDisplay {
         LimitsPresentation.display(
             isEnabled: enabled,
@@ -16,6 +17,7 @@ struct LimitsPresentationTests {
             mode: mode,
             hasNotchScreen: notch,
             pressing: pressing,
+            hasData: hasData,
             thresholds: [80, 95]
         )
     }
@@ -46,4 +48,22 @@ struct LimitsPresentationTests {
         #expect(display(notch: false, pressing: nil) == .menuBar(text: "—", level: .noData))
         #expect(display(mode: .nearLimits, notch: false, pressing: window(.fiveHour, 40)) == .hidden)
     }
+
+    @Test func noRunningWindowWithDataMeansNotStarted() {
+        // After a reset, or before the first message, the next window starts at 0%.
+        #expect(display(pressing: nil, hasData: true) == .notch(.normal))
+        #expect(display(notch: false, pressing: nil, hasData: true) == .menuBar(text: "5h 0%", level: .normal))
+        #expect(display(mode: .nearLimits, pressing: nil, hasData: true) == .hidden)
+    }
+
+    @Test(arguments: [
+        (nil as Double?, false, "—"),
+        (nil, true, "5h 0%"),
+        (42, true, "5h 42%"),
+    ])
+    func compactText(percent: Double?, hasData: Bool, expected: String) {
+        let pressing = percent.map { window(.fiveHour, $0) }
+        #expect(LimitsPresentation.compactText(pressing: pressing, hasData: hasData) == expected)
+    }
 }
+

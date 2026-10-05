@@ -59,7 +59,10 @@ struct LimitsCompactLeading: View {
     let model: LimitsNotchModel
 
     var body: some View {
-        UsageRing(percent: model.state.pressing?.usedPercent, color: level(of: model.state).notchColor)
+        UsageRing(
+            percent: model.state.pressing?.usedPercent ?? (model.state.hasData ? 0 : nil),
+            color: level(of: model.state).notchColor
+        )
             .frame(width: 14, height: 14)
     }
 }
@@ -68,7 +71,7 @@ struct LimitsCompactTrailing: View {
     let model: LimitsNotchModel
 
     var body: some View {
-        Text(model.state.pressing.map(UsageFormatting.compactText) ?? "—")
+        Text(LimitsPresentation.compactText(pressing: model.state.pressing, hasData: model.state.hasData))
             .font(.system(size: 12, weight: .semibold))
             .monospacedDigit()
             .foregroundStyle(level(of: model.state).compactTextColor)
@@ -125,16 +128,21 @@ struct LimitsExpandedView: View {
     private func windowRow(_ kind: UsageWindowKind) -> some View {
         let window = model.state.windows.first { $0.kind == kind }
         let isCurrent = window.map { $0.resetsAt > model.state.now } ?? false
-        let percent = isCurrent ? window?.usedPercent : nil
-        let level = LimitsPresentation.level(of: isCurrent ? window : nil, thresholds: model.state.thresholds)
+        let notStarted = !isCurrent && model.state.hasData
+        let percent = isCurrent ? window?.usedPercent : (notStarted ? 0 : nil)
+        let level = notStarted ? .normal : LimitsPresentation.level(of: isCurrent ? window : nil, thresholds: model.state.thresholds)
         return HStack(spacing: 10) {
             UsageRing(percent: percent, color: level.notchColor, lineWidth: 3.5)
                 .frame(width: 26, height: 26)
             VStack(alignment: .leading, spacing: 1) {
                 Text(kind.title)
                     .font(.caption.weight(.semibold))
-                if let window {
-                    Text(isCurrent ? LimitsText.resetText(window.resetsAt, now: model.state.now) : LimitsText.expiredText(window.resetsAt))
+                if let window, isCurrent {
+                    Text(LimitsText.resetText(window.resetsAt, now: model.state.now))
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.6))
+                } else if notStarted {
+                    Text(LimitsText.notStartedText)
                         .font(.caption2)
                         .foregroundStyle(.white.opacity(0.6))
                 }

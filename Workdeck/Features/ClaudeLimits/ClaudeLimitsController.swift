@@ -126,6 +126,7 @@ final class ClaudeLimitsController {
             mode: settings.mode,
             hasNotchScreen: hasNotchScreen(),
             pressing: UsageFormatting.mostPressing(current),
+            hasData: store.age != nil,
             thresholds: settings.thresholds
         )
         state = LimitsViewState(

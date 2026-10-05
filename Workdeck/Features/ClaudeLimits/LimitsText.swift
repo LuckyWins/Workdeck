@@ -17,10 +17,8 @@ nonisolated enum LimitsText {
         return rest == 0 ? "resets in \(hours)h" : "resets in \(hours)h \(rest)m"
     }
 
-    /// For a window whose reset time has passed: "reset at 14:00".
-    static func expiredText(_ resetsAt: Date, calendar: Calendar = .current) -> String {
-        "reset at \(formatted(resetsAt, "HH:mm", calendar: calendar))"
-    }
+    /// For a window that is not running: it begins with the next Claude Code message.
+    static let notStartedText = "starts with your next message"
 
     static func ageText(_ age: TimeInterval) -> String {
         if age < 60 {
@@ -67,7 +65,7 @@ nonisolated enum LimitsText {
             return "Waiting for data — start a Claude Code session"
         }
         let windows = UsageWindowKind.allCases.map { kind in
-            currentWindows.first { $0.kind == kind }.map(UsageFormatting.compactText) ?? "\(kind.shortLabel) —"
+            currentWindows.first { $0.kind == kind }.map(UsageFormatting.compactText) ?? "\(kind.shortLabel) 0%"
         }
         return (windows + ["updated \(shortAge(age))"]).joined(separator: " · ")
     }

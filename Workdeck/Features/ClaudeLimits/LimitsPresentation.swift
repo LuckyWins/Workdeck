@@ -38,6 +38,11 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
 
     static let hidden = LimitsViewState(display: .hidden, windows: [], now: .distantPast, age: nil, thresholds: [80, 95])
 
+    /// Whether any usage has ever been recorded; without it nothing is known, not even "not started".
+    var hasData: Bool {
+        age != nil
+    }
+
     var currentWindows: [UsageWindow] {
         windows.filter { $0.resetsAt > now }
     }
@@ -66,16 +71,30 @@ nonisolated enum LimitsPresentation {
         mode: LimitsDisplayMode,
         hasNotchScreen: Bool,
         pressing: UsageWindow?,
+        hasData: Bool,
         thresholds: [Int]
     ) -> LimitsDisplay {
         guard isEnabled, isConnected else { return .hidden }
-        let level = level(of: pressing, thresholds: thresholds)
+        var level = level(of: pressing, thresholds: thresholds)
+        if level == .noData, hasData {
+            // No running window, but data exists: the next window starts at 0%.
+            level = .normal
+        }
         if mode == .nearLimits, level == .noData || level == .normal {
             return .hidden
         }
         if hasNotchScreen {
             return .notch(level)
         }
-        return .menuBar(text: pressing.map(UsageFormatting.compactText) ?? "—", level: level)
+        return .menuBar(text: compactText(pressing: pressing, hasData: hasData), level: level)
+    }
+
+    /// "5h 42%"; "5h 0%" when no window is running (after a reset or before the first message);
+    /// "—" only when nothing has ever been recorded.
+    static func compactText(pressing: UsageWindow?, hasData: Bool) -> String {
+        if let pressing {
+            return UsageFormatting.compactText(pressing)
+        }
+        return hasData ? "\(UsageWindowKind.fiveHour.shortLabel) 0%" : "—"
     }
 }

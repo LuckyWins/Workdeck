@@ -25,8 +25,8 @@ struct LimitsTextTests {
         #expect(LimitsText.resetText(resetsAt, now: fixedNow, calendar: utc) == "resets Thu 09:00")
     }
 
-    @Test func expiredWindow() {
-        #expect(LimitsText.expiredText(fixedNow.addingTimeInterval(2 * 3600), calendar: utc) == "reset at 14:00")
+    @Test func notStartedWindow() {
+        #expect(LimitsText.notStartedText == "starts with your next message")
     }
 
     @Test(arguments: [
@@ -56,7 +56,7 @@ struct LimitsTextTests {
         #expect(LimitsText.rowSubtitle(isConnected: true, currentWindows: [window(.fiveHour, 42), window(.sevenDay, 18)], age: 180, connectedAt: nil, now: fixedNow)
             == "5h 42% · 7d 18% · updated 3m ago")
         #expect(LimitsText.rowSubtitle(isConnected: true, currentWindows: [window(.sevenDay, 18)], age: 5, connectedAt: nil, now: fixedNow)
-            == "5h — · 7d 18% · updated just now")
+            == "5h 0% · 7d 18% · updated just now")
     }
 
     @Test func pollerStatusTexts() {
