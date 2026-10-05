@@ -20,11 +20,16 @@ final class HelperInstaller: HelperInstallerProtocol {
     private let service = SMAppService.daemon(plistName: HelperConstants.launchDaemonPlistName)
 
     var status: HelperStatus {
-        switch service.status {
-        case .notRegistered: .notRegistered
+        Self.helperStatus(from: service.status)
+    }
+
+    static func helperStatus(from status: SMAppService.Status) -> HelperStatus {
+        switch status {
+        // A daemon that has never been registered reports `.notFound`. If the helper is really
+        // missing from the bundle, `register()` throws and the error is surfaced instead.
+        case .notRegistered, .notFound: .notRegistered
         case .requiresApproval: .requiresApproval
         case .enabled: .enabled
-        case .notFound: .unavailable("The helper is missing from the app bundle.")
         @unknown default: .unavailable("Unknown helper status.")
         }
     }
