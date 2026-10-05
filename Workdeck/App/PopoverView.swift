@@ -3,6 +3,7 @@ import SwiftUI
 
 struct PopoverView: View {
     let controller: LidSleepController
+    let claudeLimits: ClaudeLimitsController
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -26,6 +27,12 @@ struct PopoverView: View {
             Divider()
 
             ClosedLidModeRow(controller: controller)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+
+            Divider()
+
+            ClaudeLimitsRow(controller: claudeLimits)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
 

@@ -10,11 +10,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings: settings,
         appVersion: HelperConstants.version(of: .main)
     )
+    private(set) lazy var claudeLimits = ClaudeLimitsController(
+        settings: ClaudeLimitsSettings(),
+        store: ClaudeUsageStore(fileURL: WorkdeckPaths.standard().snapshotURL),
+        connector: ClaudeCodeConnector.standard(),
+        presenter: NotchPresenter()
+    )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Unit tests are hosted in this app; keep them away from the real privileged helper.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
         Task { await lidSleep.refresh() }
+        claudeLimits.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

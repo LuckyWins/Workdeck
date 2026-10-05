@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var settings: AppSettings
     let controller: LidSleepController
+    let claudeLimits: ClaudeLimitsController
 
     var body: some View {
         Form {
@@ -28,6 +29,8 @@ struct SettingsView: View {
                 Text("Also turns off if the Mac gets too hot.")
                     .foregroundStyle(.secondary)
             }
+
+            ClaudeLimitsSettingsSection(controller: claudeLimits)
 
             Section("About") {
                 LabeledContent("Version", value: HelperConstants.version(of: .main))
