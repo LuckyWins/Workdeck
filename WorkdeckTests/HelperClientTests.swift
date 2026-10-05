@@ -130,4 +130,15 @@ struct HelperClientTests {
         client.restoreSleepSynchronously()
         #expect(ContinuousClock.now - start < .seconds(2))
     }
+
+    @Test func reconnectsAfterRejectedConnection() async throws {
+        let stub = StubHelper()
+        stub.state.withLock { $0.acceptConnections = false }
+        let client = stub.makeClient()
+        await #expect(throws: HelperClientError.self) {
+            try await client.isSleepDisabled()
+        }
+        stub.state.withLock { $0.acceptConnections = true }
+        #expect(try await client.isSleepDisabled() == false)
+    }
 }

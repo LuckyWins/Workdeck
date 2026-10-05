@@ -200,15 +200,24 @@ final class LidSleepController {
             let helperVersion = try await helper.version()
             helperVersionChecked = true
             if helperVersion != appVersion {
-                try? await installer.unregister()
-                try? installer.register()
-                helperStatus = installer.status
+                await reinstallHelper()
             }
+        } catch HelperClientError.connectionFailed {
+            // A running helper whose binary was replaced (app update or rebuild) fails the
+            // code-signing check; reinstalling makes launchd start the current binary.
+            helperVersionChecked = true
+            await reinstallHelper()
         } catch {
             lastError = error.localizedDescription
             return false
         }
         return helperStatus == .enabled
+    }
+
+    private func reinstallHelper() async {
+        try? await installer.unregister()
+        try? installer.register()
+        helperStatus = installer.status
     }
 
     private func handleHelperInterruption() {

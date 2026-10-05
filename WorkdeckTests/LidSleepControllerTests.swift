@@ -197,4 +197,15 @@ struct LidSleepControllerTests {
         #expect(!controller.isActive)
         #expect(controller.notice == .cutoff(.thermal))
     }
+
+    @Test func unreachableHelperIsReinstalled() async {
+        // A helper whose binary was replaced under it (app update) fails the code-signing check.
+        helper.versionErrors = [HelperClientError.connectionFailed("Couldn’t communicate with a helper application.")]
+        let controller = makeController()
+        await controller.enable()
+        #expect(installer.unregisterCount == 1)
+        #expect(installer.registerCount == 1)
+        #expect(controller.isActive)
+        #expect(controller.lastError == nil)
+    }
 }

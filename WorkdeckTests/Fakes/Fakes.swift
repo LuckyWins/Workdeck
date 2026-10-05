@@ -6,6 +6,8 @@ final class FakeHelperClient: HelperClientProtocol {
     var onInterruption: (() -> Void)?
     var sleepDisabled = false
     var versionString = "1.0 (1)"
+    /// Errors thrown by successive `version()` calls before it starts succeeding.
+    var versionErrors: [any Error] = []
     var setError: (any Error)?
     var readError: (any Error)?
     private(set) var setCalls: [Bool] = []
@@ -36,7 +38,8 @@ final class FakeHelperClient: HelperClientProtocol {
     }
 
     func version() async throws -> String {
-        versionString
+        if !versionErrors.isEmpty { throw versionErrors.removeFirst() }
+        return versionString
     }
 
     func restoreSleepSynchronously() {
