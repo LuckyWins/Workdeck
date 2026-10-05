@@ -17,7 +17,20 @@ final class FakeHelperClient: HelperClientProtocol {
         sleepDisabled = disabled
     }
 
+    /// When set, `isSleepDisabled()` suspends until `releaseHeldRead()` is called.
+    var holdReads = false
+    private var heldRead: CheckedContinuation<Void, Never>?
+    var isReadHeld: Bool { heldRead != nil }
+
+    func releaseHeldRead() {
+        heldRead?.resume()
+        heldRead = nil
+    }
+
     func isSleepDisabled() async throws -> Bool {
+        if holdReads {
+            await withCheckedContinuation { heldRead = $0 }
+        }
         if let readError { throw readError }
         return sleepDisabled
     }

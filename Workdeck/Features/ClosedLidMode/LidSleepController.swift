@@ -30,6 +30,8 @@ final class LidSleepController {
     @ObservationIgnored private let settings: AppSettings
     @ObservationIgnored private let appVersion: String
     @ObservationIgnored private var helperVersionChecked = false
+    /// Set when a safeguard check arrived while another helper call was in flight.
+    @ObservationIgnored private var safeguardCheckPending = false
 
     init(
         helper: any HelperClientProtocol,
@@ -79,7 +81,7 @@ final class LidSleepController {
     func enable() async {
         guard !isBusy, !isActive else { return }
         isBusy = true
-        defer { isBusy = false }
+        defer { endBusy() }
         notice = nil
         lastError = nil
 
@@ -104,7 +106,7 @@ final class LidSleepController {
     func disable(reason: CutoffReason?) async {
         guard isActive, !isBusy else { return }
         isBusy = true
-        defer { isBusy = false }
+        defer { endBusy() }
         lastError = nil
 
         do {
@@ -121,7 +123,7 @@ final class LidSleepController {
     func refresh() async {
         guard !isBusy else { return }
         isBusy = true
-        defer { isBusy = false }
+        defer { endBusy() }
         power = powerMonitor.current
         _ = await prepareHelper(registerIfNeeded: false)
         await syncState()
@@ -144,10 +146,23 @@ final class LidSleepController {
     }
 
     private func evaluateSafeguards() async {
+        guard !isBusy else {
+            // Thermal notifications fire only on change, so a skipped check must be retried.
+            safeguardCheckPending = true
+            return
+        }
         guard isActive else { return }
         let decision = SafeguardPolicy.evaluate(power: power, thermal: thermalMonitor.current, threshold: threshold)
         if case let .cutoff(reason) = decision {
             await disable(reason: reason)
+        }
+    }
+
+    private func endBusy() {
+        isBusy = false
+        if safeguardCheckPending {
+            safeguardCheckPending = false
+            scheduleSafeguardCheck()
         }
     }
 

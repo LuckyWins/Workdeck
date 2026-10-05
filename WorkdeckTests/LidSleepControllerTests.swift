@@ -171,4 +171,22 @@ struct LidSleepControllerTests {
         controller.prepareForTermination()
         #expect(helper.synchronousRestoreCount == 0)
     }
+
+    @Test func cutoffDuringRefreshIsAppliedAfterwards() async {
+        let controller = makeController()
+        await controller.enable()
+        helper.holdReads = true
+        let refresh = Task { await controller.refresh() }
+        while !helper.isReadHeld {
+            await Task.yield()
+        }
+        // Thermal notifications fire only on change, so a dropped cutoff would never be retried.
+        thermal.emit(.critical)
+        await controller.safeguardTask?.value
+        helper.releaseHeldRead()
+        await refresh.value
+        await controller.safeguardTask?.value
+        #expect(!controller.isActive)
+        #expect(controller.notice == .cutoff(.thermal))
+    }
 }
