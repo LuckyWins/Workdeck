@@ -14,7 +14,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings: ClaudeLimitsSettings(),
         store: ClaudeUsageStore(fileURL: WorkdeckPaths.standard().snapshotURL),
         connector: ClaudeCodeConnector.standard(),
-        presenter: NotchPresenter()
+        presenter: NotchPresenter(),
+        poller: UsagePoller(
+            credentials: KeychainCredentialsReader(),
+            client: UsageAPIClient(transport: URLSessionTransport()),
+            snapshotURL: WorkdeckPaths.standard().snapshotURL
+        )
     )
 
     func applicationDidFinishLaunching(_ notification: Notification) {

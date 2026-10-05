@@ -17,6 +17,7 @@ final class ClaudeLimitsSettings {
         static let notifyOnReset = "claudeLimits.notifyOnReset"
         static let connectedAt = "claudeLimits.connectedAt"
         static let firedAlertKeys = "claudeLimits.firedAlertKeys"
+        static let fetchFromAPI = "claudeLimits.fetchFromAPI"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -67,6 +68,11 @@ final class ClaudeLimitsSettings {
         didSet { defaults.set(Array(firedAlertKeys).sorted(), forKey: Keys.firedAlertKeys) }
     }
 
+    /// Opt-in: poll Anthropic's undocumented usage endpoint with Claude Code's Keychain token.
+    var fetchFromAPI: Bool {
+        didSet { defaults.set(fetchFromAPI, forKey: Keys.fetchFromAPI) }
+    }
+
     var thresholds: [Int] {
         [firstThreshold, secondThreshold]
     }
@@ -81,6 +87,7 @@ final class ClaudeLimitsSettings {
         notifyOnReset = defaults.object(forKey: Keys.notifyOnReset) as? Bool ?? true
         connectedAt = defaults.object(forKey: Keys.connectedAt) as? Date
         firedAlertKeys = Set(defaults.stringArray(forKey: Keys.firedAlertKeys) ?? [])
+        fetchFromAPI = defaults.bool(forKey: Keys.fetchFromAPI)
     }
 
     /// 50–95 in steps of 5.

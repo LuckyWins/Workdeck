@@ -23,6 +23,15 @@ struct ClaudeLimitsSettingsSection: View {
                 }
             }
             Toggle("Notify when a limit resets", isOn: $settings.notifyOnReset)
+            Toggle("Fetch usage from Anthropic (unofficial)", isOn: Binding(
+                get: { settings.fetchFromAPI },
+                set: { controller.setFetchFromAPI($0) }
+            ))
+            if settings.fetchFromAPI, let status = LimitsText.pollerStatusText(controller.pollerStatus, now: controller.store.now) {
+                Text(status)
+                    .font(.caption)
+                    .foregroundStyle(controller.pollerStatus.isProblem ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+            }
             LabeledContent("Claude Code") {
                 if controller.isConnected {
                     Button("Disconnect") { controller.disconnect() }
@@ -34,8 +43,12 @@ struct ClaudeLimitsSettingsSection: View {
         } header: {
             Text("Claude Code Limits")
         } footer: {
-            Text(footer)
-                .foregroundStyle(controller.connectError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
+            VStack(alignment: .leading, spacing: 6) {
+                Text(footer)
+                    .foregroundStyle(controller.connectError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
+                Text(Self.apiDisclaimer)
+                    .foregroundStyle(.secondary)
+            }
         }
         .onChange(of: settings.mode) { controller.refresh() }
         .onChange(of: settings.firstThreshold) { controller.refresh() }
@@ -55,4 +68,6 @@ struct ClaudeLimitsSettingsSection: View {
         }
         return "Reads plan usage from Claude Code's status line (Pro and Max plans)."
     }
+
+    static let apiDisclaimer = "Fetching from Anthropic uses the login token Claude Code stores in your Keychain to call an undocumented Anthropic endpoint every 5 minutes. Anthropic's terms do not allow third-party use of Claude Code credentials, and the endpoint may change or stop working. macOS will ask for Keychain access — choose Always Allow."
 }

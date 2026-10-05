@@ -39,10 +39,23 @@ final class FakePresenter: LimitsPresenting {
 }
 
 @MainActor
+final class FakePoller: UsagePolling {
+    var status = UsagePollerStatus.idle
+    private(set) var startCount = 0
+    private(set) var stopCount = 0
+    private(set) var staleCheckCount = 0
+
+    func start() { startCount += 1 }
+    func stop() { stopCount += 1 }
+    func pollIfStale() { staleCheckCount += 1 }
+}
+
+@MainActor
 struct ClaudeLimitsControllerTests {
     let fileURL = makeTemporaryDirectory().appending(path: "Workdeck/claude-usage.json")
     let connector = FakeConnector()
     let presenter = FakePresenter()
+    let poller = FakePoller()
     let settings = ClaudeLimitsSettings(defaults: UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!)
 
     private func makeController(notch: Bool = true) -> (ClaudeLimitsController, ClaudeUsageStore) {
@@ -52,6 +65,7 @@ struct ClaudeLimitsControllerTests {
             store: store,
             connector: connector,
             presenter: presenter,
+            poller: poller,
             hasNotchScreen: { notch }
         )
         return (controller, store)
@@ -155,5 +169,51 @@ struct ClaudeLimitsControllerTests {
         #expect(!controller.isConnected)
         #expect(controller.state.display == .hidden)
         #expect(settings.connectedAt == nil)
+    }
+
+    @Test func usageAPIAloneIsADataSource() throws {
+        settings.isEnabled = true
+        settings.fetchFromAPI = true
+        try writeUsage(fiveHour: 42)
+        let (controller, store) = makeController()
+        controller.start()
+        store.reload()
+        #expect(!controller.isConnected)
+        #expect(controller.hasDataSource)
+        #expect(controller.state.display == .notch(.normal))
+        #expect(poller.startCount == 1)
+    }
+
+    @Test func enablingWithUsageAPIDoesNotAskToConnect() {
+        settings.fetchFromAPI = true
+        let (controller, _) = makeController()
+        controller.setEnabled(true)
+        #expect(!controller.isConfirmingConnect)
+        #expect(settings.isEnabled)
+    }
+
+    @Test func togglingUsageAPIStartsAndStopsPoller() {
+        let (controller, _) = makeController()
+        controller.setFetchFromAPI(true)
+        #expect(settings.fetchFromAPI)
+        #expect(poller.startCount == 1)
+        controller.setFetchFromAPI(false)
+        #expect(poller.stopCount == 1)
+    }
+
+    @Test func popoverOpenRefreshesOnlyWhenUsageAPIIsOn() {
+        let (controller, _) = makeController()
+        controller.popoverOpened()
+        #expect(poller.staleCheckCount == 0)
+        settings.fetchFromAPI = true
+        controller.popoverOpened()
+        #expect(poller.staleCheckCount == 1)
+    }
+
+    @Test func pollerProblemReplacesSubtitle() {
+        settings.fetchFromAPI = true
+        poller.status = .loginExpired
+        let (controller, _) = makeController()
+        #expect(controller.rowSubtitle == "Login expired — open Claude Code to refresh")
     }
 }

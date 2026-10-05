@@ -56,6 +56,7 @@ struct PopoverView: View {
         }
         .frame(width: 300)
         .task {
+            claudeLimits.popoverOpened()
             await controller.refresh()
         }
     }

@@ -21,7 +21,7 @@ struct ClaudeLimitsRow: View {
             Spacer(minLength: 8)
 
             Toggle("Claude Code Limits", isOn: Binding(
-                get: { controller.settings.isEnabled && controller.isConnected },
+                get: { controller.settings.isEnabled && controller.hasDataSource },
                 set: { controller.setEnabled($0) }
             ))
             .toggleStyle(.switch)

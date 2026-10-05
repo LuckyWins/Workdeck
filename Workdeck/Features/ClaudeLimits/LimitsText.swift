@@ -72,6 +72,24 @@ nonisolated enum LimitsText {
         return (windows + ["updated \(shortAge(age))"]).joined(separator: " · ")
     }
 
+    /// The usage API status shown in Settings; `nil` before the first attempt.
+    static func pollerStatusText(_ status: UsagePollerStatus, now: Date, calendar: Calendar = .current) -> String? {
+        switch status {
+        case .idle:
+            nil
+        case let .ok(fetchedAt):
+            "Last fetched \(shortAge(now.timeIntervalSince(fetchedAt)))"
+        case .loginExpired:
+            "Login expired — open Claude Code to refresh"
+        case let .rateLimited(until):
+            "Rate limited — retrying at \(formatted(until, "HH:mm", calendar: calendar))"
+        case .noCredentials:
+            "Claude Code login not found"
+        case let .failed(message):
+            message
+        }
+    }
+
     static func shortAge(_ age: TimeInterval) -> String {
         if age < 60 { return "just now" }
         if age < 3600 { return "\(Int(age / 60))m ago" }

@@ -15,6 +15,7 @@ final class ClaudeLimitsController {
 
     @ObservationIgnored private let connector: any ClaudeCodeConnecting
     @ObservationIgnored private let presenter: any LimitsPresenting
+    @ObservationIgnored private let poller: any UsagePolling
     @ObservationIgnored private let hasNotchScreen: @MainActor () -> Bool
     @ObservationIgnored private var previousWindows: [UsageWindow] = []
     @ObservationIgnored private var screenObserver: (any NSObjectProtocol)?
@@ -24,17 +25,28 @@ final class ClaudeLimitsController {
         store: ClaudeUsageStore,
         connector: any ClaudeCodeConnecting,
         presenter: any LimitsPresenting,
+        poller: any UsagePolling,
         hasNotchScreen: @escaping @MainActor () -> Bool = NotchPresenter.hasNotchScreen
     ) {
         self.settings = settings
         self.store = store
         self.connector = connector
         self.presenter = presenter
+        self.poller = poller
         self.hasNotchScreen = hasNotchScreen
     }
 
     var isConnected: Bool {
         connectionStatus == .connected
+    }
+
+    /// Data can arrive from the status line, the usage API, or both.
+    var hasDataSource: Bool {
+        isConnected || settings.fetchFromAPI
+    }
+
+    var pollerStatus: UsagePollerStatus {
+        poller.status
     }
 
     var canConnect: Bool {
@@ -46,8 +58,12 @@ final class ClaudeLimitsController {
     }
 
     var rowSubtitle: String {
-        LimitsText.rowSubtitle(
-            isConnected: isConnected,
+        if settings.fetchFromAPI, poller.status.isProblem,
+           let problem = LimitsText.pollerStatusText(poller.status, now: store.now) {
+            return problem
+        }
+        return LimitsText.rowSubtitle(
+            isConnected: hasDataSource,
             currentWindows: store.currentWindows,
             age: store.age,
             connectedAt: settings.connectedAt,
@@ -76,6 +92,26 @@ final class ClaudeLimitsController {
             MainActor.assumeIsolated { self?.refresh() }
         }
         store.startWatching()
+        if settings.fetchFromAPI {
+            poller.start()
+        }
+    }
+
+    /// Called when the popover opens: refresh API data if it is more than a minute old.
+    func popoverOpened() {
+        if settings.fetchFromAPI {
+            poller.pollIfStale()
+        }
+    }
+
+    func setFetchFromAPI(_ enabled: Bool) {
+        settings.fetchFromAPI = enabled
+        if enabled {
+            poller.start()
+        } else {
+            poller.stop()
+        }
+        refresh()
     }
 
     /// Recomputes alerts and the display from the latest snapshot and settings.
@@ -85,7 +121,7 @@ final class ClaudeLimitsController {
 
         let display = LimitsPresentation.display(
             isEnabled: settings.isEnabled,
-            isConnected: isConnected,
+            isConnected: hasDataSource,
             mode: settings.mode,
             hasNotchScreen: hasNotchScreen(),
             pressing: UsageFormatting.mostPressing(current),
@@ -100,7 +136,7 @@ final class ClaudeLimitsController {
         )
         presenter.show(state)
 
-        guard settings.isEnabled, isConnected else { return }
+        guard settings.isEnabled, hasDataSource else { return }
         let result = LimitsAlertPolicy.evaluate(
             previous: previousWindows,
             current: current,
@@ -118,7 +154,7 @@ final class ClaudeLimitsController {
     }
 
     func setEnabled(_ enabled: Bool) {
-        if enabled, !isConnected {
+        if enabled, !hasDataSource {
             isConfirmingConnect = true
             return
         }

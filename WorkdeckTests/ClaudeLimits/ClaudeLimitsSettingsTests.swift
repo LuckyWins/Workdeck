@@ -16,6 +16,7 @@ struct ClaudeLimitsSettingsTests {
         #expect(settings.notifyOnReset)
         #expect(settings.connectedAt == nil)
         #expect(settings.firedAlertKeys.isEmpty)
+        #expect(!settings.fetchFromAPI)
     }
 
     @Test func persistsEverything() {
@@ -28,6 +29,7 @@ struct ClaudeLimitsSettingsTests {
         settings.notifyOnReset = false
         settings.connectedAt = fixedNow
         settings.firedAlertKeys = ["a", "b"]
+        settings.fetchFromAPI = true
 
         let reloaded = ClaudeLimitsSettings(defaults: defaults)
         #expect(reloaded.isEnabled)
@@ -36,6 +38,7 @@ struct ClaudeLimitsSettingsTests {
         #expect(!reloaded.notifyOnReset)
         #expect(reloaded.connectedAt == fixedNow)
         #expect(reloaded.firedAlertKeys == ["a", "b"])
+        #expect(reloaded.fetchFromAPI)
     }
 
     @Test func raisingFirstAboveSecondPushesSecondUp() {
