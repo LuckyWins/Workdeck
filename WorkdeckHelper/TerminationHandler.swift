@@ -12,7 +12,7 @@ enum TerminationHandler {
         signal(SIGTERM, SIG_IGN)
         let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: queue)
         source.setEventHandler {
-            try? power.setSleepDisabled(false)
+            power.restoreSleep(reason: "SIGTERM")
             exit(0)
         }
         source.resume()

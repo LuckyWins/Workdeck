@@ -55,4 +55,15 @@ struct PowerSettingsTests {
     func parsesSleepDisabled(output: String, expected: Bool) {
         #expect(PowerSettings.parseSleepDisabled(output) == expected)
     }
+
+    @Test func restoreSleepReportsSuccess() {
+        let runner = FakeCommandRunner()
+        #expect(PowerSettings(runner: runner).restoreSleep(reason: "test"))
+        #expect(runner.calls == [["/usr/bin/pmset", "-a", "disablesleep", "0"]])
+    }
+
+    @Test func restoreSleepReportsFailureWithoutThrowing() {
+        let runner = FakeCommandRunner(result: CommandResult(exitCode: 1, output: "", errorOutput: "boom"))
+        #expect(!PowerSettings(runner: runner).restoreSleep(reason: "test"))
+    }
 }

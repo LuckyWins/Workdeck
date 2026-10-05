@@ -3,7 +3,7 @@ import Foundation
 let power = PowerSettings(runner: ProcessCommandRunner())
 
 // Launchd starts the helper at boot and after a crash; no client can be holding sleep disabled then.
-try? power.setSleepDisabled(false)
+power.restoreSleep(reason: "helper start")
 let terminationSource = TerminationHandler.install(power: power)
 
 let delegate = HelperListenerDelegate(power: power)
