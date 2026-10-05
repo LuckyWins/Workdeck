@@ -7,9 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		000000000000000131000001 /* DynamicNotchKit in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000500000001 /* DynamicNotchKit */; };
 		000000000000000150000001 /* WorkdeckHelper in Embed Helper */ = {isa = PBXBuildFile; fileRef = 000000000000000000000121 /* WorkdeckHelper */; };
 		000000000000000160000001 /* com.appcreators.workdeck.helper.plist in Embed Launch Daemon */ = {isa = PBXBuildFile; fileRef = 000000000000000000000130 /* com.appcreators.workdeck.helper.plist */; };
-		000000000000000131000001 /* DynamicNotchKit in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000500000001 /* DynamicNotchKit */; };
 		000000000000000180000001 /* workdeck-statusline in Embed Status Line */ = {isa = PBXBuildFile; fileRef = 000000000000000000000123 /* workdeck-statusline */; };
 /* End PBXBuildFile section */
 
@@ -21,19 +21,19 @@
 			remoteGlobalIDString = 000000000000000200000000;
 			remoteInfo = WorkdeckHelper;
 		};
-		000000000000000370000001 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 000000000000000000000000 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 000000000000000100000000;
-			remoteInfo = Workdeck;
-		};
 		000000000000000190000001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 000000000000000000000000 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 000000000000000600000000;
 			remoteInfo = WorkdeckStatusLine;
+		};
+		000000000000000370000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000100000000;
+			remoteInfo = Workdeck;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -71,8 +71,8 @@
 		000000000000000000000120 /* Workdeck.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Workdeck.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000121 /* WorkdeckHelper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = WorkdeckHelper; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000122 /* WorkdeckTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WorkdeckTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		000000000000000000000130 /* com.appcreators.workdeck.helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = com.appcreators.workdeck.helper.plist; sourceTree = "<group>"; };
 		000000000000000000000123 /* workdeck-statusline */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "workdeck-statusline"; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000130 /* com.appcreators.workdeck.helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = com.appcreators.workdeck.helper.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -288,12 +288,12 @@
 					000000000000000200000000 = {
 						CreatedOnToolsVersion = 27.0;
 					};
-					000000000000000600000000 = {
-						CreatedOnToolsVersion = 27.0;
-					};
 					000000000000000300000000 = {
 						CreatedOnToolsVersion = 27.0;
 						TestTargetID = 000000000000000100000000;
+					};
+					000000000000000600000000 = {
+						CreatedOnToolsVersion = 27.0;
 					};
 				};
 			};
@@ -364,15 +364,15 @@
 			target = 000000000000000200000000 /* WorkdeckHelper */;
 			targetProxy = 000000000000000170000001 /* PBXContainerItemProxy */;
 		};
-		000000000000000370000000 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 000000000000000100000000 /* Workdeck */;
-			targetProxy = 000000000000000370000001 /* PBXContainerItemProxy */;
-		};
 		000000000000000190000000 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 000000000000000600000000 /* WorkdeckStatusLine */;
 			targetProxy = 000000000000000190000001 /* PBXContainerItemProxy */;
+		};
+		000000000000000370000000 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000100000000 /* Workdeck */;
+			targetProxy = 000000000000000370000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -675,7 +675,6 @@
 		};
 /* End XCRemoteSwiftPackageReference section */
 
-
 /* Begin XCSwiftPackageProductDependency section */
 		000000000000000500000001 /* DynamicNotchKit */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -683,7 +682,6 @@
 			productName = DynamicNotchKit;
 		};
 /* End XCSwiftPackageProductDependency section */
-
 	};
 	rootObject = 000000000000000000000000 /* Project object */;
 }
