@@ -36,7 +36,7 @@ struct ClaudeCodeConnectorTests {
         let binary = try makeFakeBinary()
         try connector(binaryPath: binary).connect()
         let statusLine = try #require(try readSettings()["statusLine"] as? [String: String])
-        #expect(statusLine == ["type": "command", "command": binary])
+        #expect(statusLine == ["type": "command", "command": "'\(binary)'"])
         #expect(connector(binaryPath: binary).status == .connected)
         #expect(!FileManager.default.fileExists(atPath: connector().backupURL.path))
     }
@@ -115,7 +115,38 @@ struct ClaudeCodeConnectorTests {
         let binary = try makeFakeBinary()
         try writeSettings(["statusLine": ["type": "command", "command": "/Users/me/DerivedData/Workdeck.app/Contents/Helpers/workdeck-statusline"]])
         connector(binaryPath: binary).repairPathIfNeeded()
-        #expect((try readSettings()["statusLine"] as? [String: String])?["command"] == binary)
+        #expect((try readSettings()["statusLine"] as? [String: String])?["command"] == "'\(binary)'")
+    }
+
+    @Test func pathWithSpacesRunsThroughTheShell() throws {
+        let url = root.appending(path: "Work deck 2.app/Contents/Helpers/workdeck-statusline")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("#!/bin/sh\necho ok\n".utf8).write(to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        try connector(binaryPath: url.path).connect()
+        let command = try #require((try readSettings()["statusLine"] as? [String: String])?["command"])
+        // Claude Code runs the command in a shell.
+        #expect(ChainedCommand.run(command, input: Data()) == "ok")
+        #expect(connector(binaryPath: url.path).status == .connected)
+    }
+
+    @Test func recognizesQuotedAndUnquotedCommands() {
+        #expect(ClaudeCodeConnector.isWorkdeckCommand("/Applications/Workdeck.app/Contents/Helpers/workdeck-statusline"))
+        #expect(ClaudeCodeConnector.isWorkdeckCommand("'/Applications/Work deck.app/Contents/Helpers/workdeck-statusline'"))
+        #expect(!ClaudeCodeConnector.isWorkdeckCommand("~/bin/prompt.sh"))
+    }
+
+    @Test func doesNotRepairIntoTemporaryLocations() throws {
+        let translocated = root.appending(path: "AppTranslocation/ABC/d/Workdeck.app/Contents/Helpers/workdeck-statusline")
+        try FileManager.default.createDirectory(at: translocated.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("#!/bin/sh\n".utf8).write(to: translocated)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: translocated.path)
+        let installed = "'/Applications/Workdeck.app/Contents/Helpers/workdeck-statusline'"
+        try writeSettings(["statusLine": ["type": "command", "command": installed]])
+        connector(binaryPath: translocated.path).repairPathIfNeeded()
+        #expect((try readSettings()["statusLine"] as? [String: String])?["command"] == installed)
+        #expect(ClaudeCodeConnector.isTemporaryLocation("/Volumes/Workdeck/Workdeck.app/Contents/Helpers/workdeck-statusline"))
+        #expect(!ClaudeCodeConnector.isTemporaryLocation("/Applications/Workdeck.app/Contents/Helpers/workdeck-statusline"))
     }
 }
 

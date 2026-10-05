@@ -2,11 +2,15 @@ import Foundation
 
 /// Runs the user's previous status line command with the same stdin.
 nonisolated enum ChainedCommand {
+    /// Set for the chained child so a status line that wraps `workdeck-statusline` cannot recurse.
+    static let markerVariable = "WORKDECK_STATUSLINE_CHAINED"
+
     /// Returns the first output line, or `nil` on failure, empty output, or timeout.
     static func run(_ command: String, input: Data, timeout: TimeInterval = 2) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = ["-c", command]
+        process.environment = ProcessInfo.processInfo.environment.merging([markerVariable: "1"]) { $1 }
         let inputPipe = Pipe()
         let outputPipe = Pipe()
         process.standardInput = inputPipe

@@ -4,6 +4,7 @@ import Foundation
 nonisolated struct StatusLineRunner: Sendable {
     let paths: WorkdeckPaths
     var runChained: @Sendable (String, Data) -> String? = { ChainedCommand.run($0, input: $1) }
+    var environment = ProcessInfo.processInfo.environment
 
     /// Never throws: Claude Code's status line must keep working whatever happens here.
     func run(stdin: Data, now: Date) -> String {
@@ -18,7 +19,8 @@ nonisolated struct StatusLineRunner: Sendable {
         let own = snapshot
             .flatMap { UsageFormatting.mostPressing($0.currentWindows(at: now)) }
             .map(UsageFormatting.compactText)
-        let chained = StatusLineConfig.read(from: paths.statusLineConfigURL)?
+        let isChainedRun = environment[ChainedCommand.markerVariable] != nil
+        let chained = isChainedRun ? nil : StatusLineConfig.read(from: paths.statusLineConfigURL)?
             .chainedCommand
             .flatMap { runChained($0, stdin) }
 

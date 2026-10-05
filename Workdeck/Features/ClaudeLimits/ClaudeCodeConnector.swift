@@ -81,7 +81,7 @@ struct ClaudeCodeConnector: ClaudeCodeConnecting {
                 originalStatusLineJSON: String(decoding: originalJSON, as: UTF8.self)
             ).write(to: paths.statusLineConfigURL)
         }
-        settings.root["statusLine"] = ["type": "command", "command": binaryPath]
+        settings.root["statusLine"] = ["type": "command", "command": Self.command(for: binaryPath)]
         try write(settings)
     }
 
@@ -104,15 +104,26 @@ struct ClaudeCodeConnector: ClaudeCodeConnecting {
         guard var settings = try? readSettings(),
               let command = settings.statusLineCommand,
               Self.isWorkdeckCommand(command),
-              command != binaryPath,
+              command != Self.command(for: binaryPath),
+              !Self.isTemporaryLocation(binaryPath),
               canConnect
         else { return }
-        settings.root["statusLine"] = ["type": "command", "command": binaryPath]
+        settings.root["statusLine"] = ["type": "command", "command": Self.command(for: binaryPath)]
         try? write(settings)
     }
 
     static func isWorkdeckCommand(_ command: String) -> Bool {
-        command.hasSuffix(binarySuffix)
+        command.trimmingCharacters(in: CharacterSet(charactersIn: "'\"")).hasSuffix(binarySuffix)
+    }
+
+    /// Claude Code runs the command in a shell, so the path is single-quoted.
+    static func command(for binaryPath: String) -> String {
+        "'" + binaryPath.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    /// A mounted disk image or an App Translocation path disappears later; never point Claude Code there.
+    static func isTemporaryLocation(_ path: String) -> Bool {
+        path.hasPrefix("/Volumes/") || path.contains("/AppTranslocation/")
     }
 
     // MARK: - Settings file

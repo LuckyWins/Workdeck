@@ -62,6 +62,19 @@ struct StatusLineRunnerTests {
         #expect(runner.run(stdin: statusLineInput(), now: fixedNow) == "branch: main")
     }
 
+    @Test func chainedRunDoesNotChainAgain() throws {
+        // If the previous status line wraps workdeck-statusline, chaining would recurse forever.
+        try StatusLineConfig(chainedCommand: "wrapper.sh", originalStatusLineJSON: nil).write(to: paths.statusLineConfigURL)
+        var runner = StatusLineRunner(paths: paths)
+        runner.environment = [ChainedCommand.markerVariable: "1"]
+        runner.runChained = { _, _ in
+            Issue.record("must not chain from a chained run")
+            return nil
+        }
+        let input = statusLineInput(fiveHour: (42, fixedNow.timeIntervalSince1970 + 3600))
+        #expect(runner.run(stdin: input, now: fixedNow) == "5h 42%")
+    }
+
     @Test func failedChainedCommandIsIgnored() throws {
         try StatusLineConfig(chainedCommand: "broken", originalStatusLineJSON: nil).write(to: paths.statusLineConfigURL)
         var runner = StatusLineRunner(paths: paths)
@@ -74,6 +87,10 @@ struct StatusLineRunnerTests {
 struct ChainedCommandTests {
     @Test func returnsFirstLineAndReceivesStdin() {
         #expect(ChainedCommand.run("cat; echo second", input: Data("first\n".utf8)) == "first")
+    }
+
+    @Test func childIsMarkedAsChained() {
+        #expect(ChainedCommand.run("echo $\(ChainedCommand.markerVariable)", input: Data()) == "1")
     }
 
     @Test func failingCommandWithoutOutputYieldsNil() {
