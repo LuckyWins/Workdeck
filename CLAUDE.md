@@ -45,3 +45,7 @@ Workdeck is a macOS menu bar toolbox for developers. Each tool is one row in the
 ## Git
 
 - No `Co-Authored-By` trailers and no mention of Claude or AI tools in commit messages or PR descriptions.
+
+## Verification
+
+- Root-level behavior (helper approval, lid close, crash and reboot recovery) cannot be unit tested; follow `docs/testing.md` after changing the helper, `HelperClient`, or `LidSleepController`.
