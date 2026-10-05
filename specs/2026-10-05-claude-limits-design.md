@@ -45,13 +45,13 @@ Consequences: Workdeck shows the last known values with their age, treats window
 
 | Item | Kind | Compiled into | Purpose |
 |---|---|---|---|
-| `WorkdeckStatusLine/` | new command-line tool target | `WorkdeckStatusLine` (and tests, except `main.swift`) | The status line command Claude Code runs. |
-| `ClaudeUsage/` | new synchronized folder | `Workdeck`, `WorkdeckStatusLine` | Shared model, parser, window selection, formatting. |
+| `WorkdeckStatusLine/` | new command-line tool target | `WorkdeckStatusLine` | Only `main.swift`: reads stdin, calls `StatusLineRunner`, prints. |
+| `ClaudeUsage/` | new synchronized folder | `Workdeck`, `WorkdeckStatusLine` | Shared model, parser, formatting, snapshot file, chained command, and the `StatusLineRunner` logic. |
 | `Workdeck/Features/ClaudeLimits/` | app feature folder | `Workdeck` | Store, policy, presenters, connector, views. |
 
 - `WorkdeckStatusLine` is embedded at `Workdeck.app/Contents/Helpers/workdeck-statusline`; the app target depends on it.
 - `ClaudeUsage/` is **not** compiled into the privileged `WorkdeckHelper`, which stays minimal.
-- `WorkdeckTests` additionally compiles `WorkdeckStatusLine/` sources except `main.swift`; it reaches `ClaudeUsage` types via `@testable import Workdeck`.
+- All status line logic lives in `ClaudeUsage/`, so `WorkdeckTests` reaches it via `@testable import Workdeck`. (Compiling the tool's sources into the test bundle as well would duplicate the shared types in two modules.)
 
 ### 3.2 Dependency
 
@@ -66,7 +66,7 @@ Relevant API (v1.1.0): `DynamicNotch(hoverBehavior:style:expanded:compactLeading
 | `ClaudeUsage/UsageSnapshot` | `UsageWindow { kind: fiveHour/sevenDay, usedPercent: Double, resetsAt: Date }`, `UsageSnapshot { capturedAt: Date, fiveHour: UsageWindow?, sevenDay: UsageWindow? }`, Codable, file format version 1. |
 | `ClaudeUsage/StatusLineInputParser` | Extracts windows from Claude Code status line JSON; returns `nil` when `rate_limits` is absent or malformed. |
 | `ClaudeUsage/UsageFormatting` | Picks the most pressing window (higher percent; tie → 5-hour) and formats compact text (`5h 42%`, `7d 91%`). |
-| `WorkdeckStatusLine` core | `run(stdin:now:paths:chain:) -> String`: parse, write snapshot atomically when data is present, build output, invoke the chained command. |
+| `ClaudeUsage/StatusLineRunner` | `run(stdin:now:) -> String`: parse, write snapshot atomically when data is present, build output, invoke the chained command. |
 | `ClaudeUsageStore` (`@Observable`) | Watches the snapshot directory, decodes, drops expired windows, exposes `snapshot`, `currentWindows`, `age`. |
 | `LimitsAlertPolicy` | Pure: threshold crossings (once per window period), reset notices, persistence of fired keys. |
 | `LimitsPresentation` | Pure: decides notch compact / notch hidden / menu bar text / nothing from mode, notch availability, data, thresholds. |
