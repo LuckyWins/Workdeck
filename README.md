@@ -26,7 +26,7 @@ xcodebuild -scheme Workdeck -destination 'platform=macOS' build
 xcodebuild -scheme Workdeck -destination 'platform=macOS' test
 ```
 
-Or open `Workdeck.xcodeproj` and run the `Workdeck` scheme. Both the `Workdeck` and `WorkdeckHelper` targets are signed with team `U7HS7ZJUWC`; if you build with a different team, also update `teamIdentifier` in `Shared/HelperConstants.swift`.
+Or open `Workdeck.xcodeproj` and run the `Workdeck` scheme. Both the `Workdeck` and `WorkdeckHelper` targets are signed with team `J55BY69CVU`; if you build with a different team, also update `teamIdentifier` in `Shared/HelperConstants.swift`.
 
 Workdeck is not sandboxed and is not distributed through the Mac App Store.
 

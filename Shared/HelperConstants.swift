@@ -5,7 +5,7 @@ nonisolated enum HelperConstants {
     static let appIdentifier = "com.appcreators.workdeck"
     static let machServiceName = "com.appcreators.workdeck.helper"
     static let launchDaemonPlistName = "com.appcreators.workdeck.helper.plist"
-    static let teamIdentifier = "U7HS7ZJUWC"
+    static let teamIdentifier = "J55BY69CVU"
     static let errorDomain = "com.appcreators.workdeck.helper"
 
     /// Requirement the helper enforces on every connecting client.

@@ -6,9 +6,9 @@ import Testing
 struct HelperConstantsTests {
     @Test func requirementsPinIdentifierAndTeam() {
         #expect(HelperConstants.clientRequirement
-            == #"anchor apple generic and identifier "com.appcreators.workdeck" and certificate leaf[subject.OU] = "U7HS7ZJUWC""#)
+            == #"anchor apple generic and identifier "com.appcreators.workdeck" and certificate leaf[subject.OU] = "J55BY69CVU""#)
         #expect(HelperConstants.helperRequirement
-            == #"anchor apple generic and identifier "com.appcreators.workdeck.helper" and certificate leaf[subject.OU] = "U7HS7ZJUWC""#)
+            == #"anchor apple generic and identifier "com.appcreators.workdeck.helper" and certificate leaf[subject.OU] = "J55BY69CVU""#)
     }
 
     @Test(arguments: [HelperConstants.clientRequirement, HelperConstants.helperRequirement])

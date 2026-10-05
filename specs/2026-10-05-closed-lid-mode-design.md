@@ -46,7 +46,7 @@ Side effect: `disablesleep 1` disables system sleep entirely while active — id
 | `LSUIElement` | `YES` |
 | App bundle ID | `com.appcreators.workdeck` |
 | Helper bundle ID / Mach service | `com.appcreators.workdeck.helper` |
-| Development team | `U7HS7ZJUWC` |
+| Development team | `J55BY69CVU` |
 
 Template cleanup: remove iOS/visionOS settings, rename `MyApp` to `WorkdeckApp`, delete `ContentView.swift`.
 
@@ -76,7 +76,7 @@ A command-line tool running as root.
 
 - Listens on Mach service `com.appcreators.workdeck.helper` with `NSXPCListener`.
 - Accepts connections only from a client satisfying:
-  `identifier "com.appcreators.workdeck" and anchor apple generic and certificate leaf[subject.OU] = "U7HS7ZJUWC"`
+  `identifier "com.appcreators.workdeck" and anchor apple generic and certificate leaf[subject.OU] = "J55BY69CVU"`
   (via `NSXPCListener.setConnectionCodeSigningRequirement` / per-connection requirement).
 - `PowerSettings` sets the mode via `/usr/bin/pmset -a disablesleep 0|1` and reads it by parsing `SleepDisabled` from `pmset -g`. Commands run through an injectable `CommandRunner`.
 - On startup: runs `disablesleep 0`.

@@ -32,7 +32,7 @@
 		000000000000000150000000 /* Embed Helper */ = {
 			isa = PBXCopyFilesBuildPhase;
 			dstPath = "";
-			dstSubfolderSpec = 6;
+			dstSubfolder = Executables;
 			files = (
 				000000000000000150000001 /* WorkdeckHelper in Embed Helper */,
 			);
@@ -41,7 +41,7 @@
 		000000000000000160000000 /* Embed Launch Daemon */ = {
 			isa = PBXCopyFilesBuildPhase;
 			dstPath = Contents/Library/LaunchDaemons;
-			dstSubfolderSpec = 1;
+			dstSubfolder = Wrapper;
 			files = (
 				000000000000000160000001 /* com.appcreators.workdeck.helper.plist in Embed Launch Daemon */,
 			);
@@ -179,8 +179,6 @@
 			);
 			buildRules = (
 			);
-			dependencies = (
-			);
 			fileSystemSynchronizedGroups = (
 				000000000000000000000011 /* WorkdeckHelper */,
 				000000000000000000000012 /* Shared */,
@@ -204,8 +202,8 @@
 				000000000000000370000000 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				000000000000000000000013 /* WorkdeckTests */,
 				000000000000000000000011 /* WorkdeckHelper */,
+				000000000000000000000013 /* WorkdeckTests */,
 			);
 			name = WorkdeckTests;
 			productName = WorkdeckTests;
@@ -338,7 +336,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = U7HS7ZJUWC;
+				DEVELOPMENT_TEAM = J55BY69CVU;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -410,7 +408,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = U7HS7ZJUWC;
+				DEVELOPMENT_TEAM = J55BY69CVU;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
