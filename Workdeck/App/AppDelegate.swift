@@ -12,6 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Unit tests are hosted in this app; keep them away from the real privileged helper.
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
         Task { await lidSleep.refresh() }
     }
 

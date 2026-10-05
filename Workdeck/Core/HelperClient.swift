@@ -78,7 +78,8 @@ final class HelperClient: HelperClientProtocol {
         let timeout = timeout
         return try await withCheckedThrowingContinuation { continuation in
             let once = ResumeOnce(continuation)
-            let proxy = connection.remoteObjectProxyWithErrorHandler { error in
+            // XPC calls this on its own queue: it must not inherit main-actor isolation.
+            let proxy = connection.remoteObjectProxyWithErrorHandler { @Sendable error in
                 once.resume(with: .failure(HelperClientError.connectionFailed(error.localizedDescription)))
             }
             guard let helper = proxy as? any HelperProtocol else {

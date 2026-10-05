@@ -10,6 +10,7 @@ final class StubHelper: NSObject, Workdeck.HelperProtocol, NSXPCListenerDelegate
         var setError: NSError?
         var respond = true
         var versionString = "1.0 (1)"
+        var acceptConnections = true
     }
 
     let state = Mutex(State())
@@ -27,6 +28,7 @@ final class StubHelper: NSObject, Workdeck.HelperProtocol, NSXPCListenerDelegate
     }
 
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
+        guard state.withLock({ $0.acceptConnections }) else { return false }
         connection.exportedInterface = NSXPCInterface(with: Workdeck.HelperProtocol.self)
         connection.exportedObject = self
         connection.resume()
@@ -97,5 +99,14 @@ struct HelperClientTests {
         stub.state.withLock { $0.respond = true }
         // A second call on the same connection must still work and must not double-resume.
         #expect(try await client.isSleepDisabled() == false)
+    }
+
+    @Test func rejectedConnectionSurfacesErrorWithoutCrashing() async {
+        // The XPC error handler runs on a background queue; it must not be main-actor isolated.
+        let stub = StubHelper()
+        stub.state.withLock { $0.acceptConnections = false }
+        await #expect(throws: HelperClientError.self) {
+            try await stub.makeClient().isSleepDisabled()
+        }
     }
 }
