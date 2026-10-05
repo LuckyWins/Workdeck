@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		000000000000000150000001 /* WorkdeckHelper in Embed Helper */ = {isa = PBXBuildFile; fileRef = 000000000000000000000121 /* WorkdeckHelper */; };
 		000000000000000160000001 /* com.appcreators.workdeck.helper.plist in Embed Launch Daemon */ = {isa = PBXBuildFile; fileRef = 000000000000000000000130 /* com.appcreators.workdeck.helper.plist */; };
+		000000000000000131000001 /* DynamicNotchKit in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000500000001 /* DynamicNotchKit */; };
+		000000000000000180000001 /* workdeck-statusline in Embed Status Line */ = {isa = PBXBuildFile; fileRef = 000000000000000000000123 /* workdeck-statusline */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,6 +27,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 000000000000000100000000;
 			remoteInfo = Workdeck;
+		};
+		000000000000000190000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000600000000;
+			remoteInfo = WorkdeckStatusLine;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -47,6 +56,15 @@
 			);
 			name = "Embed Launch Daemon";
 		};
+		000000000000000180000000 /* Embed Status Line */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = Contents/Helpers;
+			dstSubfolder = Wrapper;
+			files = (
+				000000000000000180000001 /* workdeck-statusline in Embed Status Line */,
+			);
+			name = "Embed Status Line";
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -54,6 +72,7 @@
 		000000000000000000000121 /* WorkdeckHelper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = WorkdeckHelper; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000122 /* WorkdeckTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WorkdeckTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000130 /* com.appcreators.workdeck.helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = com.appcreators.workdeck.helper.plist; sourceTree = "<group>"; };
+		000000000000000000000123 /* workdeck-statusline */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "workdeck-statusline"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -92,12 +111,23 @@
 			path = WorkdeckTests;
 			sourceTree = "<group>";
 		};
+		000000000000000000000015 /* ClaudeUsage */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ClaudeUsage;
+			sourceTree = "<group>";
+		};
+		000000000000000000000016 /* WorkdeckStatusLine */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = WorkdeckStatusLine;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		000000000000000130000000 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				000000000000000131000001 /* DynamicNotchKit in Frameworks */,
 			);
 		};
 		000000000000000230000000 /* Frameworks */ = {
@@ -106,6 +136,11 @@
 			);
 		};
 		000000000000000330000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		000000000000000630000000 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
 			);
@@ -122,6 +157,8 @@
 				000000000000000000000013 /* WorkdeckTests */,
 				000000000000000000000014 /* LaunchDaemons */,
 				000000000000000000000020 /* Products */,
+				000000000000000000000015 /* ClaudeUsage */,
+				000000000000000000000016 /* WorkdeckStatusLine */,
 			);
 			sourceTree = "<group>";
 		};
@@ -139,6 +176,7 @@
 				000000000000000000000120 /* Workdeck.app */,
 				000000000000000000000121 /* WorkdeckHelper */,
 				000000000000000000000122 /* WorkdeckTests.xctest */,
+				000000000000000000000123 /* workdeck-statusline */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -155,17 +193,23 @@
 				000000000000000140000000 /* Resources */,
 				000000000000000150000000 /* Embed Helper */,
 				000000000000000160000000 /* Embed Launch Daemon */,
+				000000000000000180000000 /* Embed Status Line */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				000000000000000170000000 /* PBXTargetDependency */,
+				000000000000000190000000 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				000000000000000000000010 /* Workdeck */,
 				000000000000000000000012 /* Shared */,
+				000000000000000000000015 /* ClaudeUsage */,
 			);
 			name = Workdeck;
+			packageProductDependencies = (
+				000000000000000500000001 /* DynamicNotchKit */,
+			);
 			productName = Workdeck;
 			productReference = 000000000000000000000120 /* Workdeck.app */;
 			productType = "com.apple.product-type.application";
@@ -210,6 +254,24 @@
 			productReference = 000000000000000000000122 /* WorkdeckTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		000000000000000600000000 /* WorkdeckStatusLine */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000610000000 /* Build configuration list for PBXNativeTarget "WorkdeckStatusLine" */;
+			buildPhases = (
+				000000000000000620000000 /* Sources */,
+				000000000000000630000000 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				000000000000000000000015 /* ClaudeUsage */,
+				000000000000000000000016 /* WorkdeckStatusLine */,
+			);
+			name = WorkdeckStatusLine;
+			productName = WorkdeckStatusLine;
+			productReference = 000000000000000000000123 /* workdeck-statusline */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -224,6 +286,9 @@
 						CreatedOnToolsVersion = 26.3;
 					};
 					000000000000000200000000 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					000000000000000600000000 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 					000000000000000300000000 = {
@@ -241,6 +306,9 @@
 			);
 			mainGroup = 000000000000000000000001;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				000000000000000500000000 /* XCRemoteSwiftPackageReference "DynamicNotchKit" */,
+			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = 000000000000000000000020 /* Products */;
 			projectDirPath = "";
@@ -249,6 +317,7 @@
 				000000000000000100000000 /* Workdeck */,
 				000000000000000200000000 /* WorkdeckHelper */,
 				000000000000000300000000 /* WorkdeckTests */,
+				000000000000000600000000 /* WorkdeckStatusLine */,
 			);
 		};
 /* End PBXProject section */
@@ -282,6 +351,11 @@
 			files = (
 			);
 		};
+		000000000000000620000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -294,6 +368,11 @@
 			isa = PBXTargetDependency;
 			target = 000000000000000100000000 /* Workdeck */;
 			targetProxy = 000000000000000370000001 /* PBXContainerItemProxy */;
+		};
+		000000000000000190000000 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000600000000 /* WorkdeckStatusLine */;
+			targetProxy = 000000000000000190000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -516,6 +595,30 @@
 			};
 			name = Release;
 		};
+		000000000000000611000000 /* Debug configuration for PBXNativeTarget "WorkdeckStatusLine" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.appcreators.workdeck.statusline;
+				PRODUCT_NAME = "workdeck-statusline";
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		000000000000000612000000 /* Release configuration for PBXNativeTarget "WorkdeckStatusLine" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.appcreators.workdeck.statusline;
+				PRODUCT_NAME = "workdeck-statusline";
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -551,7 +654,36 @@
 			);
 			defaultConfigurationName = Release;
 		};
+		000000000000000610000000 /* Build configuration list for PBXNativeTarget "WorkdeckStatusLine" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000611000000 /* Debug configuration for PBXNativeTarget "WorkdeckStatusLine" */,
+				000000000000000612000000 /* Release configuration for PBXNativeTarget "WorkdeckStatusLine" */,
+			);
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		000000000000000500000000 /* XCRemoteSwiftPackageReference "DynamicNotchKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/MrKai77/DynamicNotchKit";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 1.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+
+/* Begin XCSwiftPackageProductDependency section */
+		000000000000000500000001 /* DynamicNotchKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 000000000000000500000000 /* XCRemoteSwiftPackageReference "DynamicNotchKit" */;
+			productName = DynamicNotchKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+
 	};
 	rootObject = 000000000000000000000000 /* Project object */;
 }
