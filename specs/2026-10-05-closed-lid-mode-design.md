@@ -218,7 +218,7 @@ After connecting, the app calls `version()`. If it differs from the app's bundle
 - `LidSleepController` — with fake helper client, installer, and monitors: enable success, refusal on low battery, battery cutoff, thermal cutoff, XPC error, helper interruption, approval-required state.
 - `PowerSettings` — with fake `CommandRunner`: correct `pmset` arguments, `SleepDisabled` parsing from `pmset -g` output, non-zero exit mapped to error.
 
-**Manual checklist (`docs/testing.md`)** for the root-level parts:
+**Manual checklist (`TESTING.md`)** for the root-level parts:
 
 - First-run helper approval flow.
 - Lid closed on battery: Mac stays awake (verify via SSH or a running task).
@@ -231,4 +231,4 @@ After connecting, the app calls `version()`. If it differs from the app's bundle
 ## 9. Documentation
 
 - `README.md` (root, English): overview, features, requirements, building from source, first-run helper approval, how it works, safeguards, the full-sleep-disable side effect, uninstalling and manual reset (`sudo pmset -a disablesleep 0`), project structure.
-- `docs/testing.md`: manual test checklist.
+- `TESTING.md`: manual test checklist.
