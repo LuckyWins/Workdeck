@@ -143,16 +143,18 @@ If the embedded binary is missing, Connect is disabled with an error.
 
 ### 6.1 Notch
 
-- **Compact:** leading `gauge.with.dots.needle.50percent`; trailing `5h 42%` in monospaced digits, colored by threshold.
+- **Compact:** leading — a progress ring (`UsageRing`) filled to the most pressing window's percent, green below the first threshold, orange from it, red from the second, dim white with no data; trailing — `5h 42%` in monospaced digits, white below the first threshold and orange/red above.
 - **Expanded (hover):**
 
 ```
- 5-hour    ████████░░░░░░  42%
-           resets in 1h 20m
- Weekly    ███░░░░░░░░░░░  18%
-           resets Thu 09:00
+ ◔  5-hour                 42%
+    resets in 1h 20m
+ ◔  Weekly                 18%
+    resets Thu 09:00
  Updated 3 min ago
 ```
+
+  Each window has its own ring and percent, colored by that window's level (green / orange / red).
 
   Older than one hour: "Updated 2 h ago — open Claude Code to refresh".
 - **Alert:** "5-hour limit at 80%" / "Resets at 14:00"; reset: "5-hour limit reset".

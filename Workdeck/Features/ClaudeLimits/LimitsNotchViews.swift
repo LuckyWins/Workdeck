@@ -8,14 +8,43 @@ final class LimitsNotchModel {
 }
 
 extension LimitsLevel {
-    /// Colors on the notch's black background.
+    /// Ring colors on the notch's black background.
     var notchColor: Color {
         switch self {
         case .noData: .white.opacity(0.5)
-        case .normal: .white
+        case .normal: .green
         case .warning: .orange
         case .critical: .red
         }
+    }
+
+    /// Compact text stays neutral until a threshold is reached, so a calm state does not shout green.
+    var compactTextColor: Color {
+        self == .normal ? .white : notchColor
+    }
+}
+
+/// A circular gauge: a dim track with an arc filled to the used percent, starting at the top.
+struct UsageRing: View {
+    let percent: Double?
+    let color: Color
+    var lineWidth: CGFloat = 2.5
+
+    static func fraction(for percent: Double?) -> Double {
+        min(max((percent ?? 0) / 100, 0), 1)
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(.white.opacity(0.2), lineWidth: lineWidth)
+            Circle()
+                .trim(from: 0, to: Self.fraction(for: percent))
+                .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+        }
+        .padding(lineWidth / 2)
+        .animation(.easeInOut(duration: 0.3), value: percent)
     }
 }
 
@@ -30,8 +59,8 @@ struct LimitsCompactLeading: View {
     let model: LimitsNotchModel
 
     var body: some View {
-        Image(systemName: "gauge.with.dots.needle.50percent")
-            .foregroundStyle(level(of: model.state).notchColor)
+        UsageRing(percent: model.state.pressing?.usedPercent, color: level(of: model.state).notchColor)
+            .frame(width: 14, height: 14)
     }
 }
 
@@ -42,7 +71,7 @@ struct LimitsCompactTrailing: View {
         Text(model.state.pressing.map(UsageFormatting.compactText) ?? "—")
             .font(.system(size: 12, weight: .semibold))
             .monospacedDigit()
-            .foregroundStyle(level(of: model.state).notchColor)
+            .foregroundStyle(level(of: model.state).compactTextColor)
     }
 }
 
@@ -97,30 +126,25 @@ struct LimitsExpandedView: View {
         let window = model.state.windows.first { $0.kind == kind }
         let isCurrent = window.map { $0.resetsAt > model.state.now } ?? false
         let percent = isCurrent ? window?.usedPercent : nil
-        return VStack(alignment: .leading, spacing: 2) {
-            HStack {
+        let level = LimitsPresentation.level(of: isCurrent ? window : nil, thresholds: model.state.thresholds)
+        return HStack(spacing: 10) {
+            UsageRing(percent: percent, color: level.notchColor, lineWidth: 3.5)
+                .frame(width: 26, height: 26)
+            VStack(alignment: .leading, spacing: 1) {
                 Text(kind.title)
                     .font(.caption.weight(.semibold))
-                    .frame(width: 56, alignment: .leading)
-                ProgressView(value: (percent ?? 0) / 100)
-                    .tint(barColor(isCurrent ? window : nil))
-                Text(percent.map(UsageFormatting.percentText) ?? "—")
-                    .font(.caption.weight(.semibold))
-                    .monospacedDigit()
-                    .frame(width: 40, alignment: .trailing)
+                if let window {
+                    Text(isCurrent ? LimitsText.resetText(window.resetsAt, now: model.state.now) : LimitsText.expiredText(window.resetsAt))
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
             }
-            if let window {
-                Text(isCurrent ? LimitsText.resetText(window.resetsAt, now: model.state.now) : LimitsText.expiredText(window.resetsAt))
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.6))
-                    .padding(.leading, 64)
-            }
+            Spacer(minLength: 8)
+            Text(percent.map(UsageFormatting.percentText) ?? "—")
+                .font(.callout.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(percent == nil ? .white.opacity(0.5) : level.notchColor)
         }
-    }
-
-    private func barColor(_ window: UsageWindow?) -> Color {
-        let level = LimitsPresentation.level(of: window, thresholds: model.state.thresholds)
-        return level == .normal ? .white : level.notchColor
     }
 
     private func alertColor(_ alert: LimitsAlert) -> Color {
