@@ -7,9 +7,12 @@ nonisolated struct StatusLineRunner: Sendable {
 
     /// Never throws: Claude Code's status line must keep working whatever happens here.
     func run(stdin: Data, now: Date) -> String {
-        let snapshot = StatusLineInputParser.snapshot(from: stdin, capturedAt: now)
-        if let snapshot {
-            try? UsageSnapshotFile.write(snapshot, to: paths.snapshotURL)
+        var snapshot = StatusLineInputParser.snapshot(from: stdin, capturedAt: now)
+        if let incoming = snapshot {
+            let existing = try? UsageSnapshotFile.read(from: paths.snapshotURL)
+            let merged = existing?.merged(with: incoming, now: now) ?? incoming
+            try? UsageSnapshotFile.write(merged, to: paths.snapshotURL)
+            snapshot = merged
         }
 
         let own = snapshot

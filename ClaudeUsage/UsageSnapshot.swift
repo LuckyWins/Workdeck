@@ -47,4 +47,25 @@ nonisolated struct UsageSnapshot: Codable, Equatable, Sendable {
     func currentWindows(at now: Date) -> [UsageWindow] {
         [fiveHour, sevenDay].compactMap { $0 }.filter { $0.resetsAt > now }
     }
+
+    /// Combines data from several Claude Code sessions sharing one account. An idle session may
+    /// report fewer or older windows, so it must not erase or roll back a running window.
+    func merged(with incoming: UsageSnapshot, now: Date) -> UsageSnapshot {
+        UsageSnapshot(
+            capturedAt: incoming.capturedAt,
+            fiveHour: Self.merge(fiveHour, incoming.fiveHour, now: now),
+            sevenDay: Self.merge(sevenDay, incoming.sevenDay, now: now)
+        )
+    }
+
+    private static func merge(_ existing: UsageWindow?, _ incoming: UsageWindow?, now: Date) -> UsageWindow? {
+        let existing = existing.flatMap { $0.resetsAt > now ? $0 : nil }
+        guard let incoming else { return existing }
+        guard let existing else { return incoming }
+        if incoming.resetsAt != existing.resetsAt {
+            return incoming.resetsAt > existing.resetsAt ? incoming : existing
+        }
+        // Usage never decreases within a period, so the higher value is the fresher one.
+        return incoming.usedPercent >= existing.usedPercent ? incoming : existing
+    }
 }

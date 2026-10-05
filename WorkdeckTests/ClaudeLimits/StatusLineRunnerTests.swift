@@ -24,6 +24,17 @@ struct StatusLineRunnerTests {
         #expect(try UsageSnapshotFile.read(from: paths.snapshotURL) == earlier)
     }
 
+    @Test func idleSessionDoesNotWipeRunningWindow() throws {
+        let running = UsageSnapshot(capturedAt: fixedNow, fiveHour: window(.fiveHour, 85), sevenDay: nil)
+        try UsageSnapshotFile.write(running, to: paths.snapshotURL)
+        let idleInput = statusLineInput(sevenDay: (20, fixedNow.timeIntervalSince1970 + 86_400))
+        let output = StatusLineRunner(paths: paths).run(stdin: idleInput, now: fixedNow.addingTimeInterval(60))
+        #expect(output == "5h 85%")
+        let saved = try UsageSnapshotFile.read(from: paths.snapshotURL)
+        #expect(saved.fiveHour == window(.fiveHour, 85))
+        #expect(saved.sevenDay?.usedPercent == 20)
+    }
+
     @Test func malformedInputPrintsNothingAndWritesNothing() {
         let output = StatusLineRunner(paths: paths).run(stdin: Data("garbage".utf8), now: fixedNow)
         #expect(output == "")

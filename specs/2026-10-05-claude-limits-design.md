@@ -88,7 +88,7 @@ On every invocation:
 5. Print the compact text for the most pressing window (if any), joined with the chained output by ` · `. Print nothing if both are empty.
 6. Always exit 0. Any error (bad JSON, write failure, chained command failure or timeout) is swallowed; Claude Code's status line must never break.
 
-Concurrent sessions write the same file; last write wins. Limits are per account, so this is correct.
+Concurrent sessions write the same file, so new data is merged into the existing snapshot rather than replacing it: an unexpired window missing from the input is kept, a later `resets_at` wins, and within the same period the higher percent wins (usage never decreases within a period). This keeps an idle session from erasing or rolling back a window that another session is updating.
 
 Performance target: well under 100 ms for the command itself (excluding the chained command).
 
