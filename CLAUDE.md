@@ -24,6 +24,7 @@ Workdeck is a macOS menu bar toolbox for developers. Each tool is one row in the
 - `LaunchDaemons/` — launchd job copied into `Workdeck.app/Contents/Library/LaunchDaemons`.
 - `WorkdeckStatusLine/` — `workdeck-statusline`, the Claude Code status line command embedded in `Contents/Helpers`. Only `main.swift`; its logic is `StatusLineRunner` in `ClaudeUsage/`. It must always exit 0 and stay fast (it runs on every Claude Code message).
 - `ClaudeUsage/` — compiled into the app and `WorkdeckStatusLine` (not the privileged helper): usage model, parser, snapshot file, chained command. Everything here is `nonisolated`.
+- `Workdeck/Features/ClaudeLimits/UsageAPI/` — opt-in poller for the undocumented `api.anthropic.com/api/oauth/usage` endpoint using Claude Code's Keychain token. Never refresh, persist, or log the token; keep it out of error text. It writes through the same snapshot file and merge as the status line.
 - `WorkdeckTests/` — also compiles `WorkdeckHelper/` sources except `main.swift`, `HelperService.swift`, and `HelperListenerDelegate.swift` (exception set in `project.pbxproj`). Fakes live in `WorkdeckTests/Fakes/`.
 - Source folders are Xcode file-system-synchronized groups: new files are picked up automatically. Do not edit `project.pbxproj` to add source files.
 

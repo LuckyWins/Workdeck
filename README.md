@@ -25,7 +25,9 @@ Shows how much of your Claude Code plan limits you have used — the 5-hour wind
 
 **Connecting to Claude Code.** Turn on Claude Code Limits in the popover (or click **Connect…** in Settings). Workdeck adds its status line command to `~/.claude/settings.json` and saves a backup as `~/.claude/settings.json.workdeck-backup`. Only the `statusLine` key changes, but the file is re-written, so key order and formatting may change. If you already had a status line, Workdeck keeps running it and shows its output after the usage, e.g. `5h 42% · main`. **Disconnect** in Settings restores your previous status line.
 
-**Limitations.** Claude Code reports plan usage only for Claude Pro and Max subscriptions, and only while a Claude Code session is running (after the first response). Between sessions Workdeck shows the last known values and how old they are. Workdeck never reads your Claude credentials.
+**Limitations.** Claude Code reports plan usage through the status line only for Claude Pro and Max subscriptions, and only while a Claude Code session runs in a terminal (after the first response). The graphical panel of the Claude Code VS Code extension does not run the status line. Between sessions Workdeck shows the last known values and how old they are.
+
+**Working only in the VS Code extension.** Turn on **Fetch usage from Anthropic (unofficial)** in Settings. Workdeck then reads the login token Claude Code stores in your Keychain and calls an undocumented Anthropic endpoint every 5 minutes (and when you open the popover, at most once a minute). macOS asks for Keychain access the first time — choose **Always Allow**. Workdeck never refreshes or stores the token. Anthropic's terms do not allow third-party use of Claude Code credentials, and the endpoint may change or stop working at any time; use this at your own discretion. If the login expires, open Claude Code to refresh it.
 
 ## Requirements
 

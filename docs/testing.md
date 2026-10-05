@@ -54,6 +54,9 @@ Watch the snapshot with `cat ~/Library/Application\ Support/Workdeck/claude-usag
 | L11 | Quick pass over the notch | Brush the pointer quickly across the compact notch on the way to the menu bar, several times. | The notch never stays expanded after the pointer has left. |
 | L12 | External display as main | With the lid open, make an external display the main display (Displays settings), then change its resolution or sleep/wake. | The compact notch stays on the built-in screen; no black pill appears on the external display. |
 | L13 | Sleep/wake with lid closed | Lid closed on an external display (menu bar fallback active), sleep and wake the Mac. | No black pill at the top of the external display; the menu bar text remains. |
+| L14 | Keychain prompt | In Settings, turn on "Fetch usage from Anthropic (unofficial)". | macOS asks to allow Workdeck to use "Claude Code-credentials"; the popover stays responsive while the prompt is open. After Always Allow, Settings shows "Last fetched just now" and later polls do not prompt. |
+| L15 | VS Code panel only | Disconnect the status line, keep the API toggle on, enable the indicator, work only in the VS Code extension panel. | The notch shows usage within one poll (≤ 5 min, or immediately on opening the popover); values match `/usage` in the panel. |
+| L16 | Expired login | Wait for (or force, by signing out of Claude Code) an expired token. | Popover row and Settings show "Login expired — open Claude Code to refresh"; after Claude Code refreshes its login, the next poll shows data again without restarting Workdeck. |
 
 ## Results
 
