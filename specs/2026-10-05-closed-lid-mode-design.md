@@ -231,4 +231,14 @@ After connecting, the app calls `version()`. If it differs from the app's bundle
 ## 9. Documentation
 
 - `README.md` (root, English): overview, features, requirements, building from source, first-run helper approval, how it works, safeguards, the full-sleep-disable side effect, uninstalling and manual reset (`sudo pmset -a disablesleep 0`), project structure.
+- `CLAUDE.md` (root, English): guidance for AI coding agents working in the repo:
+  - Project purpose and the "menu bar toolbox" direction (new tools are added as popover rows under `Features/`).
+  - Build and test commands (`xcodebuild` for the `Workdeck` scheme, running `WorkdeckTests`).
+  - Architecture map: app vs. privileged helper, shared XPC protocol, where each unit lives.
+  - Conventions: Swift 6 strict concurrency, SwiftUI + Apple HIG, English-only UI/code comments/docs/commits, no third-party dependencies without discussion.
+  - Helper rules: keep it minimal, no new XPC methods without a security review, never execute arbitrary commands, every enable path must have a restore-sleep path.
+  - Repository layout for docs: specs in `specs/`, plans in `plans/`, other documentation in `docs/`, `README.md` in the root.
+  - Manual verification: root-level behavior is checked via `docs/testing.md`.
 - `docs/testing.md`: manual test checklist.
+
+`README.md` and `CLAUDE.md` are created early in the implementation (once the project structure exists) and updated as the feature lands, so both stay accurate at every commit.
