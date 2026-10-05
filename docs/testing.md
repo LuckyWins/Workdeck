@@ -57,6 +57,7 @@ Watch the snapshot with `cat ~/Library/Application\ Support/Workdeck/claude-usag
 | L14 | Keychain prompt | In Settings, turn on "Fetch usage from Anthropic (unofficial)". | macOS asks to allow Workdeck to use "Claude Code-credentials"; the popover stays responsive while the prompt is open. After Always Allow, Settings shows "Last fetched just now" and later polls do not prompt. |
 | L15 | VS Code panel only | Disconnect the status line, keep the API toggle on, enable the indicator, work only in the VS Code extension panel. | The notch shows usage within one poll (≤ 5 min, or immediately on opening the popover); values match `/usage` in the panel. |
 | L16 | Expired login | Wait for (or force, by signing out of Claude Code) an expired token. | Popover row and Settings show "Login expired — open Claude Code to refresh"; after Claude Code refreshes its login, the next poll shows data again without restarting Workdeck. |
+| L17 | Keychain denied, then token refresh | Turn the API toggle on and click Deny at the Keychain prompt; wait 10 minutes. Then toggle it off and on and choose Always Allow; later, let Claude Code refresh its login. | After Deny: no further prompts, status "Keychain access denied — turn the setting off and on to try again". After Always Allow: data. After Claude Code's token refresh: note whether macOS prompts again. |
 
 ## Results
 
