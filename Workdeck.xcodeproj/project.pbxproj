@@ -60,6 +60,8 @@
 		000000000000000400000000 /* Exceptions for "WorkdeckHelper" folder in "WorkdeckTests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				HelperListenerDelegate.swift,
+				HelperService.swift,
 				main.swift,
 			);
 			target = 000000000000000300000000 /* WorkdeckTests */;
