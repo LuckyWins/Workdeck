@@ -12,12 +12,12 @@ The second Workdeck tool shows Claude Code subscription usage limits — the 5-h
 - See how much of the Claude Code limits is used without opening a terminal or running `/usage`.
 - Avoid hitting a limit unexpectedly: alert at configurable thresholds and, optionally, when a limit resets.
 - Two display modes, switchable in Settings: always visible, or only near limits.
-- No credentials: read only data that Claude Code hands to a status line command.
+- By default no credentials: read only data that Claude Code hands to a status line command. An opt-in second source (§10) covers working only in the Claude Code VS Code extension, whose panel does not run the status line.
 - English UI and documentation; minimal, HIG-aligned look.
 
 ### Non-Goals (v1)
 
-- Reading OAuth tokens or calling undocumented Anthropic endpoints.
+- Refreshing Claude Code's OAuth token or running Claude Code on the user's behalf.
 - Estimating usage from `~/.claude/projects/**/*.jsonl` transcripts.
 - API-key (Console) usage and cost.
 - `CLAUDE_CONFIG_DIR` support (only `~/.claude/settings.json`).
@@ -209,3 +209,51 @@ The first enable while not connected runs the Connect confirmation. Turning the 
 - `README.md`: feature description, connecting to Claude Code, what is changed in `settings.json`, how to disconnect, data limitations (Pro/Max only, updates only during sessions).
 - `CLAUDE.md`: `WorkdeckStatusLine` target and `ClaudeUsage/` folder, the DynamicNotchKit exception, the rule that the status line command must always exit 0.
 - `docs/testing.md`: manual scenarios above.
+
+## 10. Amendment: Anthropic Usage API (Opt-In)
+
+**Why:** the Claude Code VS Code extension's graphical panel does not run the `statusLine` command (confirmed by testing and by third-party extension authors), so a user who works only in the panel gets no data. Every comparable tool reads Claude Code's OAuth token from the Keychain and polls an undocumented endpoint. The user chose to add this as an opt-in source, accepting that Anthropic's terms ("developers may not collect, store, or intermediate Claude.ai credentials or session tokens") do not allow it and that the endpoint may change.
+
+### 10.1 Endpoint (undocumented)
+
+- `GET https://api.anthropic.com/api/oauth/usage`, headers `Authorization: Bearer <token>`, `anthropic-beta: oauth-2025-04-20`, `Accept: application/json`, timeout 15 s.
+- Response: `{"five_hour": {"utilization": 21.0, "resets_at": "<ISO 8601>"}, "seven_day": {…}, …}`. `utilization` is a percent (0–100); `resets_at` is ISO 8601 (with or without fractional seconds); a window may be `null` or absent; other keys are ignored.
+- Token: Keychain generic password, service `Claude Code-credentials`; its data is JSON with the token at `claudeAiOauth.accessToken`.
+
+### 10.2 Components (`Workdeck/Features/ClaudeLimits/UsageAPI/`, app only)
+
+| Unit | Responsibility |
+|---|---|
+| `ClaudeCredentials` | `accessToken(fromCredentialsJSON:)` (pure) and `KeychainCredentialsReader` (`SecItemCopyMatching`); errors: not found, denied, malformed. |
+| `UsageAPIResponseParser` | Response body → `UsageSnapshot` (clamped percents, ISO dates, missing/null windows). |
+| `UsageAPIClient` | Builds the request; 200 → snapshot, 401/403 → `loginExpired`, 429 → `rateLimited(retryAfter)` (from `Retry-After`, default 10 min), other → `failed`. Transport injected. |
+| `UsagePoller` (`@Observable`) | Polls every 5 minutes while enabled; `pollIfStale()` on popover open at most once per minute; pauses until `retryAfter` after 429; merges results into the snapshot file with `UsageSnapshot.merged(with:now:)` (atomic write), so `ClaudeUsageStore` and everything downstream is unchanged. Exposes a status: idle, ok(fetchedAt), loginExpired, rateLimited(until), noCredentials, failed(message). |
+
+### 10.3 Behavior Changes
+
+- `ClaudeLimitsSettings.fetchFromAPI` (default off).
+- The indicator may show when the status line is connected **or** `fetchFromAPI` is on.
+- Enabling the popover toggle asks to connect the status line only when `fetchFromAPI` is off.
+- The controller starts/stops the poller with the setting and calls `pollIfStale()` when the popover opens.
+- Workdeck never refreshes the token and never runs Claude Code. On 401/403 it keeps polling every 5 minutes (Claude Code may refresh the token at any time) and shows the status.
+- The token lives only in memory for one request; it is never written to disk, logged, or included in error text. Requests go only to `https://api.anthropic.com`.
+
+### 10.4 UI
+
+- Settings → Claude Code Limits: toggle **Fetch usage from Anthropic (unofficial)** with the footnote "Uses the login token Claude Code stores in your Keychain to call an undocumented Anthropic endpoint every 5 minutes. Anthropic's terms do not allow third-party use of Claude Code credentials, and the endpoint may change or stop working. macOS will ask for Keychain access — choose Always Allow." and a status line: "Last fetched 2 min ago", "Login expired — open Claude Code to refresh", "Rate limited — retrying at 14:20", "Claude Code login not found", or the error in red.
+- Popover row: when the status line is not connected but the API is on, the subtitle shows data or the poller's problem instead of "Not connected to Claude Code".
+
+### 10.5 Errors
+
+| Failure | Handling |
+|---|---|
+| No Keychain item or access denied | `noCredentials`; keep polling on schedule. |
+| 401 / 403 | `loginExpired`; keep polling every 5 minutes. |
+| 429 | Wait for `Retry-After`, or 10 minutes. |
+| Unparseable response | `failed("Unexpected response")`; snapshot untouched. |
+| Setting turned off | Stop the timer; keep the snapshot. |
+
+### 10.6 Testing
+
+Unit: token extraction; response parsing (both windows, `null`, fractional-second dates, out-of-range values, extra keys); client with a fake transport (URL and headers, each status code, `Retry-After`, token never in error text); poller with a fake client, temporary directory and injected clock (merge into the snapshot, 5-minute interval, 1-minute popover throttle, 429 pause, statuses, stop on disable); controller (shows without the status line when the API is on, no connect prompt, poller problems in the subtitle). Manual (`docs/testing.md` L14–L16): Keychain prompt and Always Allow, data while working only in the VS Code panel, expired-token behavior.
+
