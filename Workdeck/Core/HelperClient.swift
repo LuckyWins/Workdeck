@@ -31,10 +31,16 @@ final class HelperClient: HelperClientProtocol {
 
     private let makeConnection: () -> NSXPCConnection
     private let timeout: TimeInterval
+    private let terminationTimeout: TimeInterval
     private var connection: NSXPCConnection?
 
-    init(timeout: TimeInterval = 5, makeConnection: @escaping () -> NSXPCConnection = HelperClient.privilegedConnection) {
+    init(
+        timeout: TimeInterval = 5,
+        terminationTimeout: TimeInterval = 2,
+        makeConnection: @escaping () -> NSXPCConnection = HelperClient.privilegedConnection
+    ) {
         self.timeout = timeout
+        self.terminationTimeout = terminationTimeout
         self.makeConnection = makeConnection
     }
 
@@ -66,9 +72,17 @@ final class HelperClient: HelperClientProtocol {
         }
     }
 
+    /// Waits at most `terminationTimeout`; if the helper hangs, it still restores sleep when the connection drops.
     func restoreSleepSynchronously() {
-        let proxy = activeConnection().synchronousRemoteObjectProxyWithErrorHandler { _ in }
-        (proxy as? any HelperProtocol)?.setSleepDisabled(false) { _ in }
+        let finished = DispatchSemaphore(value: 0)
+        let proxy = activeConnection().remoteObjectProxyWithErrorHandler { @Sendable _ in
+            finished.signal()
+        }
+        guard let helper = proxy as? any HelperProtocol else { return }
+        helper.setSleepDisabled(false) { _ in
+            finished.signal()
+        }
+        _ = finished.wait(timeout: .now() + terminationTimeout)
     }
 
     private func call<T: Sendable>(

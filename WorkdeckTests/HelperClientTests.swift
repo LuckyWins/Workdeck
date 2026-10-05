@@ -22,9 +22,11 @@ final class StubHelper: NSObject, Workdeck.HelperProtocol, NSXPCListenerDelegate
         listener.resume()
     }
 
-    @MainActor func makeClient(timeout: TimeInterval = 5) -> HelperClient {
+    @MainActor func makeClient(timeout: TimeInterval = 5, terminationTimeout: TimeInterval = 2) -> HelperClient {
         let endpoint = listener.endpoint
-        return HelperClient(timeout: timeout) { NSXPCConnection(listenerEndpoint: endpoint) }
+        return HelperClient(timeout: timeout, terminationTimeout: terminationTimeout) {
+            NSXPCConnection(listenerEndpoint: endpoint)
+        }
     }
 
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
@@ -108,5 +110,24 @@ struct HelperClientTests {
         await #expect(throws: HelperClientError.self) {
             try await stub.makeClient().isSleepDisabled()
         }
+    }
+
+    @Test func synchronousRestoreReEnablesSleep() async throws {
+        let stub = StubHelper()
+        let client = stub.makeClient()
+        try await client.setSleepDisabled(true)
+        client.restoreSleepSynchronously()
+        #expect(stub.state.withLock { $0.sleepDisabled } == false)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func synchronousRestoreGivesUpWhenHelperHangs() async throws {
+        let stub = StubHelper()
+        let client = stub.makeClient(terminationTimeout: 0.2)
+        _ = try await client.isSleepDisabled()
+        stub.state.withLock { $0.respond = false }
+        let start = ContinuousClock.now
+        client.restoreSleepSynchronously()
+        #expect(ContinuousClock.now - start < .seconds(2))
     }
 }
