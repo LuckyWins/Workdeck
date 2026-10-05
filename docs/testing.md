@@ -21,7 +21,7 @@ pmset -g | grep SleepDisabled
 |---|---|---|---|
 | 1 | First-run approval | Open the popover, turn on Closed-Lid Mode. | Subtitle reads "Requires a one-time approval"; toggle is disabled; "Open System Settings…" opens Login Items & Extensions. |
 | 2 | Approval picked up | Allow Workdeck in System Settings, reopen the popover. | Toggle is enabled; turning it on succeeds; menu bar icon becomes filled; `SleepDisabled 1`. |
-| 3 | Lid closed on adapter | With the mode on, start `ping 1.1.1.1` in Terminal (or an SSH session from another machine), close the lid for 2 minutes, open it. | The ping (or SSH session) kept running without a gap. |
+| 3 | Lid closed on adapter | With the mode on, run `while true; do date +%T >> ~/lid-test.log; sleep 1; done` in Terminal, close the lid for 2 minutes, open it, check `tail -200 ~/lid-test.log` and `pmset -g log \| grep -E " Sleep \| Wake " \| tail -5`. | Timestamps continue through the closed-lid period (isolated one-second skips are loop drift, not sleep); no `Sleep` entry in that window. |
 | 4 | Lid closed on battery | Unplug, repeat scenario 3. | Same as 3; subtitle mentions "Turns off below 20% battery". |
 | 5 | Turn off | Turn the toggle off. | Icon becomes outline; `SleepDisabled` gone. |
 | 6 | Quit restores sleep | Turn on, choose Quit Workdeck. | `SleepDisabled` gone. |
@@ -34,3 +34,17 @@ pmset -g | grep SleepDisabled
 | 13 | Helper stopped | Turn on, then turn Workdeck off in **System Settings → General → Login Items & Extensions**. | `SleepDisabled` gone; the popover shows the approval state. |
 
 Thermal cutoff is covered by unit tests only; it cannot be triggered reliably by hand.
+
+## Results
+
+Mark each run with the date, build commit, and macOS version. Record only scenarios that were actually executed.
+
+### 2026-10-05 — commit `99dd67f`, macOS 27.0.1, MacBook Pro
+
+| # | Result | Notes |
+|---|---|---|
+| 1 | ✅ Pass | Approval state shown after the team-ID and `.notFound` fixes. |
+| 2 | ✅ Pass | Toggle became usable after approving in System Settings and reopening the popover. |
+| 3 | ⏳ Not run | |
+| 4 | ✅ Pass | On battery at 51 %, lid closed ~1.5 min: timestamp log continuous 16:18:27–16:20:15, no `Sleep` entry in `pmset -g log`. |
+| 5–13 | ⏳ Not run | |
