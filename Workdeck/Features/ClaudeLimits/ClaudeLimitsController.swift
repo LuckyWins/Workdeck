@@ -58,7 +58,8 @@ final class ClaudeLimitsController {
     }
 
     var rowSubtitle: String {
-        if settings.fetchFromAPI, poller.status.isProblem,
+        // With a working status line, its data matters more than a usage API problem (spec §10.4).
+        if !isConnected, settings.fetchFromAPI, poller.status.isProblem,
            let problem = LimitsText.pollerStatusText(poller.status, now: store.now) {
             return problem
         }

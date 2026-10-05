@@ -216,4 +216,17 @@ struct ClaudeLimitsControllerTests {
         let (controller, _) = makeController()
         #expect(controller.rowSubtitle == "Login expired — open Claude Code to refresh")
     }
+
+    @Test func pollerProblemDoesNotHideStatusLineData() throws {
+        connector.status = .connected
+        settings.isEnabled = true
+        settings.fetchFromAPI = true
+        poller.status = .failed("The Internet connection appears to be offline.")
+        try writeUsage(fiveHour: 42)
+        let (controller, store) = makeController()
+        controller.start()
+        store.reload()
+        #expect(controller.rowSubtitle == "5h 42% · 7d — · updated just now")
+    }
 }
+
