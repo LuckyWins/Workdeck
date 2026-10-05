@@ -58,6 +58,7 @@ Sleep is restored in every exit path:
 2. **Crash or force quit** — the helper notices the dropped XPC connection and turns the mode off.
 3. **Restart** — the helper starts at boot and resets the setting.
 4. **Helper crash** — the relaunched helper resets the setting and Workdeck shows "Turned off: helper restarted".
+5. **Helper stopped** — when launchd stops the helper (for example, Workdeck is turned off in Login Items & Extensions), it resets the setting before exiting.
 
 ## Uninstalling
 
