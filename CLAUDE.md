@@ -13,7 +13,7 @@ Workdeck is a macOS menu bar toolbox for developers. Each tool is one row in the
 - Test: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"` (`-quiet` hides Swift Testing output)
 - Single suite: add `-only-testing:WorkdeckTests/<SuiteName>` after `test`.
 - Tests use Swift Testing and are hosted in `Workdeck.app`. `AppDelegate` skips its startup helper refresh when `XCTestConfigurationFilePath` is set, so tests never talk to the real privileged helper.
-- Helper logs: `log stream --predicate 'subsystem == "com.appcreators.workdeck.helper"'`.
+- Helper logs: `/usr/bin/log stream --predicate 'subsystem == "com.appcreators.workdeck.helper"'`.
 
 ## Architecture
 

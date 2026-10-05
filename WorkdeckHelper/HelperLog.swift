@@ -2,7 +2,7 @@ import Foundation
 import os
 
 /// Unified logging for the helper. View with:
-/// `log stream --predicate 'subsystem == "com.appcreators.workdeck.helper"'`
+/// `/usr/bin/log stream --predicate 'subsystem == "com.appcreators.workdeck.helper"'`
 enum HelperLog {
     static let power = Logger(subsystem: "com.appcreators.workdeck.helper", category: "power")
 }

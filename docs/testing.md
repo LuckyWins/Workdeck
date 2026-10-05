@@ -48,3 +48,11 @@ Mark each run with the date, build commit, and macOS version. Record only scenar
 | 3 | ⏳ Not run | |
 | 4 | ✅ Pass | On battery at 51 %, lid closed ~1.5 min: timestamp log continuous 16:18:27–16:20:15, no `Sleep` entry in `pmset -g log`. |
 | 5–13 | ⏳ Not run | |
+
+### 2026-10-05 — commit `0af2b9c`, installed with `make install` to `/Applications`
+
+| # | Result | Notes |
+|---|---|---|
+| 1 | ✅ Pass | Re-approval requested for the `/Applications` copy; stale DerivedData helper was replaced automatically. |
+| 2 | ✅ Pass | Mode toggles on and off; each change is logged by the helper with the client PID. |
+
