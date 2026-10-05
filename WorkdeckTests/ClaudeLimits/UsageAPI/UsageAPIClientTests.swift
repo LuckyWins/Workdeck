@@ -47,4 +47,15 @@ struct UsageAPIClientTests {
         }
         #expect(!message.contains("secret-token"))
     }
+
+    @Test func requestsAreNeverCachedOrStored() {
+        // The request carries the token in a header; nothing may be written to URLCache or cookie storage.
+        let configuration = URLSessionTransport.session.configuration
+        #expect(configuration.urlCache == nil)
+        #expect(configuration.httpCookieStorage == nil)
+        #expect(configuration.urlCredentialStorage == nil)
+        #expect(configuration.requestCachePolicy == .reloadIgnoringLocalCacheData)
+        #expect(UsageAPIClient.request(token: "t").cachePolicy == .reloadIgnoringLocalCacheData)
+    }
 }
+

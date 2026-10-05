@@ -12,8 +12,18 @@ nonisolated protocol HTTPTransport: Sendable {
 }
 
 nonisolated struct URLSessionTransport: HTTPTransport {
+    /// Ephemeral and storage-free: requests carry the token, so nothing may reach disk caches.
+    static let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.httpCookieStorage = nil
+        configuration.urlCredentialStorage = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: configuration)
+    }()
+
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await Self.session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
         return (data, http)
     }
@@ -27,7 +37,7 @@ nonisolated struct UsageAPIClient: Sendable {
     let transport: any HTTPTransport
 
     static func request(token: String) -> URLRequest {
-        var request = URLRequest(url: endpoint, timeoutInterval: 15)
+        var request = URLRequest(url: endpoint, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
