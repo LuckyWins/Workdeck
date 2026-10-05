@@ -1,0 +1,81 @@
+import Foundation
+
+nonisolated enum LimitsDisplayMode: String, CaseIterable, Identifiable, Sendable {
+    case always
+    case nearLimits
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .always: "Always"
+        case .nearLimits: "Only near limits"
+        }
+    }
+}
+
+nonisolated enum LimitsLevel: Equatable, Sendable {
+    case noData
+    case normal
+    case warning
+    case critical
+}
+
+nonisolated enum LimitsDisplay: Equatable, Sendable {
+    case hidden
+    case notch(LimitsLevel)
+    case menuBar(text: String, level: LimitsLevel)
+}
+
+/// Everything the notch and menu bar need to render.
+nonisolated struct LimitsViewState: Equatable, Sendable {
+    var display: LimitsDisplay
+    /// The snapshot's windows, including ones whose reset time has passed.
+    var windows: [UsageWindow]
+    var now: Date
+    var age: TimeInterval?
+    var thresholds: [Int]
+
+    static let hidden = LimitsViewState(display: .hidden, windows: [], now: .distantPast, age: nil, thresholds: [80, 95])
+
+    var currentWindows: [UsageWindow] {
+        windows.filter { $0.resetsAt > now }
+    }
+
+    var pressing: UsageWindow? {
+        UsageFormatting.mostPressing(currentWindows)
+    }
+}
+
+nonisolated enum LimitsPresentation {
+    static func level(of window: UsageWindow?, thresholds: [Int]) -> LimitsLevel {
+        guard let window else { return .noData }
+        let sorted = thresholds.sorted()
+        if let second = sorted.last, sorted.count > 1, window.usedPercent >= Double(second) {
+            return .critical
+        }
+        if let first = sorted.first, window.usedPercent >= Double(first) {
+            return .warning
+        }
+        return .normal
+    }
+
+    static func display(
+        isEnabled: Bool,
+        isConnected: Bool,
+        mode: LimitsDisplayMode,
+        hasNotchScreen: Bool,
+        pressing: UsageWindow?,
+        thresholds: [Int]
+    ) -> LimitsDisplay {
+        guard isEnabled, isConnected else { return .hidden }
+        let level = level(of: pressing, thresholds: thresholds)
+        if mode == .nearLimits, level == .noData || level == .normal {
+            return .hidden
+        }
+        if hasNotchScreen {
+            return .notch(level)
+        }
+        return .menuBar(text: pressing.map(UsageFormatting.compactText) ?? "—", level: level)
+    }
+}
