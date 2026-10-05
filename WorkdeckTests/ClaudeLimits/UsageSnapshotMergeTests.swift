@@ -41,4 +41,17 @@ struct UsageSnapshotMergeTests {
         #expect(merged.fiveHour == nil)
         #expect(merged.capturedAt == fixedNow)
     }
+
+    @Test func resetTimesFromDifferentSourcesWithinFiveMinutesAreTheSamePeriod() {
+        // The status line reports whole epoch seconds, the usage API fractional ISO 8601 times.
+        let terminal = window(.fiveHour, 80)
+        let api = window(.fiveHour, 40, resetsIn: 3600 + 30.5)
+        #expect(snapshot(terminal).merged(with: snapshot(api), now: fixedNow).fiveHour == terminal)
+        // The period's reset time stays stable so alerts do not mistake the switch for a new period.
+        let higherAPI = window(.fiveHour, 85, resetsIn: 3600 - 0.06)
+        let merged = snapshot(terminal).merged(with: snapshot(higherAPI), now: fixedNow).fiveHour
+        #expect(merged?.usedPercent == 85)
+        #expect(merged?.resetsAt == terminal.resetsAt)
+    }
 }
+

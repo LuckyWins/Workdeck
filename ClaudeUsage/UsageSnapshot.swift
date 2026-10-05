@@ -58,14 +58,23 @@ nonisolated struct UsageSnapshot: Codable, Equatable, Sendable {
         )
     }
 
+    /// Reset times from the status line (whole epoch seconds) and the usage API (fractional ISO 8601)
+    /// differ slightly for the same period; periods themselves are hours apart.
+    static let samePeriodTolerance: TimeInterval = 5 * 60
+
     private static func merge(_ existing: UsageWindow?, _ incoming: UsageWindow?, now: Date) -> UsageWindow? {
         let existing = existing.flatMap { $0.resetsAt > now ? $0 : nil }
         guard let incoming else { return existing }
         guard let existing else { return incoming }
-        if incoming.resetsAt != existing.resetsAt {
+        if abs(incoming.resetsAt.timeIntervalSince(existing.resetsAt)) > samePeriodTolerance {
             return incoming.resetsAt > existing.resetsAt ? incoming : existing
         }
-        // Usage never decreases within a period, so the higher value is the fresher one.
-        return incoming.usedPercent >= existing.usedPercent ? incoming : existing
+        // Same period: usage never decreases within it, so keep the higher value. Keep the existing
+        // reset time so alert keys and reset detection see one stable period.
+        return UsageWindow(
+            kind: existing.kind,
+            usedPercent: max(existing.usedPercent, incoming.usedPercent),
+            resetsAt: existing.resetsAt
+        )
     }
 }
