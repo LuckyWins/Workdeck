@@ -1,0 +1,98 @@
+import Foundation
+import Testing
+@testable import Workdeck
+
+@MainActor
+struct UsagePollerTests {
+    let snapshotURL = makeTemporaryDirectory().appending(path: "Workdeck/claude-usage.json")
+    let transport = FakeTransport()
+
+    private func makePoller(token: String? = "t", now: @escaping () -> Date = { fixedNow }) -> UsagePoller {
+        UsagePoller(
+            credentials: FakeCredentials(token: token),
+            client: UsageAPIClient(transport: transport),
+            snapshotURL: snapshotURL,
+            clock: now,
+            schedulesTimer: false
+        )
+    }
+
+    @Test func successMergesIntoSnapshotFile() async throws {
+        try UsageSnapshotFile.write(UsageSnapshot(capturedAt: fixedNow, fiveHour: nil, sevenDay: window(.sevenDay, 30, resetsIn: 86_400)), to: snapshotURL)
+        transport.enqueue(.init(status: 200, body: usageBody(fiveHour: (42, 3600))))
+        let poller = makePoller()
+        poller.start()
+        await poller.pollTask?.value
+        let saved = try UsageSnapshotFile.read(from: snapshotURL)
+        #expect(saved.fiveHour == window(.fiveHour, 42))
+        #expect(saved.sevenDay == window(.sevenDay, 30, resetsIn: 86_400))
+        #expect(poller.status == .ok(fetchedAt: fixedNow))
+    }
+
+    @Test func missingCredentials() async {
+        let poller = makePoller(token: nil)
+        poller.start()
+        await poller.pollTask?.value
+        #expect(poller.status == .noCredentials)
+        #expect(transport.requests.isEmpty)
+    }
+
+    @Test func expiredLoginKeepsSnapshot() async throws {
+        let existing = UsageSnapshot(capturedAt: fixedNow, fiveHour: window(.fiveHour, 12), sevenDay: nil)
+        try UsageSnapshotFile.write(existing, to: snapshotURL)
+        transport.enqueue(.init(status: 401, body: ""))
+        let poller = makePoller()
+        poller.start()
+        await poller.pollTask?.value
+        #expect(poller.status == .loginExpired)
+        #expect(try UsageSnapshotFile.read(from: snapshotURL) == existing)
+    }
+
+    @Test func popoverChecksAreThrottledToOncePerMinute() async {
+        var now = fixedNow
+        transport.enqueue(.init(status: 200, body: usageBody(fiveHour: (1, 3600))))
+        transport.enqueue(.init(status: 200, body: usageBody(fiveHour: (2, 3600))))
+        let poller = makePoller { now }
+        poller.start()
+        await poller.pollTask?.value
+        now = fixedNow.addingTimeInterval(30)
+        poller.pollIfStale()
+        await poller.pollTask?.value
+        #expect(transport.requests.count == 1)
+        now = fixedNow.addingTimeInterval(61)
+        poller.pollIfStale()
+        await poller.pollTask?.value
+        #expect(transport.requests.count == 2)
+    }
+
+    @Test func rateLimitPausesPolling() async {
+        var now = fixedNow
+        transport.enqueue(.init(status: 429, body: "", headers: ["Retry-After": "300"]))
+        let poller = makePoller { now }
+        poller.start()
+        await poller.pollTask?.value
+        #expect(poller.status == .rateLimited(until: fixedNow.addingTimeInterval(300)))
+        now = fixedNow.addingTimeInterval(120)
+        poller.poll()
+        await poller.pollTask?.value
+        #expect(transport.requests.count == 1)
+        transport.enqueue(.init(status: 200, body: usageBody(fiveHour: (5, 3600))))
+        now = fixedNow.addingTimeInterval(301)
+        poller.poll()
+        await poller.pollTask?.value
+        #expect(transport.requests.count == 2)
+        #expect(poller.status == .ok(fetchedAt: now))
+    }
+
+    @Test func stoppedPollerDoesNothing() async {
+        let poller = makePoller()
+        poller.pollIfStale()
+        poller.poll()
+        await poller.pollTask?.value
+        #expect(transport.requests.isEmpty)
+        poller.start()
+        await poller.pollTask?.value
+        poller.stop()
+        #expect(poller.status == .idle)
+    }
+}

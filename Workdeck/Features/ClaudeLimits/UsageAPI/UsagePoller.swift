@@ -1,0 +1,138 @@
+import Foundation
+import Observation
+
+nonisolated enum UsagePollerStatus: Equatable, Sendable {
+    case idle
+    case ok(fetchedAt: Date)
+    case loginExpired
+    case rateLimited(until: Date)
+    case noCredentials
+    case failed(String)
+
+    /// Statuses the user should see instead of usage data.
+    var isProblem: Bool {
+        switch self {
+        case .idle, .ok: false
+        case .loginExpired, .rateLimited, .noCredentials, .failed: true
+        }
+    }
+}
+
+protocol UsagePolling: AnyObject {
+    var status: UsagePollerStatus { get }
+    func start()
+    func stop()
+    /// Polls now unless the last attempt was less than a minute ago.
+    func pollIfStale()
+}
+
+/// Opt-in: fetches usage from Anthropic every 5 minutes and merges it into the shared snapshot file,
+/// so the store, alerts and notch work exactly as with status line data.
+@Observable
+final class UsagePoller: UsagePolling {
+    static let interval: TimeInterval = 5 * 60
+    static let minimumInterval: TimeInterval = 60
+
+    private(set) var status = UsagePollerStatus.idle
+
+    @ObservationIgnored private let credentials: any ClaudeCredentialsReading
+    @ObservationIgnored private let client: UsageAPIClient
+    @ObservationIgnored private let snapshotURL: URL
+    @ObservationIgnored private let clock: () -> Date
+    @ObservationIgnored private let schedulesTimer: Bool
+    @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var isRunning = false
+    @ObservationIgnored private var lastAttempt: Date?
+    @ObservationIgnored private var pausedUntil: Date?
+    /// The poll in flight; exposed so tests can await it.
+    @ObservationIgnored private(set) var pollTask: Task<Void, Never>?
+
+    init(
+        credentials: any ClaudeCredentialsReading,
+        client: UsageAPIClient,
+        snapshotURL: URL,
+        clock: @escaping () -> Date = { Date() },
+        schedulesTimer: Bool = true
+    ) {
+        self.credentials = credentials
+        self.client = client
+        self.snapshotURL = snapshotURL
+        self.clock = clock
+        self.schedulesTimer = schedulesTimer
+    }
+
+    func start() {
+        guard !isRunning else { return }
+        isRunning = true
+        if schedulesTimer {
+            timer = Timer.scheduledTimer(withTimeInterval: Self.interval, repeats: true) { @Sendable [weak self] _ in
+                MainActor.assumeIsolated { self?.poll() }
+            }
+        }
+        poll()
+    }
+
+    func stop() {
+        isRunning = false
+        timer?.invalidate()
+        timer = nil
+        status = .idle
+    }
+
+    func pollIfStale() {
+        guard isRunning else { return }
+        if let lastAttempt, clock().timeIntervalSince(lastAttempt) < Self.minimumInterval {
+            return
+        }
+        poll()
+    }
+
+    /// Runs one fetch unless one is in flight, the poller is stopped, or a 429 pause is active.
+    func poll() {
+        guard isRunning, pollTask == nil else { return }
+        let now = clock()
+        if let pausedUntil, now < pausedUntil {
+            return
+        }
+        lastAttempt = now
+        pollTask = Task {
+            await performPoll(now: now)
+            pollTask = nil
+        }
+    }
+
+    private func performPoll(now: Date) async {
+        let credentials = credentials
+        let token: String
+        do {
+            // The Keychain read can block on the access prompt, so keep it off the main actor.
+            token = try await Task.detached { try credentials.accessToken() }.value
+        } catch {
+            status = .noCredentials
+            return
+        }
+
+        let result = await client.fetch(token: token, now: now)
+        guard isRunning else { return }
+        switch result {
+        case let .snapshot(incoming):
+            let existing = try? UsageSnapshotFile.read(from: snapshotURL)
+            let merged = existing?.merged(with: incoming, now: now) ?? incoming
+            do {
+                try UsageSnapshotFile.write(merged, to: snapshotURL)
+                pausedUntil = nil
+                status = .ok(fetchedAt: now)
+            } catch {
+                status = .failed("Couldn't save usage data")
+            }
+        case .loginExpired:
+            status = .loginExpired
+        case let .rateLimited(retryAfter):
+            let until = now.addingTimeInterval(retryAfter)
+            pausedUntil = until
+            status = .rateLimited(until: until)
+        case let .failed(message):
+            status = .failed(message)
+        }
+    }
+}
