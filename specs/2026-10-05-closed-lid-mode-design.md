@@ -239,6 +239,7 @@ After connecting, the app calls `version()`. If it differs from the app's bundle
   - Helper rules: keep it minimal, no new XPC methods without a security review, never execute arbitrary commands, every enable path must have a restore-sleep path.
   - Repository layout for docs: specs in `specs/`, plans in `plans/`, other documentation in `docs/`, `README.md` in the root.
   - Manual verification: root-level behavior is checked via `docs/testing.md`.
+  - Git: no `Co-Authored-By` trailers and no mention of Claude/AI tools in commit messages or PR descriptions.
 - `docs/testing.md`: manual test checklist.
 
 `README.md` and `CLAUDE.md` are created early in the implementation (once the project structure exists) and updated as the feature lands, so both stay accurate at every commit.
