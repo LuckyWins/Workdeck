@@ -18,7 +18,9 @@ struct SafeguardPolicyTests {
         Case(power: .init(isOnBattery: true, batteryPercent: 20), thermal: .nominal, threshold: 20, expected: .allow),
         Case(power: .init(isOnBattery: true, batteryPercent: nil), thermal: .nominal, threshold: 50, expected: .allow),
         Case(power: .init(isOnBattery: false, batteryPercent: nil), thermal: .fair, threshold: 20, expected: .allow),
-        Case(power: .init(isOnBattery: false, batteryPercent: 90), thermal: .serious, threshold: 20, expected: .cutoff(.thermal)),
+        // `.serious` is routine under sustained build load; only `.critical` cuts off.
+        Case(power: .init(isOnBattery: false, batteryPercent: 90), thermal: .serious, threshold: 20, expected: .allow),
+        Case(power: .init(isOnBattery: false, batteryPercent: 90), thermal: .critical, threshold: 20, expected: .cutoff(.thermal)),
         Case(power: .init(isOnBattery: true, batteryPercent: 5), thermal: .critical, threshold: 20, expected: .cutoff(.thermal)),
     ]
 

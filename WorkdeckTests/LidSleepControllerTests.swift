@@ -44,7 +44,7 @@ struct LidSleepControllerTests {
     }
 
     @Test func enableRefusedWhenHot() async {
-        thermal.current = .serious
+        thermal.current = .critical
         let controller = makeController()
         await controller.enable()
         #expect(!controller.isActive)
@@ -109,6 +109,14 @@ struct LidSleepControllerTests {
         #expect(controller.notice == .cutoff(.thermal))
     }
 
+    @Test func seriousThermalStateKeepsModeOn() async {
+        let controller = makeController()
+        await controller.enable()
+        thermal.emit(.serious)
+        await controller.safeguardTask?.value
+        #expect(controller.isActive)
+    }
+
     @Test func raisingThresholdAboveChargeTurnsModeOff() async {
         power.current = PowerSnapshot(isOnBattery: true, batteryPercent: 30)
         let controller = makeController()
@@ -133,7 +141,7 @@ struct LidSleepControllerTests {
     @Test func reEnablingClearsPreviousCutoff() async {
         let controller = makeController()
         await controller.enable()
-        thermal.emit(.serious)
+        thermal.emit(.critical)
         await controller.safeguardTask?.value
         thermal.current = .nominal
         await controller.enable()

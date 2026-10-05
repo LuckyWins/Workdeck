@@ -187,7 +187,7 @@ A cutoff/refusal subtitle persists until the user toggles the mode again.
 Every monitor event runs `SafeguardPolicy.evaluate`. A `.cutoff(reason)` result calls `disable(reason:)`.
 
 - **Low battery:** triggers only when on battery power and `percent < threshold`. Not applicable on Macs without a battery.
-- **Thermal:** triggers on `.serious` or `.critical`.
+- **Thermal:** triggers on `.critical` only. `.serious` is reported routinely under sustained CPU load — exactly the long builds this mode exists for — so it does not cut off.
 - Enabling is refused under the same conditions.
 
 ### 6.3 State Synchronization

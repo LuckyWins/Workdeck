@@ -24,7 +24,8 @@ nonisolated enum SafeguardPolicy {
         thermal: ProcessInfo.ThermalState,
         threshold: Int
     ) -> SafeguardDecision {
-        if thermal == .serious || thermal == .critical {
+        // `.serious` is routine during long builds, the main use case; only `.critical` cuts off.
+        if thermal == .critical {
             return .cutoff(.thermal)
         }
         if power.isOnBattery, let percent = power.batteryPercent, percent < threshold {
