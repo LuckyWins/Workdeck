@@ -52,3 +52,27 @@ func usageBody(fiveHour: (Double, TimeInterval)? = nil, sevenDay: (Double, TimeI
     }
     return #"{"five_hour": \#(entry(fiveHour)), "seven_day": \#(entry(sevenDay)), "seven_day_opus": null}"#
 }
+
+/// Fails with a fixed error, counts reads, and can hold the read until released.
+final class ScriptedCredentials: ClaudeCredentialsReading {
+    private let error: ClaudeCredentialsError
+    private let reads = Mutex(0)
+    private let gate: DispatchSemaphore?
+
+    init(failingWith error: ClaudeCredentialsError, held: Bool = false) {
+        self.error = error
+        gate = held ? DispatchSemaphore(value: 0) : nil
+    }
+
+    var readCount: Int { reads.withLock { $0 } }
+
+    func release() {
+        gate?.signal()
+    }
+
+    func accessToken() throws -> String {
+        reads.withLock { $0 += 1 }
+        gate?.wait()
+        throw error
+    }
+}

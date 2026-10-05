@@ -85,6 +85,8 @@ nonisolated enum LimitsText {
             "Rate limited — retrying at \(formatted(until, "HH:mm", calendar: calendar))"
         case .noCredentials:
             "Claude Code login not found"
+        case .keychainDenied:
+            "Keychain access denied — turn the setting off and on to try again"
         case let .failed(message):
             message
         }

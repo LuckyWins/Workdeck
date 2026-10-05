@@ -7,13 +7,15 @@ nonisolated enum UsagePollerStatus: Equatable, Sendable {
     case loginExpired
     case rateLimited(until: Date)
     case noCredentials
+    /// The user denied the Keychain prompt; polling waits until the setting is toggled.
+    case keychainDenied
     case failed(String)
 
     /// Statuses the user should see instead of usage data.
     var isProblem: Bool {
         switch self {
         case .idle, .ok: false
-        case .loginExpired, .rateLimited, .noCredentials, .failed: true
+        case .loginExpired, .rateLimited, .noCredentials, .keychainDenied, .failed: true
         }
     }
 }
@@ -44,6 +46,8 @@ final class UsagePoller: UsagePolling {
     @ObservationIgnored private var isRunning = false
     @ObservationIgnored private var lastAttempt: Date?
     @ObservationIgnored private var pausedUntil: Date?
+    /// Every Keychain read after a denial shows the system prompt again, so stop asking.
+    @ObservationIgnored private var isBlockedByDenial = false
     /// The poll in flight; exposed so tests can await it.
     @ObservationIgnored private(set) var pollTask: Task<Void, Never>?
 
@@ -64,6 +68,7 @@ final class UsagePoller: UsagePolling {
     func start() {
         guard !isRunning else { return }
         isRunning = true
+        isBlockedByDenial = false
         if schedulesTimer {
             timer = Timer.scheduledTimer(withTimeInterval: Self.interval, repeats: true) { @Sendable [weak self] _ in
                 MainActor.assumeIsolated { self?.poll() }
@@ -89,7 +94,7 @@ final class UsagePoller: UsagePolling {
 
     /// Runs one fetch unless one is in flight, the poller is stopped, or a 429 pause is active.
     func poll() {
-        guard isRunning, pollTask == nil else { return }
+        guard isRunning, !isBlockedByDenial, pollTask == nil else { return }
         let now = clock()
         if let pausedUntil, now < pausedUntil {
             return
@@ -108,7 +113,16 @@ final class UsagePoller: UsagePolling {
             // The Keychain read can block on the access prompt, so keep it off the main actor.
             token = try await Task.detached { try credentials.accessToken() }.value
         } catch {
-            status = .noCredentials
+            guard isRunning else { return }
+            switch error as? ClaudeCredentialsError {
+            case .accessDenied:
+                isBlockedByDenial = true
+                status = .keychainDenied
+            case .malformed:
+                status = .failed("Couldn't read Claude Code login")
+            case .notFound, nil:
+                status = .noCredentials
+            }
             return
         }
 

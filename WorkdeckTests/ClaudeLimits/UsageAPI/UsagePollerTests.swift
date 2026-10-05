@@ -95,4 +95,63 @@ struct UsagePollerTests {
         poller.stop()
         #expect(poller.status == .idle)
     }
+
+    private func makePoller(credentials: any ClaudeCredentialsReading) -> UsagePoller {
+        UsagePoller(
+            credentials: credentials,
+            client: UsageAPIClient(transport: transport),
+            snapshotURL: snapshotURL,
+            clock: { fixedNow },
+            schedulesTimer: false
+        )
+    }
+
+    @Test func deniedKeychainAccessStopsAskingUntilRestarted() async {
+        // Each read shows the system prompt again, so a denial must not be retried on a schedule.
+        let credentials = ScriptedCredentials(failingWith: .accessDenied)
+        let poller = makePoller(credentials: credentials)
+        poller.start()
+        await poller.pollTask?.value
+        #expect(poller.status == .keychainDenied)
+        poller.poll()
+        await poller.pollTask?.value
+        #expect(credentials.readCount == 1)
+        poller.stop()
+        poller.start()
+        await poller.pollTask?.value
+        #expect(credentials.readCount == 2)
+    }
+
+    @Test func missingLoginKeepsRetrying() async {
+        let credentials = ScriptedCredentials(failingWith: .notFound)
+        let poller = makePoller(credentials: credentials)
+        poller.start()
+        await poller.pollTask?.value
+        #expect(poller.status == .noCredentials)
+        poller.poll()
+        await poller.pollTask?.value
+        #expect(credentials.readCount == 2)
+    }
+
+    @Test func unreadableLoginIsReportedAsSuch() async {
+        let poller = makePoller(credentials: ScriptedCredentials(failingWith: .malformed))
+        poller.start()
+        await poller.pollTask?.value
+        #expect(poller.status == .failed("Couldn't read Claude Code login"))
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func credentialFailureAfterStopLeavesIdle() async throws {
+        let credentials = ScriptedCredentials(failingWith: .accessDenied, held: true)
+        let poller = makePoller(credentials: credentials)
+        poller.start()
+        while credentials.readCount == 0 {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        poller.stop()
+        credentials.release()
+        await poller.pollTask?.value
+        #expect(poller.status == .idle)
+    }
 }
+
