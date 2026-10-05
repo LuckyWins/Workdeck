@@ -22,13 +22,19 @@ Keeps your Mac awake while the lid is closed — for long builds, remote session
 ## Building
 
 ```bash
-xcodebuild -scheme Workdeck -destination 'platform=macOS' build
-xcodebuild -scheme Workdeck -destination 'platform=macOS' test
+make build     # Release build into ./build
+make test      # run the unit tests
+make install   # build, quit a running Workdeck, copy it to /Applications, and launch it
+make clean     # remove ./build
 ```
 
 Or open `Workdeck.xcodeproj` and run the `Workdeck` scheme. Both the `Workdeck` and `WorkdeckHelper` targets are signed with team `J55BY69CVU`; if you build with a different team, also update `teamIdentifier` in `Shared/HelperConstants.swift`.
 
 Workdeck is not sandboxed and is not distributed through the Mac App Store.
+
+`make install` produces a build signed with your Apple Development certificate. It runs on your own Mac; sharing it with others requires Developer ID signing and notarization, which this project does not set up yet.
+
+macOS ties the helper approval to the app's location. After the first `make install`, approve Workdeck again in Login Items & Extensions; the copy Xcode runs from DerivedData stays listed there as a separate entry and can be turned off.
 
 ## First Run
 
@@ -75,6 +81,12 @@ sudo pmset -a disablesleep 0
 ## Troubleshooting
 
 - **Check the current state:** `pmset -g | grep SleepDisabled` — no output means sleep works normally.
+- **Helper logs:** every change and every safety-net restore is logged:
+
+  ```bash
+  log stream --predicate 'subsystem == "com.appcreators.workdeck.helper"'
+  log show --last 1h --predicate 'subsystem == "com.appcreators.workdeck.helper"'
+  ```
 - **"Couldn't change the sleep setting" after rebuilding in Xcode:** launchd may still be running an older helper build. Turn Workdeck off and on again in Login Items & Extensions. As a last resort, `sudo sfltool resetbtm` resets all background item approvals (for every app) and requires a restart.
 
 ## Project Structure
