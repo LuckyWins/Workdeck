@@ -6,7 +6,10 @@ import Testing
 @MainActor
 final class FakeNotchSurface: NotchSurface {
     var onHoverChange: ((Bool) -> Void)?
+    var model: LimitsNotchModel?
     private(set) var calls: [String] = []
+    /// The alert the model held at each expand, captured synchronously so timing cannot race it.
+    private(set) var alertsAtExpand: [LimitsAlert?] = []
     private(set) var overlapped = false
     private var busy = false
 
@@ -18,7 +21,10 @@ final class FakeNotchSurface: NotchSurface {
         busy = false
     }
 
-    func expand(on screen: NSScreen) async { await perform("expand") }
+    func expand(on screen: NSScreen) async {
+        alertsAtExpand.append(model?.alert)
+        await perform("expand")
+    }
     func compact(on screen: NSScreen) async { await perform("compact") }
     func hide() async { await perform("hide") }
     func closeWindow() { calls.append("close") }
@@ -31,8 +37,9 @@ struct NotchPresenterTests {
     private func makePresenter(screen: NSScreen? = NSScreen.screens.first) -> (NotchPresenter, () -> Int) {
         var created = 0
         let presenter = NotchPresenter(
-            makeSurface: { _ in
+            makeSurface: { model in
                 created += 1
+                surface.model = model
                 return surface
             },
             screen: { screen },
@@ -92,12 +99,8 @@ struct NotchPresenterTests {
         let (presenter, _) = makePresenter()
         presenter.show(state(.hidden))
         presenter.present(.reset(.fiveHour))
-        // Wait for the expansion itself rather than a fixed delay, which is flaky under load.
-        while !surface.calls.contains("expand") {
-            try await Task.sleep(for: .milliseconds(5))
-        }
-        #expect(presenter.model.alert == .reset(.fiveHour))
         await settle(presenter)
+        #expect(surface.alertsAtExpand == [.reset(.fiveHour)])
         #expect(presenter.appliedTarget == .hidden)
         #expect(surface.calls == ["expand", "hide"])
         #expect(presenter.model.alert == nil)
