@@ -41,7 +41,7 @@ Watch the snapshot with `cat ~/Library/Application\ Support/Workdeck/claude-usag
 
 | # | Scenario | Steps | Expected |
 |---|---|---|---|
-| L1 | Connect from popover | Turn on Claude Code Limits in the popover. | "Connect Claude Code?" alert appears; Connect adds `statusLine` pointing at `…/Contents/Helpers/workdeck-statusline`; backup file exists. |
+| L1 | Connect from popover | Turn on Claude Code in the popover. | "Connect Claude Code?" alert appears; Connect adds `statusLine` pointing at `…/Contents/Helpers/workdeck-statusline`; backup file exists. |
 | L2 | Connect from Settings | Disconnect, then click Connect… in Settings. | Same alert and result as L1. |
 | L3 | Data arrives | Run a Claude Code session (Pro/Max) and send a message. | Claude Code's status line shows `5h N%`; the notch shows the same; popover row shows both windows and "updated just now". |
 | L4 | Hover | Hover the compact notch, then move away. | Expands with both windows, reset times and age; collapses on exit. |
