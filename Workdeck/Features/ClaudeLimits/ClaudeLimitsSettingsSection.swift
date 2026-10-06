@@ -7,22 +7,14 @@ struct ClaudeLimitsSettingsSection: View {
         @Bindable var settings = controller.settings
 
         Section {
-            Picker("Show", selection: $settings.mode) {
-                ForEach(LimitsDisplayMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
+            LabeledContent("Status line") {
+                if controller.isConnected {
+                    Button("Disconnect") { controller.disconnect() }
+                } else {
+                    Button("Connect…") { controller.isConfirmingConnect = true }
+                        .disabled(!controller.canConnect)
                 }
             }
-            Picker("First alert at", selection: $settings.firstThreshold) {
-                ForEach(ClaudeLimitsSettings.firstThresholdOptions, id: \.self) { value in
-                    Text("\(value)%").tag(value)
-                }
-            }
-            Picker("Second alert at", selection: $settings.secondThreshold) {
-                ForEach(ClaudeLimitsSettings.secondThresholdOptions(above: settings.firstThreshold), id: \.self) { value in
-                    Text("\(value)%").tag(value)
-                }
-            }
-            Toggle("Notify when a limit resets", isOn: $settings.notifyOnReset)
             Toggle("Fetch usage from Anthropic (unofficial)", isOn: Binding(
                 get: { settings.fetchFromAPI },
                 set: { controller.setFetchFromAPI($0) }
@@ -32,13 +24,24 @@ struct ClaudeLimitsSettingsSection: View {
                     .font(.caption)
                     .foregroundStyle(controller.pollerStatus.isProblem ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
             }
-            LabeledContent("Claude Code") {
-                if controller.isConnected {
-                    Button("Disconnect") { controller.disconnect() }
-                } else {
-                    Button("Connect…") { controller.isConfirmingConnect = true }
-                        .disabled(!controller.canConnect)
+            if controller.hasDataSource {
+                Picker("Show", selection: $settings.mode) {
+                    ForEach(LimitsDisplayMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
                 }
+                Picker("First alert at", selection: $settings.firstThreshold) {
+                    ForEach(ClaudeLimitsSettings.firstThresholdOptions, id: \.self) { value in
+                        Text("\(value)%").tag(value)
+                    }
+                }
+                Picker("Second alert at", selection: $settings.secondThreshold) {
+                    ForEach(ClaudeLimitsSettings.secondThresholdOptions(above: settings.firstThreshold), id: \.self) { value in
+                        Text("\(value)%").tag(value)
+                    }
+                }
+                Toggle("Notify when a limit resets", isOn: $settings.notifyOnReset)
+                Toggle("Forecast when limits run out", isOn: $settings.showForecast)
             }
         } header: {
             Text("Claude Code Limits")
@@ -53,6 +56,7 @@ struct ClaudeLimitsSettingsSection: View {
         .onChange(of: settings.mode) { controller.refresh() }
         .onChange(of: settings.firstThreshold) { controller.refresh() }
         .onChange(of: settings.secondThreshold) { controller.refresh() }
+        .onChange(of: settings.showForecast) { controller.refresh() }
         .claudeConnectConfirmation(controller)
     }
 
@@ -69,5 +73,5 @@ struct ClaudeLimitsSettingsSection: View {
         return "Reads plan usage from Claude Code's status line (Pro and Max plans)."
     }
 
-    static let apiDisclaimer = "Fetching from Anthropic uses the login token Claude Code stores in your Keychain to call an undocumented Anthropic endpoint every 5 minutes. Anthropic's terms do not allow third-party use of Claude Code credentials, and the endpoint may change or stop working. macOS will ask for Keychain access — choose Always Allow."
+    static let apiDisclaimer = "Fetching from Anthropic uses the login token Claude Code stores in your Keychain to call an undocumented Anthropic endpoint every 5 minutes. Anthropic's terms do not allow third-party use of Claude Code credentials, and the endpoint may change or stop working."
 }
