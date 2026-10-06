@@ -68,4 +68,17 @@ struct LimitsTextTests {
         #expect(LimitsText.pollerStatusText(.noCredentials, now: fixedNow, calendar: utc) == "Claude Code login not found")
         #expect(LimitsText.pollerStatusText(.failed("HTTP 500"), now: fixedNow, calendar: utc) == "HTTP 500")
     }
+
+    @Test func sessionAlertTexts() {
+        let finished = LimitsAlert.sessionFinished(project: "Workdeck", worked: 14 * 60)
+        let needsYou = LimitsAlert.sessionNeedsYou(project: "vitastir")
+        #expect(LimitsText.alertTitle(finished) == "Workdeck finished")
+        #expect(LimitsText.alertSubtitle(finished, now: fixedNow, calendar: utc) == "worked 14m")
+        #expect(LimitsText.alertTitle(needsYou) == "vitastir needs you")
+        #expect(LimitsText.alertSubtitle(needsYou, now: fixedNow, calendar: utc) == "permission prompt")
+        #expect(LimitsText.alertSymbol(finished) == "✓")
+        #expect(LimitsText.alertSymbol(needsYou) == "!")
+        #expect(LimitsText.alertSymbol(.reset(.fiveHour)) == "✓")
+        #expect(LimitsText.alertSymbol(.threshold(window(.fiveHour, 80), threshold: 80)) == "!")
+    }
 }

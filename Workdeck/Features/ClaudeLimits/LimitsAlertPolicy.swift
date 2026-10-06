@@ -3,6 +3,8 @@ import Foundation
 nonisolated enum LimitsAlert: Equatable, Sendable {
     case threshold(UsageWindow, threshold: Int)
     case reset(UsageWindowKind)
+    case sessionFinished(project: String, worked: TimeInterval)
+    case sessionNeedsYou(project: String)
 }
 
 /// Decides which alerts to show when new usage data arrives. Pure; the caller persists `firedKeys`.

@@ -111,7 +111,7 @@ struct LimitsExpandedView: View {
     private func alertView(_ alert: LimitsAlert) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
-                Text("!")
+                Text(LimitsText.alertSymbol(alert))
                     .fontWeight(.bold)
                     .foregroundStyle(alertColor(alert))
                 Text(LimitsText.alertTitle(alert))
@@ -242,8 +242,8 @@ struct LimitsExpandedView: View {
 
     private func alertColor(_ alert: LimitsAlert) -> Color {
         switch alert {
-        case .threshold: .orange
-        case .reset: .green
+        case .threshold, .sessionNeedsYou: .orange
+        case .reset, .sessionFinished: .green
         }
     }
 }

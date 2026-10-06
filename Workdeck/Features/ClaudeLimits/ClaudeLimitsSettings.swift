@@ -4,6 +4,7 @@ import Observation
 @Observable
 final class ClaudeLimitsSettings {
     static let firstThresholdOptions = Array(stride(from: 50, through: 95, by: 5))
+    static let finishedAfterOptions = [1, 2, 5, 10, 15, 30]
 
     static func secondThresholdOptions(above first: Int) -> [Int] {
         Array(stride(from: first + 5, through: 100, by: 5))
@@ -19,6 +20,10 @@ final class ClaudeLimitsSettings {
         static let firedAlertKeys = "claudeLimits.firedAlertKeys"
         static let fetchFromAPI = "claudeLimits.fetchFromAPI"
         static let showForecast = "claudeLimits.showForecast"
+        static let keepAwake = "claudeSessions.keepAwake"
+        static let notifyFinished = "claudeSessions.notifyFinished"
+        static let finishedAfterMinutes = "claudeSessions.finishedAfterMinutes"
+        static let notifyNeedsYou = "claudeSessions.notifyNeedsYou"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -79,6 +84,24 @@ final class ClaudeLimitsSettings {
         didSet { defaults.set(showForecast, forKey: Keys.showForecast) }
     }
 
+    /// Hold a power assertion while any session works (spec §10.6).
+    var keepAwakeWhileWorking: Bool {
+        didSet { defaults.set(keepAwakeWhileWorking, forKey: Keys.keepAwake) }
+    }
+
+    var notifyWhenFinished: Bool {
+        didSet { defaults.set(notifyWhenFinished, forKey: Keys.notifyFinished) }
+    }
+
+    /// Only turns at least this long announce that they finished.
+    var finishedAfterMinutes: Int {
+        didSet { defaults.set(finishedAfterMinutes, forKey: Keys.finishedAfterMinutes) }
+    }
+
+    var notifyWhenNeedsYou: Bool {
+        didSet { defaults.set(notifyWhenNeedsYou, forKey: Keys.notifyNeedsYou) }
+    }
+
     var thresholds: [Int] {
         [firstThreshold, secondThreshold]
     }
@@ -95,6 +118,11 @@ final class ClaudeLimitsSettings {
         firedAlertKeys = Set(defaults.stringArray(forKey: Keys.firedAlertKeys) ?? [])
         fetchFromAPI = defaults.bool(forKey: Keys.fetchFromAPI)
         showForecast = defaults.object(forKey: Keys.showForecast) as? Bool ?? true
+        keepAwakeWhileWorking = defaults.bool(forKey: Keys.keepAwake)
+        notifyWhenFinished = defaults.bool(forKey: Keys.notifyFinished)
+        let minutes = defaults.object(forKey: Keys.finishedAfterMinutes) as? Int ?? 10
+        finishedAfterMinutes = Self.finishedAfterOptions.contains(minutes) ? minutes : 10
+        notifyWhenNeedsYou = defaults.bool(forKey: Keys.notifyNeedsYou)
     }
 
     /// 50–95 in steps of 5.

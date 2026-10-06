@@ -56,6 +56,10 @@ nonisolated enum LimitsText {
             "\(window.kind.title) limit at \(threshold)%"
         case let .reset(kind):
             "\(kind.title) limit reset"
+        case let .sessionFinished(project, _):
+            "\(project) finished"
+        case let .sessionNeedsYou(project):
+            "\(project) needs you"
         }
     }
 
@@ -66,6 +70,18 @@ nonisolated enum LimitsText {
             return "Resets at \(formatted(window.resetsAt, format, calendar: calendar))"
         case .reset:
             return nil
+        case let .sessionFinished(_, worked):
+            return "worked \(SessionsText.duration(from: now.addingTimeInterval(-worked), to: now))"
+        case .sessionNeedsYou:
+            return "permission prompt"
+        }
+    }
+
+    /// "!" for something to act on, "✓" for good news.
+    static func alertSymbol(_ alert: LimitsAlert) -> String {
+        switch alert {
+        case .threshold, .sessionNeedsYou: "!"
+        case .reset, .sessionFinished: "✓"
         }
     }
 
