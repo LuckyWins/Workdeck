@@ -144,7 +144,7 @@ struct SessionHooksConnectorTests {
         let old = try makeFakeBinary(app: "Old.app")
         let current = try makeFakeBinary(app: "Workdeck.app")
         try connector(old).connect()
-        connector(current).repairPathIfNeeded()
+        connector(current).repairPathIfNeeded(addingMissingEvents: false)
         #expect(try commands("Stop") == ["'\(current)'"])
         #expect(connector(current).status == .connected)
     }
@@ -152,10 +152,10 @@ struct SessionHooksConnectorTests {
     @Test func noRepairFromTemporaryLocationsOrWhenDisconnected() throws {
         let installed = try makeFakeBinary(app: "Workdeck.app")
         try connector(installed).connect()
-        SessionHooksConnector(file: ClaudeSettingsFile(url: settingsURL), binaryPath: "/Volumes/Workdeck/Workdeck.app/Contents/Helpers/workdeck-hook").repairPathIfNeeded()
+        SessionHooksConnector(file: ClaudeSettingsFile(url: settingsURL), binaryPath: "/Volumes/Workdeck/Workdeck.app/Contents/Helpers/workdeck-hook").repairPathIfNeeded(addingMissingEvents: false)
         #expect(try commands("Stop") == ["'\(installed)'"])
         try connector(installed).disconnect()
-        connector(try makeFakeBinary(app: "Other.app")).repairPathIfNeeded()
+        connector(try makeFakeBinary(app: "Other.app")).repairPathIfNeeded(addingMissingEvents: false)
         #expect(try readSettings()["hooks"] == nil)
     }
 
@@ -166,10 +166,36 @@ struct SessionHooksConnectorTests {
             hooks[event] = [["hooks": [SessionHooksConnector.hook(for: binary)]]]
         }
         try writeSettings(["hooks": hooks])
-        #expect(connector(binary).status == .notConnected)
-        connector(binary).repairPathIfNeeded()
+        // The original eight events are enough to count as connected; the new ones are added once.
         #expect(connector(binary).status == .connected)
+        connector(binary).repairPathIfNeeded(addingMissingEvents: false)
+        #expect(try commands("PreToolUse").isEmpty)
+        connector(binary).repairPathIfNeeded(addingMissingEvents: true)
         #expect(try commands("PreToolUse") == ["'\(binary)'"])
         #expect(try commands("Stop") == ["'\(binary)'"])
+    }
+
+    @Test func removingAnOptionalEventKeepsTheConnection() throws {
+        let binary = try makeFakeBinary()
+        try connector(binary).connect()
+        var settings = try readSettings()
+        var hooks = settings["hooks"] as! [String: Any]
+        hooks.removeValue(forKey: "PreToolUse")
+        settings["hooks"] = hooks
+        try writeSettings(settings)
+        #expect(connector(binary).status == .connected)
+        #expect(!SessionHooksConnector.requiredEvents.contains("PreToolUse"))
+        #expect(!SessionHooksConnector.requiredEvents.contains("PreCompact"))
+    }
+
+    @Test func repairLeavesTheBackupAlone() throws {
+        let old = try makeFakeBinary(app: "Old.app")
+        let current = try makeFakeBinary(app: "Workdeck.app")
+        try connector(old).connect()
+        let backupURL = ClaudeSettingsFile(url: settingsURL).backupURL
+        try Data("original".utf8).write(to: backupURL)
+        connector(current).repairPathIfNeeded(addingMissingEvents: true)
+        #expect(try commands("Stop") == ["'\(current)'"])
+        #expect(try String(contentsOf: backupURL, encoding: .utf8) == "original")
     }
 }

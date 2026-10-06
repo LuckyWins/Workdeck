@@ -101,6 +101,8 @@ struct SessionsList: View {
                     .fontWeight(.semibold)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                    // The project tells sessions apart; the action may be cut first.
+                    .layoutPriority(1)
                 Spacer(minLength: 6)
                 Text(row.status == .working ? (row.action ?? SessionsText.statusText(row.status)) : SessionsText.statusText(row.status))
                     .foregroundStyle(row.status == .idle ? Terminal.dim : row.status.notchColor)

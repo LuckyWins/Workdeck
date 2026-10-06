@@ -243,4 +243,15 @@ struct SessionReducerTests {
         #expect(session.status == .idle)
         #expect(!session.isBusy)
     }
+
+    @Test func stepsOfUnknownAgentsLeaveTheSessionRowAlone() throws {
+        let main = hookEvent(.preToolUse, at: 10) { $0.action = "Agent Explore" }
+        let agentStart = hookEvent(.subagentStart, at: 11) { $0.agentID = "a1"; $0.agentType = "Explore" }
+        let agentStop = hookEvent(.subagentStop, at: 20) { $0.agentID = "a1" }
+        // The stopped agent's late PostToolUse, and a step from an agent not seen yet.
+        let lateAgentTool = hookEvent(.postToolUse, at: 21) { $0.agentID = "a1" }
+        let unknownAgentTool = hookEvent(.preToolUse, at: 22) { $0.agentID = "a9"; $0.action = "Read z.swift" }
+        let session = try #require(SessionReducer.reduce([start, main, agentStart, agentStop, lateAgentTool, unknownAgentTool]))
+        #expect(session.action == "Agent Explore")
+    }
 }

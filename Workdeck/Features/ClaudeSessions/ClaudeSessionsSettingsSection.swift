@@ -17,15 +17,24 @@ struct ClaudeSessionsSettingsSection: View {
             }
             if controller.isHooksConnected {
                 Toggle("Keep Mac awake while Claude works", isOn: $settings.keepAwakeWhileWorking)
-                Toggle("Notify when a session finishes", isOn: $settings.notifyWhenFinished)
-                if settings.notifyWhenFinished {
-                    Picker("After working for", selection: $settings.finishedAfterMinutes) {
-                        ForEach(ClaudeLimitsSettings.finishedAfterOptions, id: \.self) { minutes in
-                            Text("\(minutes) min").tag(minutes)
+                Group {
+                    Toggle("Notify when a session finishes", isOn: $settings.notifyWhenFinished)
+                    if settings.notifyWhenFinished {
+                        Picker("After working for", selection: $settings.finishedAfterMinutes) {
+                            ForEach(ClaudeLimitsSettings.finishedAfterOptions, id: \.self) { minutes in
+                                Text("\(minutes) min").tag(minutes)
+                            }
                         }
                     }
+                    Toggle("Notify when a session needs you", isOn: $settings.notifyWhenNeedsYou)
                 }
-                Toggle("Notify when a session needs you", isOn: $settings.notifyWhenNeedsYou)
+                // Alerts appear in the notch, which only shows while the indicator is on.
+                .disabled(!settings.isEnabled)
+                if !settings.isEnabled {
+                    Text("Turn on Claude Code in the menu bar popover to see alerts in the notch.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         } header: {
             Text("Claude Code · Sessions")

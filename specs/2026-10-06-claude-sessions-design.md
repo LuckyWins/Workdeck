@@ -225,7 +225,7 @@ After trying the first version, the user chose a terminal-style notch (htop-like
 
 ### 10.1 Hooks and Data
 
-- Two more hook events: `PreToolUse` (the current action) and `PreCompact` (context compaction starts), ten in total. On launch, if any Workdeck hook entry exists but some events are missing, the connector adds them (no new Connect needed).
+- Two more hook events: `PreToolUse` (the current action) and `PreCompact` (context compaction starts), ten in total. On the first launch of a version that subscribes to new events, the connector adds them once if Workdeck's hooks are connected (no new Connect needed; tracked by `claudeSessions.hookEventsVersion`). Events a user later removes stay removed. `PreToolUse` and `PreCompact` are optional: without them the hooks still count as connected. Repairs (path or events) never overwrite the backup.
 - `HookEvent.action`: for `PreToolUse` only, the tool name and a short target, at most 30 characters (longer → 29 + "…"):
   - `Read`, `Edit`, `MultiEdit`, `Write` → file name of `file_path` (no directories); `NotebookEdit` → file name of `notebook_path`;
   - `Bash` → the first line of `command`, whitespace collapsed, with secret-looking values masked before truncation (`NAME=value` → `NAME=…`, `-pPASSWORD` → `-p…`, `Bearer|Basic|token VALUE` → `Bearer …`);
@@ -240,7 +240,7 @@ After trying the first version, the user chose a terminal-style notch (htop-like
 | Event | Effect |
 |---|---|
 | `UserPromptSubmit` | As before; also starts the turn (`turnStartedAt`). Any change from idle to working or compacting (a background task or wake-up without a prompt) also starts a turn. |
-| `PreToolUse` | Sets the action of the agent with that `agent_id` when it is running, otherwise of the session. Status working unless the session is waiting. |
+| `PreToolUse` | Sets the action of the agent with that `agent_id` when it is running; an `agent_id` of an agent not running (stopped, or not read yet) changes nothing; no `agent_id` sets the session's action. Status working unless the session is waiting. |
 | `PostToolUse` | As before; also clears the action it belongs to. |
 | `Stop` | As before; clears the session action and records `lastStopAt`. |
 | `PreCompact` | Status compacting; remembers the status it interrupted. |
@@ -258,6 +258,7 @@ Compacting counts as working for the counter color, ordering and keep-awake.
 - **Keep Mac awake while Claude works** (`claudeSessions.keepAwake`).
 - **Notify when a session finishes** (`claudeSessions.notifyFinished`) with **after working for** 1, 2, 5, 10, 15 or 30 minutes (`claudeSessions.finishedAfterMinutes`, default 10), shown when the toggle is on.
 - **Notify when a session needs you** (`claudeSessions.notifyNeedsYou`).
+- The two notify toggles are disabled while the indicator is off (alerts live in the notch), with the hint "Turn on Claude Code in the menu bar popover to see alerts in the notch."
 
 ### 10.5 Alerts
 

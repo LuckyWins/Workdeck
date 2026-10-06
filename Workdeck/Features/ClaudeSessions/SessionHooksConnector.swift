@@ -5,13 +5,17 @@ protocol SessionHooksConnecting {
     var canConnect: Bool { get }
     func connect() throws
     func disconnect() throws
-    func repairPathIfNeeded()
+    func repairPathIfNeeded(addingMissingEvents: Bool)
 }
 
 /// Adds Workdeck's hook entries to Claude Code's user settings, and removes them again (spec §5.3).
 struct SessionHooksConnector: SessionHooksConnecting {
     static let binarySuffix = "/Contents/Helpers/workdeck-hook"
     static let events = HookEventName.allCases.map(\.rawValue)
+    /// Events added after the first version: without them sessions still work (no actions, no compacting),
+    /// so a user may remove them and stay connected.
+    static let optionalEvents: Set<String> = [HookEventName.preToolUse.rawValue, HookEventName.preCompact.rawValue]
+    static let requiredEvents = events.filter { !optionalEvents.contains($0) }
 
     let file: ClaudeSettingsFile
     let binaryPath: String
@@ -24,20 +28,15 @@ struct SessionHooksConnector: SessionHooksConnecting {
         FileManager.default.isExecutableFile(atPath: binaryPath)
     }
 
-    /// Connected only when every event has Workdeck's hook; a partial set is repaired by connecting again.
+    /// Connected when every required event has Workdeck's hook; a partial set is repaired by connecting again.
     var status: ClaudeConnectionStatus {
         guard let hooks = (try? file.read())?["hooks"] as? [String: Any] else { return .notConnected }
-        let complete = Self.events.allSatisfy { !Self.workdeckCommands(in: hooks[$0]).isEmpty }
+        let complete = Self.requiredEvents.allSatisfy { !Self.workdeckCommands(in: hooks[$0]).isEmpty }
         return complete ? .connected : .notConnected
     }
 
     func connect() throws {
-        guard canConnect else { throw ClaudeConnectorError.binaryMissing }
-        var root = try file.read() ?? [:]
-        try file.backUp()
-        let hooks = root["hooks"] as? [String: Any] ?? [:]
-        root["hooks"] = Self.adding(Self.hook(for: binaryPath), to: Self.removingWorkdeckHooks(from: hooks))
-        try file.write(root)
+        try install(events: Self.events, backingUp: true)
     }
 
     func disconnect() throws {
@@ -52,18 +51,30 @@ struct SessionHooksConnector: SessionHooksConnecting {
         try file.write(root)
     }
 
-    /// Points the hooks at this app bundle and adds events a newer Workdeck subscribes to.
-    func repairPathIfNeeded() {
+    /// Points the hooks at this app bundle and, once per new Workdeck version, adds events it newly
+    /// subscribes to. Events the user removed stay removed otherwise. Repairs keep the existing backup.
+    func repairPathIfNeeded(addingMissingEvents: Bool) {
         guard let hooks = (try? file.read())?["hooks"] as? [String: Any] else { return }
-        let commands = Self.events.flatMap { Self.workdeckCommands(in: hooks[$0]) }
-        // Workdeck was connected but points elsewhere, or a newer version subscribes to more events.
-        let isComplete = Self.events.allSatisfy { !Self.workdeckCommands(in: hooks[$0]).isEmpty }
+        let connected = Self.events.filter { !Self.workdeckCommands(in: hooks[$0]).isEmpty }
+        let commands = connected.flatMap { Self.workdeckCommands(in: hooks[$0]) }
+        let needsPath = commands.contains { $0 != ClaudeCodeConnector.command(for: binaryPath) }
+        let needsEvents = addingMissingEvents && connected.count < Self.events.count
         guard !commands.isEmpty,
-              !isComplete || commands.contains(where: { $0 != ClaudeCodeConnector.command(for: binaryPath) }),
-              !ClaudeCodeConnector.isTemporaryLocation(binaryPath),
-              canConnect
+              needsPath || needsEvents,
+              !ClaudeCodeConnector.isTemporaryLocation(binaryPath)
         else { return }
-        try? connect()
+        try? install(events: needsEvents ? Self.events : connected, backingUp: false)
+    }
+
+    private func install(events: [String], backingUp: Bool) throws {
+        guard canConnect else { throw ClaudeConnectorError.binaryMissing }
+        var root = try file.read() ?? [:]
+        if backingUp {
+            try file.backUp()
+        }
+        let hooks = root["hooks"] as? [String: Any] ?? [:]
+        root["hooks"] = Self.adding(Self.hook(for: binaryPath), to: Self.removingWorkdeckHooks(from: hooks), events: events)
+        try file.write(root)
     }
 
     static func isWorkdeckCommand(_ command: String) -> Bool {
@@ -109,7 +120,7 @@ struct SessionHooksConnector: SessionHooksConnecting {
         return result
     }
 
-    static func adding(_ hook: [String: Any], to hooks: [String: Any]) -> [String: Any] {
+    static func adding(_ hook: [String: Any], to hooks: [String: Any], events: [String] = events) -> [String: Any] {
         var result = hooks
         for event in events {
             var groups = result[event] as? [[String: Any]] ?? []

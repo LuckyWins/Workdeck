@@ -87,7 +87,7 @@ final class FakeHooksConnector: SessionHooksConnecting {
     var status: ClaudeConnectionStatus = .notConnected
     var canConnect = true
     var connectError: (any Error)?
-    private(set) var repairCount = 0
+    private(set) var repairs: [Bool] = []
 
     func connect() throws {
         if let connectError { throw connectError }
@@ -98,8 +98,8 @@ final class FakeHooksConnector: SessionHooksConnecting {
         status = .notConnected
     }
 
-    func repairPathIfNeeded() {
-        repairCount += 1
+    func repairPathIfNeeded(addingMissingEvents: Bool) {
+        repairs.append(addingMissingEvents)
     }
 }
 
@@ -569,5 +569,13 @@ struct ClaudeLimitsControllerTests {
         store.reload()
         #expect(presenter.shown.last?.display == .hidden)
         #expect(presenter.shown.last?.sessions.totalCount == 1)
+    }
+
+    @Test func newHookEventsAreAddedOnlyOnce() {
+        let (first, _) = makeController()
+        first.start()
+        let (second, _) = makeController()
+        second.start()
+        #expect(hooksConnector.repairs == [true, false])
     }
 }

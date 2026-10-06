@@ -24,6 +24,7 @@ final class ClaudeLimitsSettings {
         static let notifyFinished = "claudeSessions.notifyFinished"
         static let finishedAfterMinutes = "claudeSessions.finishedAfterMinutes"
         static let notifyNeedsYou = "claudeSessions.notifyNeedsYou"
+        static let hookEventsVersion = "claudeSessions.hookEventsVersion"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -102,6 +103,11 @@ final class ClaudeLimitsSettings {
         didSet { defaults.set(notifyWhenNeedsYou, forKey: Keys.notifyNeedsYou) }
     }
 
+    /// How many hook events this Mac's Workdeck last offered; newly added events are installed once.
+    var hookEventsVersion: Int {
+        didSet { defaults.set(hookEventsVersion, forKey: Keys.hookEventsVersion) }
+    }
+
     var thresholds: [Int] {
         [firstThreshold, secondThreshold]
     }
@@ -123,6 +129,7 @@ final class ClaudeLimitsSettings {
         let minutes = defaults.object(forKey: Keys.finishedAfterMinutes) as? Int ?? 10
         finishedAfterMinutes = Self.finishedAfterOptions.contains(minutes) ? minutes : 10
         notifyWhenNeedsYou = defaults.bool(forKey: Keys.notifyNeedsYou)
+        hookEventsVersion = defaults.integer(forKey: Keys.hookEventsVersion)
     }
 
     /// 50–95 in steps of 5.

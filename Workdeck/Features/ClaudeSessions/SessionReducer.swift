@@ -98,12 +98,15 @@ nonisolated enum SessionReducer {
         return session
     }
 
-    /// An agent's own tool call updates that agent; anything else is the main agent's.
+    /// An agent's own tool call updates that agent; a call without an agent ID is the main agent's.
     private static func setAction(_ action: String?, for agentID: String?, on session: inout ClaudeSession) {
-        if let agentID, let index = session.agents.firstIndex(where: { $0.id == agentID }) {
-            session.agents[index].action = action
-        } else {
+        guard let agentID else {
             session.action = action
+            return
+        }
+        // An agent that already stopped, or whose start has not been read yet, leaves the session row alone.
+        if let index = session.agents.firstIndex(where: { $0.id == agentID }) {
+            session.agents[index].action = action
         }
     }
 

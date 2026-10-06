@@ -143,7 +143,8 @@ final class ClaudeLimitsController {
     func start() {
         connector.repairPathIfNeeded()
         connectionStatus = connector.status
-        hooksConnector.repairPathIfNeeded()
+        hooksConnector.repairPathIfNeeded(addingMissingEvents: settings.hookEventsVersion < SessionHooksConnector.events.count)
+        settings.hookEventsVersion = SessionHooksConnector.events.count
         hooksStatus = hooksConnector.status
         sessions.onChange = { [weak self] in self?.sessionsChanged() }
         presenter.setSessionAction { [weak self] id in self?.activateSession(id: id) }
