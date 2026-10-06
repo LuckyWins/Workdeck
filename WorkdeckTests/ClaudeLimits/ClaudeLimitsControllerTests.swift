@@ -48,6 +48,23 @@ final class FakePoller: UsagePolling {
     func start() { startCount += 1 }
     func stop() { stopCount += 1 }
     func pollIfStale() { staleCheckCount += 1 }
+
+    private(set) var pausedValues: [Bool] = []
+    func setPaused(_ paused: Bool) { pausedValues.append(paused) }
+}
+
+@MainActor
+final class FakeActivity: SessionActivityMonitoring {
+    var isActive = true
+    var onChange: ((Bool) -> Void)?
+    private(set) var startCount = 0
+
+    func start() { startCount += 1 }
+
+    func send(_ active: Bool) {
+        isActive = active
+        onChange?(active)
+    }
 }
 
 @MainActor
@@ -56,6 +73,7 @@ struct ClaudeLimitsControllerTests {
     let connector = FakeConnector()
     let presenter = FakePresenter()
     let poller = FakePoller()
+    let activity = FakeActivity()
     let settings = ClaudeLimitsSettings(defaults: UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!)
 
     private func makeController(notch: Bool = true) -> (ClaudeLimitsController, ClaudeUsageStore) {
@@ -66,6 +84,7 @@ struct ClaudeLimitsControllerTests {
             connector: connector,
             presenter: presenter,
             poller: poller,
+            activity: activity,
             hasNotchScreen: { notch }
         )
         return (controller, store)
@@ -228,5 +247,25 @@ struct ClaudeLimitsControllerTests {
         store.reload()
         #expect(controller.rowSubtitle == "5h 42% · 7d 0% · updated just now")
     }
-}
 
+    @Test func lockPausesPollerAndUnlockRefreshes() {
+        settings.fetchFromAPI = true
+        let (controller, _) = makeController()
+        controller.start()
+        #expect(activity.startCount == 1)
+        #expect(poller.pausedValues == [false])
+        activity.send(false)
+        #expect(poller.pausedValues.last == true)
+        activity.send(true)
+        #expect(poller.pausedValues.last == false)
+        #expect(poller.staleCheckCount == 1)
+    }
+
+    @Test func unlockWithUsageAPIOffDoesNotPoll() {
+        let (controller, _) = makeController()
+        controller.start()
+        activity.send(false)
+        activity.send(true)
+        #expect(poller.staleCheckCount == 0)
+    }
+}

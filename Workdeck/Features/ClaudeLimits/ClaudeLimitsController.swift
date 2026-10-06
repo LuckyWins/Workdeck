@@ -16,6 +16,7 @@ final class ClaudeLimitsController {
     @ObservationIgnored private let connector: any ClaudeCodeConnecting
     @ObservationIgnored private let presenter: any LimitsPresenting
     @ObservationIgnored private let poller: any UsagePolling
+    @ObservationIgnored private let activity: any SessionActivityMonitoring
     @ObservationIgnored private let hasNotchScreen: @MainActor () -> Bool
     @ObservationIgnored private var previousWindows: [UsageWindow] = []
     @ObservationIgnored private var screenObserver: (any NSObjectProtocol)?
@@ -26,6 +27,7 @@ final class ClaudeLimitsController {
         connector: any ClaudeCodeConnecting,
         presenter: any LimitsPresenting,
         poller: any UsagePolling,
+        activity: any SessionActivityMonitoring,
         hasNotchScreen: @escaping @MainActor () -> Bool = NotchPresenter.hasNotchScreen
     ) {
         self.settings = settings
@@ -33,6 +35,7 @@ final class ClaudeLimitsController {
         self.connector = connector
         self.presenter = presenter
         self.poller = poller
+        self.activity = activity
         self.hasNotchScreen = hasNotchScreen
     }
 
@@ -93,6 +96,9 @@ final class ClaudeLimitsController {
             MainActor.assumeIsolated { self?.refresh() }
         }
         store.startWatching()
+        activity.onChange = { [weak self] active in self?.sessionActivityChanged(active) }
+        activity.start()
+        poller.setPaused(!activity.isActive)
         if settings.fetchFromAPI {
             poller.start()
         }
@@ -101,6 +107,14 @@ final class ClaudeLimitsController {
     /// Called when the popover opens: refresh API data if it is more than a minute old.
     func popoverOpened() {
         if settings.fetchFromAPI {
+            poller.pollIfStale()
+        }
+    }
+
+    /// No polling while the screen is locked or asleep; catch up as soon as someone is back.
+    private func sessionActivityChanged(_ active: Bool) {
+        poller.setPaused(!active)
+        if active, settings.fetchFromAPI {
             poller.pollIfStale()
         }
     }

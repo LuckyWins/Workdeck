@@ -19,7 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             credentials: SecurityCLICredentialsReader(),
             client: UsageAPIClient(transport: URLSessionTransport()),
             snapshotURL: WorkdeckPaths.standard().snapshotURL
-        )
+        ),
+        activity: SessionActivityMonitor()
     )
 
     func applicationDidFinishLaunching(_ notification: Notification) {

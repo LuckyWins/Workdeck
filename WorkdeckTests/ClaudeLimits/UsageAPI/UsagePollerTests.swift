@@ -84,6 +84,22 @@ struct UsagePollerTests {
         #expect(poller.status == .ok(fetchedAt: now))
     }
 
+    @Test func pausedPollerSkipsPollsUntilResumed() async {
+        transport.enqueue(.init(status: 200, body: usageBody(fiveHour: (5, 3600))))
+        let poller = makePoller()
+        poller.setPaused(true)
+        poller.start()
+        await poller.pollTask?.value
+        poller.pollIfStale()
+        poller.poll()
+        await poller.pollTask?.value
+        #expect(transport.requests.isEmpty)
+        poller.setPaused(false)
+        poller.pollIfStale()
+        await poller.pollTask?.value
+        #expect(transport.requests.count == 1)
+    }
+
     @Test func stoppedPollerDoesNothing() async {
         let poller = makePoller()
         poller.pollIfStale()

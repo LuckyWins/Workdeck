@@ -26,6 +26,8 @@ protocol UsagePolling: AnyObject {
     func stop()
     /// Polls now unless the last attempt was less than a minute ago.
     func pollIfStale()
+    /// While paused (screen locked or asleep) timer ticks and stale checks do nothing.
+    func setPaused(_ paused: Bool)
 }
 
 /// Opt-in: fetches usage from Anthropic every 5 minutes and merges it into the shared snapshot file,
@@ -48,6 +50,7 @@ final class UsagePoller: UsagePolling {
     @ObservationIgnored private var pausedUntil: Date?
     /// Every Keychain read after a denial shows the system prompt again, so stop asking.
     @ObservationIgnored private var isBlockedByDenial = false
+    @ObservationIgnored private var isPaused = false
     /// The poll in flight; exposed so tests can await it.
     @ObservationIgnored private(set) var pollTask: Task<Void, Never>?
 
@@ -84,6 +87,10 @@ final class UsagePoller: UsagePolling {
         status = .idle
     }
 
+    func setPaused(_ paused: Bool) {
+        isPaused = paused
+    }
+
     func pollIfStale() {
         guard isRunning else { return }
         if let lastAttempt, clock().timeIntervalSince(lastAttempt) < Self.minimumInterval {
@@ -94,7 +101,7 @@ final class UsagePoller: UsagePolling {
 
     /// Runs one fetch unless one is in flight, the poller is stopped, or a 429 pause is active.
     func poll() {
-        guard isRunning, !isBlockedByDenial, pollTask == nil else { return }
+        guard isRunning, !isPaused, !isBlockedByDenial, pollTask == nil else { return }
         let now = clock()
         if let pausedUntil, now < pausedUntil {
             return
