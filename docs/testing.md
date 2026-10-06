@@ -63,6 +63,21 @@ Watch the snapshot with `cat ~/Library/Application\ Support/Workdeck/claude-usag
 | L20 | Settings layout | Disconnect the status line and turn the API off. Then turn either on. | Only "Status line" and the API toggle are shown; turning either on reveals Show, the alert pickers, the reset toggle and the forecast toggle. |
 | L21 | Forecast | Use Claude Code heavily in a running 5-hour window, then hover the notch. Turn off "Forecast when limits run out". | When the limit would run out before the reset, the row shows "runs out ~HH:mm · resets HH:mm" with the first part orange; with the setting off, the usual "resets in …" text returns. |
 
+## Claude Code Sessions Checklist
+
+Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessions` and the hooks with `python3 -c "import json,os; print(list(json.load(open(os.path.expanduser('~/.claude/settings.json'))).get('hooks', {})))"`.
+
+| # | Scenario | Steps | Expected |
+|---|---|---|---|
+| S1 | Connect | Settings → Claude Code · Sessions → Connect…, confirm. | Eight hook events appear in `settings.json`, each with an async `workdeck-hook` entry; `settings.json.workdeck-backup` holds the previous file; other hooks are unchanged. |
+| S2 | VS Code panel | Open a Claude Code panel in VS Code and send a message. | The compact notch shows `● 1` (green while working); the expanded notch lists the project as "working", then "idle" with a duration after the answer. |
+| S3 | Terminal | Run `claude` in Terminal in another folder and send a message. | A second row appears; the counter shows 2. |
+| S4 | Waiting for you | In a session without auto-approval, ask for a command that needs permission. | The row turns orange "waiting for you" and moves to the top; the dot is orange. After approving, it returns to "working". |
+| S5 | Agents | Ask a session to use the Explore agent. | An indented row "Explore · <task>" appears under the session while it runs and disappears when it finishes. With three or more agents, at most two rows plus "+N agents". |
+| S6 | Click to focus | Click the VS Code session row, then the Terminal row. | The VS Code window with that project comes to the front; Terminal is activated. |
+| S7 | Closing | Close the VS Code panel tab; separately, `kill` a terminal `claude` process. | The closed session disappears at once; the killed one within 10 seconds. Their files are deleted. |
+| S8 | Disconnect | Disconnect in Settings. | Only Workdeck's hook entries are removed; your own hooks stay; the sessions disappear from the notch. |
+
 ## Results
 
 Mark each run with the date, build commit, and macOS version. Record only scenarios that were actually executed.

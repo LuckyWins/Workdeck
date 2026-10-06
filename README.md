@@ -14,7 +14,9 @@ Keeps your Mac awake while the lid is closed — for long builds, remote session
 
 > **Note:** While Closed-Lid Mode is on, macOS does not sleep at all — idle sleep and Apple menu → Sleep are disabled too. The display still turns off as usual.
 
-### Claude Code Limits
+### Claude Code
+
+#### Limits
 
 Shows how much of your Claude Code plan limits you have used — the 5-hour window and the weekly window — in the MacBook notch, Dynamic Island style.
 
@@ -24,11 +26,17 @@ Shows how much of your Claude Code plan limits you have used — the 5-hour wind
 - A forecast in the expanded view, e.g. `runs out ~16:40 · resets 18:00`, when a limit will run out before it resets at your current pace (can be turned off in Settings).
 - On a screen without a notch (an external display, or with the lid closed) the usage appears as text next to the Workdeck icon in the menu bar.
 
-**Connecting to Claude Code.** Turn on Claude Code Limits in the popover (or click **Connect…** in Settings). Workdeck adds its status line command to `~/.claude/settings.json` and saves a backup as `~/.claude/settings.json.workdeck-backup`. Only the `statusLine` key changes, but the file is re-written, so key order and formatting may change. If you already had a status line, Workdeck keeps running it and shows its output after the usage, e.g. `5h 42% · main`. **Disconnect** in Settings restores your previous status line.
+**Connecting to Claude Code.** Turn on Claude Code in the popover (or click **Connect…** in Settings). Workdeck adds its status line command to `~/.claude/settings.json` and saves a backup as `~/.claude/settings.json.workdeck-backup`. Only the `statusLine` key changes, but the file is re-written, so key order and formatting may change. If you already had a status line, Workdeck keeps running it and shows its output after the usage, e.g. `5h 42% · main`. **Disconnect** in Settings restores your previous status line.
 
 **Limitations.** Claude Code reports plan usage through the status line only for Claude Pro and Max subscriptions, and only while a Claude Code session runs in a terminal (after the first response). The graphical panel of the Claude Code VS Code extension does not run the status line. Between sessions Workdeck shows the last known values and how old they are.
 
 **Working only in the VS Code extension.** Turn on **Fetch usage from Anthropic (unofficial)** in Settings. Workdeck then reads the login token Claude Code stores in your Keychain (through the system `security` tool, so macOS does not ask for your password) and calls an undocumented Anthropic endpoint every 5 minutes, when you open the popover (at most once a minute), and when you click the refresh button in the expanded notch. Polling pauses while the screen is locked or asleep and catches up when you unlock. Workdeck never refreshes or stores the token. Anthropic's terms do not allow third-party use of Claude Code credentials, and the endpoint may change or stop working at any time; use this at your own discretion. If the login expires, open Claude Code to refresh it.
+
+#### Sessions
+
+Connect **Session hooks** in Settings to see every live Claude Code session in the expanded notch: whether it is working, waiting for you (a permission prompt), or idle, and which subagents are running inside it. The compact notch shows how many sessions are live; the dot is orange when one waits for you. Click a session to bring its window to the front (VS Code, Cursor and Windsurf open the project's window; terminals are activated).
+
+Workdeck adds asynchronous hooks for `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PostToolUse`, `Notification`, `Stop`, `SubagentStart` and `SubagentStop` to `~/.claude/settings.json` (with the same backup as the status line). The hook command, `workdeck-hook`, keeps only the event name, session and agent IDs, the project folder, the agent type and task description, and which app hosts the session, in `~/Library/Application Support/Workdeck/sessions`. Prompts, answers and tool input are never stored. **Disconnect** removes only Workdeck's hooks.
 
 ## Requirements
 
@@ -118,6 +126,8 @@ Shared/            Code compiled into both the app and the helper
 LaunchDaemons/     launchd job definition embedded in the app bundle
 ClaudeUsage/       Code shared by the app and the status line command
 WorkdeckStatusLine/ Claude Code status line command (workdeck-statusline)
+ClaudeHooks/       Code shared by the app and the hook command
+WorkdeckHook/      Claude Code hook command (workdeck-hook)
 WorkdeckTests/     Unit tests (Swift Testing)
 specs/             Design specs
 plans/             Implementation plans
