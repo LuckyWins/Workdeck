@@ -76,6 +76,7 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | S5 | Agents | Ask a session to use the Explore agent. | An indented row "Explore · <task>" appears under the session while it runs and disappears when it finishes. With three or more agents, at most two rows plus "+N agents". |
 | S6 | Click to focus | Click the VS Code session row, then the Terminal row. | The VS Code window with that project comes to the front; Terminal is activated. |
 | S7 | Closing | Close the VS Code panel tab; separately, `kill` a terminal `claude` process. | The closed session disappears at once; the killed one within 10 seconds. Their files are deleted. |
+| S9 | Interrupt | Send a long task, press Esc while it works; separately, answer "No" to a permission prompt. Wait about a minute. | The session returns to "idle" within about a minute (Claude Code's idle prompt). |
 | S8 | Disconnect | Disconnect in Settings. | Only Workdeck's hook entries are removed; your own hooks stay; the sessions disappear from the notch. |
 
 ## Results

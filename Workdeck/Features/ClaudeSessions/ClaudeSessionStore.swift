@@ -20,6 +20,8 @@ final class ClaudeSessionStore {
     @ObservationIgnored private var events: [String: [HookEvent]] = [:]
     @ObservationIgnored private var offsets: [String: UInt64] = [:]
     @ObservationIgnored private var source: (any DispatchSourceFileSystemObject)?
+    /// One source per event file: appending to a file does not change its directory.
+    @ObservationIgnored private var fileSources: [String: any DispatchSourceFileSystemObject] = [:]
     @ObservationIgnored private var timer: Timer?
 
     init(directory: URL, liveness: any ProcessLiveness, clock: @escaping () -> Date = { Date() }) {
@@ -42,7 +44,7 @@ final class ClaudeSessionStore {
             source.resume()
             self.source = source
         }
-        // Appending to a file does not change its directory, and dead processes send no events.
+        // Dead processes send no events.
         timer = Timer.scheduledTimer(withTimeInterval: Self.checkInterval, repeats: true) { @Sendable [weak self] _ in
             MainActor.assumeIsolated { self?.reload() }
         }
@@ -65,6 +67,7 @@ final class ClaudeSessionStore {
             }
             events[id, default: []] += result.events
             offsets[id] = result.offset
+            watchFile(id, at: file)
         }
         for id in Array(events.keys) where !present.contains(id) {
             forget(id)
@@ -119,5 +122,19 @@ final class ClaudeSessionStore {
     private func forget(_ id: String) {
         events[id] = nil
         offsets[id] = nil
+        fileSources.removeValue(forKey: id)?.cancel()
+    }
+
+    private func watchFile(_ id: String, at url: URL) {
+        guard source != nil, fileSources[id] == nil else { return }
+        let descriptor = open(url.path, O_EVTONLY)
+        guard descriptor >= 0 else { return }
+        let fileSource = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: [.write, .extend, .delete, .rename], queue: .main)
+        fileSource.setEventHandler { @Sendable [weak self] in
+            MainActor.assumeIsolated { self?.reload() }
+        }
+        fileSource.setCancelHandler { close(descriptor) }
+        fileSource.resume()
+        fileSources[id] = fileSource
     }
 }

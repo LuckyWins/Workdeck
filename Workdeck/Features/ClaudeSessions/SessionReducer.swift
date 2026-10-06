@@ -11,11 +11,11 @@ nonisolated enum SessionReducer {
 
     static func apply(_ event: HookEvent, to current: ClaudeSession?) -> ClaudeSession {
         var session = current ?? ClaudeSession(id: event.sessionID, status: .idle, since: event.time, lastEventAt: event.time)
-        if event.name == .sessionStart {
-            // A new process (startup or resume): drop the old state, keep what identifies the session.
+        // Compaction keeps the session running; startup, resume and clear begin afresh.
+        if event.name == .sessionStart, event.source != "compact" {
             session = ClaudeSession(
                 id: event.sessionID,
-                cwd: session.cwd,
+                cwd: event.projectDir ?? event.cwd ?? session.cwd,
                 status: .idle,
                 since: event.time,
                 pid: session.pid,
@@ -26,7 +26,12 @@ nonisolated enum SessionReducer {
                 lastEventAt: event.time
             )
         }
-        session.cwd = event.cwd ?? session.cwd
+        // The Bash tool keeps `cd` between commands, so a later `cwd` is not the project.
+        if let projectDir = event.projectDir {
+            session.cwd = projectDir
+        } else if session.cwd == nil {
+            session.cwd = event.cwd
+        }
         if let pid = event.pid, pid != session.pid {
             session.pid = pid
             session.pidSince = event.time
@@ -39,11 +44,23 @@ nonisolated enum SessionReducer {
         switch event.name {
         case .sessionStart:
             break
-        case .userPromptSubmit, .postToolUse:
+        case .userPromptSubmit:
             setStatus(.working, at: event.time, on: &session)
+        case .postToolUse:
+            // Agents run in parallel: only the agent that asked for permission ends the wait.
+            if session.status != .waiting || event.agentID == session.waitingAgentID {
+                setStatus(.working, at: event.time, on: &session)
+            }
         case .notification:
-            if event.notificationType == "permission_prompt" {
+            switch event.notificationType {
+            case "permission_prompt":
                 setStatus(.waiting, at: event.time, on: &session)
+                session.waitingAgentID = event.agentID
+            case "idle_prompt":
+                // An interrupt (Esc) or a denied permission sends no Stop; this arrives about a minute later.
+                setStatus(.idle, at: event.time, on: &session)
+            default:
+                break
             }
         case .stop:
             setStatus(.idle, at: event.time, on: &session)

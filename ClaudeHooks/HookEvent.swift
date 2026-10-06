@@ -17,7 +17,10 @@ nonisolated struct HookEvent: Codable, Equatable, Sendable {
     var time: Date
     var name: HookEventName
     var sessionID: String
+    /// Claude's current directory, which follows `cd` in the Bash tool.
     var cwd: String?
+    /// `CLAUDE_PROJECT_DIR`: the project the session was started in.
+    var projectDir: String?
     /// `CLAUDE_PID`: the `claude` process running the session.
     var pid: Int32?
     /// `CLAUDE_CODE_ENTRYPOINT`, e.g. `cli` or `claude-vscode`.

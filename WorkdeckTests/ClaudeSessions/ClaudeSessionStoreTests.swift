@@ -128,6 +128,20 @@ struct ClaudeSessionStoreTests {
         store.reload()
         #expect(calls == 1)
     }
+
+    @Test(.timeLimit(.minutes(1)))
+    func appendsAreSeenWithoutWaitingForTheTimer() async throws {
+        start("s1")
+        let store = makeStore()
+        store.startWatching()
+        #expect(store.sessions.first?.status == .idle)
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 5), to: directory)
+        let deadline = Date().addingTimeInterval(3)
+        while store.sessions.first?.status != .working, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(store.sessions.first?.status == .working)
+    }
 }
 
 struct SystemProcessLivenessTests {

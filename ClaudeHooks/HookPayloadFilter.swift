@@ -26,6 +26,7 @@ nonisolated enum HookPayloadFilter {
             name: name,
             sessionID: sessionID,
             cwd: root["cwd"] as? String,
+            projectDir: environment["CLAUDE_PROJECT_DIR"].flatMap { $0.isEmpty ? nil : $0 },
             pid: environment["CLAUDE_PID"].flatMap { Int32($0) },
             entrypoint: short(environment["CLAUDE_CODE_ENTRYPOINT"]),
             hostBundleID: short(environment["__CFBundleIdentifier"]),

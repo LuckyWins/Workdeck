@@ -96,4 +96,12 @@ struct HookPayloadFilterTests {
         ]))
         #expect(payload.event.agentType?.count == HookPayloadFilter.maxFieldLength)
     }
+
+    @Test func copiesTheProjectDirectory() throws {
+        var environment = self.environment
+        environment["CLAUDE_PROJECT_DIR"] = "/Users/me/Workdeck"
+        let payload = try #require(parse(["hook_event_name": "Stop", "session_id": sessionID, "cwd": "/Users/me/Workdeck/sub"], environment: environment))
+        #expect(payload.event.projectDir == "/Users/me/Workdeck")
+        #expect(payload.event.cwd == "/Users/me/Workdeck/sub")
+    }
 }

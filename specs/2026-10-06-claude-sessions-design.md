@@ -118,7 +118,7 @@ All file-system, clock, process, and workspace access is injected so units are t
 
 - Configured for `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PostToolUse`, `Notification`, `Stop`, `SubagentStart`, `SubagentStop`, each as `{"type": "command", "command": "'<app>/Contents/Helpers/workdeck-hook'", "async": true, "timeout": 5}` with no matcher.
 - Reads stdin (at most 4 MiB: `PostToolUse` payloads carry the tool output, which Workdeck never reads), filters (§4.2), appends one line, exits 0 with no output. Larger input or any error → exit 0 silently.
-- Environment fields: `CLAUDE_PID` → `pid`, `CLAUDE_CODE_ENTRYPOINT` → `entrypoint`, `__CFBundleIdentifier` → `hostBundleID`, `TERM_PROGRAM` → `termProgram`.
+- Environment fields: `CLAUDE_PROJECT_DIR` → `projectDir`, `CLAUDE_PID` → `pid`, `CLAUDE_CODE_ENTRYPOINT` → `entrypoint`, `__CFBundleIdentifier` → `hostBundleID`, `TERM_PROGRAM` → `termProgram`.
 - `transcript_path` is used only to locate the agent's `meta.json` and is not stored.
 
 ### 5.2 Session State
@@ -127,15 +127,17 @@ All file-system, clock, process, and workspace access is injected so units are t
 
 | Event | Effect |
 |---|---|
-| `SessionStart` | Resets the session: status idle, no agents, takes `pid` and host fields from this event. |
-| `UserPromptSubmit`, `PostToolUse` | Status working (keeps `since` if already working). |
-| `Notification` with `notification_type == "permission_prompt"` | Status waiting. Other notification types → no change. |
+| `SessionStart` (any `source` except `compact`) | Resets the session: status idle, no agents, takes `pid` and host fields from this event. Compaction keeps status and agents. |
+| `UserPromptSubmit` | Status working (keeps `since` if already working). |
+| `PostToolUse` | Status working, except while waiting for another agent: only a tool call from the agent that asked for permission (same `agent_id`, `nil` for the main agent) ends the wait. |
+| `Notification` with `notification_type == "permission_prompt"` | Status waiting; remembers the asking agent. |
+| `Notification` with `notification_type == "idle_prompt"` | Status idle: an interrupt (Esc) or a denied permission sends no `Stop`, and Claude Code reports the idle prompt about a minute later. Other notification types → no change. |
 | `Stop` | Status idle. Running agents stay (background agents outlive the turn). |
 | `SubagentStart` | Adds the agent. |
 | `SubagentStop` | Removes the agent. |
 | `SessionEnd` | Session ended: the store removes it and deletes its file. |
 
-`since` changes only when the status changes. Fields missing from an event (for example `pid`) keep their previous values.
+`since` changes only when the status changes. Fields missing from an event (for example `pid`) keep their previous values. The project folder is `CLAUDE_PROJECT_DIR` when the hook environment has it, otherwise the first `cwd` reported (or the `cwd` of `SessionStart`); later `cwd` values follow `cd` in the Bash tool and are ignored.
 
 ### 5.3 Connecting
 
@@ -149,7 +151,7 @@ All file-system, clock, process, and workspace access is injected so units are t
 
 ### 5.4 Store, Liveness, and Window Activation
 
-- The store watches the sessions directory (file system events plus a 10-second timer). It keeps a byte offset per file and reads only appended complete lines; a partial last line waits for the next read. Malformed lines are skipped.
+- The store watches the sessions directory and each event file (file system events; appending to a file does not change its directory) plus a 10-second timer. It keeps a byte offset per file and reads only appended complete lines; a partial last line waits for the next read. Malformed lines are skipped.
 - Liveness, every 10 seconds and after each read: a session is removed and its file deleted when
   - its last event is `SessionEnd`, or
   - it has a `pid` and that process is gone, or it started after the event that reported the PID (the PID was reused), or

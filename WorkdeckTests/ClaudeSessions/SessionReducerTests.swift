@@ -50,8 +50,8 @@ struct SessionReducerTests {
     }
 
     @Test func otherNotificationsChangeNothing() throws {
-        let idlePrompt = hookEvent(.notification, at: 20) { $0.notificationType = "idle_prompt" }
-        let session = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10), idlePrompt]))
+        let other = hookEvent(.notification, at: 20) { $0.notificationType = "auth_success" }
+        let session = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10), other]))
         #expect(session.status == .working)
         #expect(session.since == fixedNow.addingTimeInterval(10))
     }
@@ -119,5 +119,52 @@ struct SessionReducerTests {
     @Test func projectNameFallsBackWithoutAFolder() throws {
         let session = try #require(SessionReducer.reduce([hookEvent(.stop, at: 0)]))
         #expect(session.projectName == "Claude Code")
+    }
+
+    @Test func idlePromptMeansIdleAfterAnInterrupt() throws {
+        // Esc or a denied permission sends no Stop; Claude Code reports the idle prompt about a minute later.
+        let prompt = hookEvent(.notification, at: 20) { $0.notificationType = "permission_prompt" }
+        let idle = hookEvent(.notification, at: 80) { $0.notificationType = "idle_prompt" }
+        let session = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10), prompt, idle]))
+        #expect(session.status == .idle)
+        #expect(session.since == fixedNow.addingTimeInterval(80))
+    }
+
+    @Test func waitingIgnoresOtherAgentsToolCalls() throws {
+        let prompt = hookEvent(.notification, at: 20) { $0.notificationType = "permission_prompt" }
+        let otherAgent = hookEvent(.postToolUse, at: 21) { $0.agentID = "a1" }
+        let waiting = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10), prompt, otherAgent]))
+        #expect(waiting.status == .waiting)
+        let resumed = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10), prompt, otherAgent, hookEvent(.postToolUse, at: 22)]))
+        #expect(resumed.status == .working)
+    }
+
+    @Test func agentWaitingClearsOnItsOwnToolCall() throws {
+        let prompt = hookEvent(.notification, at: 20) { $0.notificationType = "permission_prompt"; $0.agentID = "a1" }
+        let main = hookEvent(.postToolUse, at: 21)
+        let own = hookEvent(.postToolUse, at: 22) { $0.agentID = "a1" }
+        #expect(SessionReducer.reduce([start, prompt, main])?.status == .waiting)
+        #expect(SessionReducer.reduce([start, prompt, main, own])?.status == .working)
+    }
+
+    @Test func compactionKeepsStatusAndAgents() throws {
+        let agent = hookEvent(.subagentStart, at: 12) { $0.agentID = "a1"; $0.agentType = "Explore" }
+        let compact = hookEvent(.sessionStart, at: 30) { $0.source = "compact"; $0.pid = 42 }
+        let session = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10), agent, compact]))
+        #expect(session.status == .working)
+        #expect(session.since == fixedNow.addingTimeInterval(10))
+        #expect(session.agents.map(\.id) == ["a1"])
+    }
+
+    @Test func projectFolderSurvivesChangingDirectory() throws {
+        let cd = hookEvent(.postToolUse, at: 10) { $0.cwd = "/p/Workdeck/packages/foo" }
+        let session = try #require(SessionReducer.reduce([start, cd]))
+        #expect(session.cwd == "/p/Workdeck")
+        #expect(session.projectName == "Workdeck")
+    }
+
+    @Test func projectDirectoryFromClaudeCodeWins() throws {
+        let event = hookEvent(.userPromptSubmit, at: 10) { $0.cwd = "/p/Workdeck/sub"; $0.projectDir = "/p/Root" }
+        #expect(SessionReducer.reduce([start, event])?.projectName == "Root")
     }
 }
