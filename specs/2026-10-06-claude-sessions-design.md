@@ -297,3 +297,28 @@ Unit: action extraction for every tool kind, truncation, other input never store
   ```
   Line one: full type, model, a cyan `bg` for background agents, duration. Line two: the current action (or the description), and `N steps`. The tree line continues between agents. Help text: description · model · background/foreground.
 - Not yet verified live: the model and `bg` on agents started after this version is installed (agents started earlier were recorded without them).
+
+## 12. Amendment: Controller Split, Live Background Agents, Diagnostics (2026-10-06)
+
+### 12.1 Controller Split (no behavior change)
+
+- `ClaudeLimitsController` keeps only limits: status line connection, usage API poller, screen activity, limits alerts, the limits part of the notch state.
+- New `ClaudeSessionsController`: session hooks connection, the session store, session alerts, keep-awake, window activation.
+- New `ClaudeCodeController` composes both: the combined notch state (`LimitsViewState`), the popover row (subtitle, indicator toggle), the menu bar text, presenting alerts from both parts.
+- `ClaudeLimitsSettings` becomes `ClaudeCodeSettings` (same UserDefaults keys); `ClaudeLimitsRow` becomes `ClaudeCodeRow`.
+- Folders: `Workdeck/Features/ClaudeCode/` with `Limits/` (and `Limits/UsageAPI/`) and `Sessions/`; shared notch and settings code at its root. Tests mirror this under `WorkdeckTests/ClaudeCode/`.
+
+### 12.2 Live Background Agents
+
+- Probe (2026-10-06): `Stop` and `SubagentStop` carry `background_tasks`, a list of `{id, type, status, agent_type, description}`; `id` equals the agent's `agent_id`; the main agent's `Stop` lists the background agents alive at that moment (a `SubagentStop` still lists the stopping agent as running).
+- The hook records, for `Stop` without `agent_id` only, `backgroundAgentIDs`: the `id` of entries whose `type` is `"subagent"` (validated like other IDs). Descriptions are never read.
+- Reducer: on such a `Stop`, running agents whose IDs are not in the list are removed — foreground agents have finished by then, and a background agent missing from the list was stopped (e.g. with `TaskStop`). The `TaskStop` silence rule and the 30-minute silence rule (§10) stay as fallbacks for `Stop` events without the field.
+
+### 12.3 Diagnostics
+
+- Unified logging (`os.Logger`), subsystem `com.appcreators.workdeck`, categories `sessions`, `alerts`, `keepAwake`, `limits`. Logged: session status transitions (`vitastir: working → idle`), agents appearing and disappearing, alert decisions including why an alert was not shown (below threshold, host app in front, agents still running, indicator off), keep-awake on/off, hook connection errors, usage API status changes. Never logged: prompts, actions, descriptions, tokens; only session IDs (first 8 characters), project names, agent types, statuses.
+- Settings → About: **Copy Diagnostics** copies the last hour of Workdeck's log entries plus a snapshot of the current state (sessions with status, agent count, types and models; relevant settings; connection states; app version) to the clipboard as plain text.
+
+### 12.4 Testing
+
+Unit: the split keeps every existing test's assertions (only constructors and the object a call goes through change); background agent IDs parsed only from main `Stop` and only `subagent` entries; reducer removal on `Stop`; alert decision reasons; the diagnostics snapshot text. Manual: `docs/testing.md` S15 (stopping a background agent with TaskStop removes it at the next Stop) and S16 (Copy Diagnostics).
