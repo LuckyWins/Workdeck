@@ -20,26 +20,6 @@ struct ClaudeLimitsRow: View {
 
             Spacer(minLength: 8)
 
-            if controller.settings.fetchFromAPI {
-                Group {
-                    if controller.isFetching {
-                        ProgressView()
-                            .controlSize(.mini)
-                    } else {
-                        Button {
-                            controller.refreshNow()
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                        }
-                        .buttonStyle(.borderless)
-                        .foregroundStyle(.secondary)
-                        .disabled(!controller.canRefreshNow)
-                        .help("Refresh usage")
-                    }
-                }
-                .frame(width: 16, height: 16)
-            }
-
             Toggle("Claude Code Limits", isOn: Binding(
                 get: { controller.settings.isEnabled && controller.hasDataSource },
                 set: { controller.setEnabled($0) }

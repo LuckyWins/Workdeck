@@ -132,4 +132,12 @@ struct NotchPresenterTests {
         await settle(presenter)
         #expect(created() == 0)
     }
+
+    @Test func refreshActionReachesTheNotchViews() {
+        let (presenter, _) = makePresenter()
+        var refreshed = 0
+        presenter.setRefreshAction { refreshed += 1 }
+        presenter.model.onRefresh?()
+        #expect(refreshed == 1)
+    }
 }

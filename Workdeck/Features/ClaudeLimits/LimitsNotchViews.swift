@@ -5,6 +5,7 @@ import SwiftUI
 final class LimitsNotchModel {
     var state = LimitsViewState.hidden
     var alert: LimitsAlert?
+    @ObservationIgnored var onRefresh: (() -> Void)?
 }
 
 extension LimitsLevel {
@@ -117,11 +118,43 @@ struct LimitsExpandedView: View {
             ForEach(UsageWindowKind.allCases, id: \.self) { kind in
                 windowRow(kind)
             }
-            if let age = model.state.age {
-                Text(LimitsText.ageText(age))
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.6))
+            if model.state.age != nil || model.state.refresh != .hidden {
+                HStack(spacing: 6) {
+                    if let age = model.state.age {
+                        Text(LimitsText.ageText(age))
+                            .font(.caption2)
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    Spacer(minLength: 8)
+                    refreshButton
+                }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var refreshButton: some View {
+        switch model.state.refresh {
+        case .hidden:
+            EmptyView()
+        case .fetching:
+            ProgressView()
+                .controlSize(.mini)
+                .tint(.white)
+                .frame(width: 14, height: 14)
+        case .ready, .unavailable:
+            Button {
+                model.onRefresh?()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.caption.weight(.semibold))
+                    .frame(width: 14, height: 14)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white.opacity(model.state.refresh == .ready ? 0.7 : 0.3))
+            .disabled(model.state.refresh != .ready)
+            .help("Refresh usage")
         }
     }
 

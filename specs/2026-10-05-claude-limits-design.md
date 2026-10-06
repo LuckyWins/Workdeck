@@ -281,7 +281,8 @@ Unit: token extraction; response parsing (both windows, `null`, fractional-secon
 
 ### 11.3 Manual Refresh
 
-- Popover row: a small borderless `arrow.clockwise` button in the secondary color, left of the toggle, help text "Refresh usage". Shown only when `fetchFromAPI` is on; a small progress indicator replaces it while a fetch is in flight; disabled while a 429 pause is active.
+- Expanded notch: a small `arrow.clockwise` button at the end of the bottom line, next to "Updated 3 min ago", help text "Refresh usage". Shown only when `fetchFromAPI` is on; a small progress indicator replaces it while a fetch is in flight; dimmed and disabled while a 429 pause is active. (Moved from the popover row at the user's request; on a screen without a notch there is no button, and opening the popover still refreshes stale data.)
+- The poller reports every `status` and `isFetching` change through `onChange`, so the controller re-renders the notch; the controller hands the button's action to the presenter (`setRefreshAction`).
 - It calls `UsagePoller.refreshNow()`: polls immediately regardless of the 1-minute throttle and clears the Keychain denial block. It still respects the 429 pause and never starts a second fetch while one is in flight.
 - The `keychainDenied` status text becomes "Keychain access denied — click Refresh to try again".
 

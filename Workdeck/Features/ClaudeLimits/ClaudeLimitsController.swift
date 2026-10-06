@@ -52,19 +52,16 @@ final class ClaudeLimitsController {
         poller.status
     }
 
-    var isFetching: Bool {
-        poller.isFetching
-    }
-
-    /// The refresh button is off while a fetch runs or Anthropic asked us to wait.
-    var canRefreshNow: Bool {
+    /// The notch's refresh button: only for the usage API, off while a fetch runs or Anthropic asked us to wait.
+    var refreshState: LimitsRefreshState {
+        guard settings.fetchFromAPI else { return .hidden }
         if poller.isFetching {
-            return false
+            return .fetching
         }
         if case let .rateLimited(until) = poller.status, until > store.now {
-            return false
+            return .unavailable
         }
-        return true
+        return .ready
     }
 
     var canConnect: Bool {
@@ -103,6 +100,8 @@ final class ClaudeLimitsController {
         connector.repairPathIfNeeded()
         connectionStatus = connector.status
         store.onChange = { [weak self] in self?.refresh() }
+        poller.onChange = { [weak self] in self?.refresh() }
+        presenter.setRefreshAction { [weak self] in self?.refreshNow() }
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil,
@@ -176,7 +175,8 @@ final class ClaudeLimitsController {
             now: store.now,
             age: store.age,
             thresholds: settings.thresholds,
-            forecasts: forecasts
+            forecasts: forecasts,
+            refresh: refreshState
         )
         presenter.show(state)
 

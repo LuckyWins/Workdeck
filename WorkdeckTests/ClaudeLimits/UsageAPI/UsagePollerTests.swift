@@ -241,4 +241,16 @@ struct UsagePollerTests {
         await poller.pollTask?.value
         #expect(transport.requests.count == 1)
     }
+
+    @Test func reportsFetchingAndStatusChanges() async {
+        transport.enqueue(.init(status: 200, body: usageBody(fiveHour: (5, 3600))))
+        let poller = makePoller()
+        var fetchingSeen: [Bool] = []
+        poller.onChange = { fetchingSeen.append(poller.isFetching) }
+        poller.start()
+        await poller.pollTask?.value
+        #expect(fetchingSeen.first == true)
+        #expect(fetchingSeen.last == false)
+        #expect(poller.status == .ok(fetchedAt: fixedNow))
+    }
 }

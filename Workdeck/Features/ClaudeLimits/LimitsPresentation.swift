@@ -27,6 +27,15 @@ nonisolated enum LimitsDisplay: Equatable, Sendable {
     case menuBar(text: String, level: LimitsLevel)
 }
 
+/// The refresh button in the expanded notch; shown only when usage comes from Anthropic's API.
+nonisolated enum LimitsRefreshState: Equatable, Sendable {
+    case hidden
+    case ready
+    case fetching
+    /// Anthropic asked us to wait (429).
+    case unavailable
+}
+
 /// Everything the notch and menu bar need to render.
 nonisolated struct LimitsViewState: Equatable, Sendable {
     var display: LimitsDisplay
@@ -37,6 +46,7 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
     var thresholds: [Int]
     /// When each window runs out at the current pace; only windows that run out before their reset.
     var forecasts: [UsageWindowKind: Date] = [:]
+    var refresh = LimitsRefreshState.hidden
 
     static let hidden = LimitsViewState(display: .hidden, windows: [], now: .distantPast, age: nil, thresholds: [80, 95])
 

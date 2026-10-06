@@ -8,6 +8,8 @@ protocol LimitsPresenting: AnyObject {
     func show(_ state: LimitsViewState)
     /// Expands the notch with the alert for a few seconds, one alert at a time.
     func present(_ alert: LimitsAlert)
+    /// What the refresh button in the expanded notch does.
+    func setRefreshAction(_ action: @escaping () -> Void)
 }
 
 /// The notch operations the presenter needs; DynamicNotchKit in the app, a fake in tests.
@@ -117,6 +119,10 @@ final class NotchPresenter: LimitsPresenting {
             alertTask = nil
             requestReconcile()
         }
+    }
+
+    func setRefreshAction(_ action: @escaping () -> Void) {
+        model.onRefresh = action
     }
 
     /// DynamicNotchKit rebuilds its window on `NSScreen.screens.first` after a screen change, in any

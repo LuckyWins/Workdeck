@@ -36,6 +36,11 @@ final class FakePresenter: LimitsPresenting {
     func present(_ alert: LimitsAlert) {
         alerts.append(alert)
     }
+
+    private(set) var refreshAction: (() -> Void)?
+    func setRefreshAction(_ action: @escaping () -> Void) {
+        refreshAction = action
+    }
 }
 
 @MainActor
@@ -53,6 +58,7 @@ final class FakePoller: UsagePolling {
     func setPaused(_ paused: Bool) { pausedValues.append(paused) }
 
     var isFetching = false
+    var onChange: (() -> Void)?
     private(set) var refreshCount = 0
     func refreshNow() { refreshCount += 1 }
 }
@@ -282,17 +288,30 @@ struct ClaudeLimitsControllerTests {
         #expect(poller.refreshCount == 1)
     }
 
-    @Test func refreshIsUnavailableWhileFetchingOrRateLimited() {
-        settings.fetchFromAPI = true
+    @Test func notchRefreshStateFollowsPoller() {
         let (controller, _) = makeController()
-        #expect(controller.canRefreshNow)
+        controller.start()
+        #expect(presenter.shown.last?.refresh == .hidden)
+        controller.setFetchFromAPI(true)
+        #expect(presenter.shown.last?.refresh == .ready)
         poller.isFetching = true
-        #expect(!controller.canRefreshNow)
+        poller.onChange?()
+        #expect(presenter.shown.last?.refresh == .fetching)
         poller.isFetching = false
         poller.status = .rateLimited(until: fixedNow.addingTimeInterval(60))
-        #expect(!controller.canRefreshNow)
+        poller.onChange?()
+        #expect(presenter.shown.last?.refresh == .unavailable)
         poller.status = .rateLimited(until: fixedNow.addingTimeInterval(-1))
-        #expect(controller.canRefreshNow)
+        poller.onChange?()
+        #expect(presenter.shown.last?.refresh == .ready)
+    }
+
+    @Test func notchRefreshButtonRefreshesUsage() {
+        settings.fetchFromAPI = true
+        let (controller, _) = makeController()
+        controller.start()
+        presenter.refreshAction?()
+        #expect(poller.refreshCount == 1)
     }
 
     @Test func passesForecastWhenEnabled() throws {

@@ -30,6 +30,8 @@ protocol UsagePolling: AnyObject {
     func setPaused(_ paused: Bool)
     /// True while a fetch is in flight.
     var isFetching: Bool { get }
+    /// Called whenever `status` or `isFetching` changes.
+    var onChange: (() -> Void)? { get set }
     /// The refresh button: polls now despite the 1-minute throttle and retries after a Keychain denial.
     func refreshNow()
 }
@@ -41,8 +43,13 @@ final class UsagePoller: UsagePolling {
     static let interval: TimeInterval = 5 * 60
     static let minimumInterval: TimeInterval = 60
 
-    private(set) var status = UsagePollerStatus.idle
-    private(set) var isFetching = false
+    private(set) var status = UsagePollerStatus.idle {
+        didSet { onChange?() }
+    }
+    private(set) var isFetching = false {
+        didSet { onChange?() }
+    }
+    @ObservationIgnored var onChange: (() -> Void)?
 
     @ObservationIgnored private let credentials: any ClaudeCredentialsReading
     @ObservationIgnored private let client: UsageAPIClient
