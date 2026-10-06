@@ -38,6 +38,8 @@ nonisolated struct SessionsViewState: Equatable, Sendable {
     var rows: [SessionRow] = []
     var hiddenSessionCount = 0
     var totalCount = 0
+    /// Sessions that are working, compacting or waiting for you: what the compact counter shows.
+    var activeCount = 0
     var waitingCount = 0
     /// Subagents running in all sessions, including ones not listed.
     var agentCount = 0
@@ -71,6 +73,7 @@ nonisolated enum SessionsPresentation {
             rows: Array(rows),
             hiddenSessionCount: max(0, sessions.count - maxSessions),
             totalCount: sessions.count,
+            activeCount: sessions.filter { $0.status != .idle }.count,
             waitingCount: sessions.filter { $0.status == .waiting }.count,
             agentCount: sessions.reduce(0) { $0 + $1.agents.count },
             level: level(of: sessions),

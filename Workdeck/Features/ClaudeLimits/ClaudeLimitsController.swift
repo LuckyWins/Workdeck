@@ -221,7 +221,7 @@ final class ClaudeLimitsController {
             pressing: pressing,
             hasData: hasData,
             thresholds: settings.thresholds,
-            hasSessions: sessionsView.totalCount > 0
+            hasSessions: sessionsView.activeCount > 0
         )
         let level = LimitsPresentation.displayLevel(pressing: pressing, hasData: hasData, thresholds: settings.thresholds)
         state = LimitsViewState(

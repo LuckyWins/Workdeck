@@ -22,29 +22,35 @@ extension SessionsLevel {
     }
 }
 
-/// "●2 ✦3" on the right of the compact notch: live sessions, and running subagents when there are any.
+/// "●2 ✦3" on the right of the compact notch: active sessions (working, compacting or waiting for you),
+/// and running subagents when there are any. Numbers roll when they change.
 struct SessionsCounter: View {
     let state: SessionsViewState
 
     var body: some View {
-        if let color = state.level.notchColor {
-            HStack(spacing: 6) {
+        HStack(spacing: 6) {
+            if state.activeCount > 0, let color = state.level.notchColor {
                 HStack(spacing: 1) {
                     Text("●")
                         .foregroundStyle(color)
-                    Text("\(state.totalCount)")
+                    Text("\(state.activeCount)")
                         .foregroundStyle(.white)
+                        .contentTransition(.numericText(value: Double(state.activeCount)))
                 }
-                if state.agentCount > 0 {
-                    HStack(spacing: 1) {
-                        Text("✦")
-                            .foregroundStyle(.cyan)
-                        Text("\(state.agentCount)")
-                            .foregroundStyle(.white)
-                    }
+            }
+            if state.agentCount > 0 {
+                HStack(spacing: 1) {
+                    Text("✦")
+                        .foregroundStyle(.cyan)
+                    Text("\(state.agentCount)")
+                        .foregroundStyle(.white)
+                        .contentTransition(.numericText(value: Double(state.agentCount)))
                 }
             }
         }
+        .animation(.snappy, value: state.activeCount)
+        .animation(.snappy, value: state.agentCount)
+        .animation(.snappy, value: state.level)
     }
 }
 

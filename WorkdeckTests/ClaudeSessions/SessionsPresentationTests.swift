@@ -65,6 +65,16 @@ struct SessionsPresentationTests {
         #expect(row.agents.first?.action == "Read y.swift")
         #expect(row.agents.first?.description == "Find")
     }
+
+    @Test func countsOnlyActiveSessions() {
+        let state = SessionsPresentation.viewState(
+            sessions: [session("a", .working), session("b", .idle), session("c", .waiting), session("d", .compacting), session("e", .idle)],
+            now: fixedNow
+        )
+        #expect(state.activeCount == 3)
+        #expect(state.totalCount == 5)
+        #expect(SessionsPresentation.viewState(sessions: [session("a", .idle)], now: fixedNow).activeCount == 0)
+    }
 }
 
 struct SessionsTextTests {

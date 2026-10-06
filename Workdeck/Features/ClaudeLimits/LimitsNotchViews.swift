@@ -71,6 +71,8 @@ struct LimitsCompactLeading: View {
                 Text(LimitsPresentation.compactNotchText(pressing: model.state.pressing, hasData: model.state.hasData))
                     .font(Terminal.font(12, weight: .semibold))
                     .foregroundStyle(level(of: model.state).compactTextColor)
+                    .contentTransition(.numericText(value: model.state.pressing?.usedPercent ?? 0))
+                    .animation(.snappy, value: model.state.pressing?.usedPercent)
             }
         }
     }
@@ -229,6 +231,8 @@ struct LimitsExpandedView: View {
                 Text(String(repeating: " ", count: max(1, 5 - percentText.count)) + percentText)
                     .fontWeight(.semibold)
                     .foregroundStyle(color)
+                    .contentTransition(.numericText(value: percent ?? 0))
+                    .animation(.snappy, value: percent)
                 Spacer(minLength: 6)
                 Text(reset)
                     .foregroundStyle(Terminal.dim)

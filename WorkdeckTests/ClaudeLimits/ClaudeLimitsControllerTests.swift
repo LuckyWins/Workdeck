@@ -441,6 +441,7 @@ struct ClaudeLimitsControllerTests {
         settings.mode = .nearLimits
         try writeUsage(fiveHour: 10)
         addLiveSession()
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "s1"), to: sessionsDirectory)
         let (controller, store) = makeController()
         controller.start()
         store.reload()
@@ -554,5 +555,19 @@ struct ClaudeLimitsControllerTests {
         controller.start()
         #expect(controller.sessions.sessions.first?.isBusy == true)
         #expect(!sleepPreventer.isPreventing)
+    }
+
+    @Test func idleSessionsAloneDoNotKeepTheNotch() throws {
+        connector.status = .connected
+        hooksConnector.status = .connected
+        settings.isEnabled = true
+        settings.mode = .nearLimits
+        try writeUsage(fiveHour: 10)
+        addLiveSession()
+        let (controller, store) = makeController()
+        controller.start()
+        store.reload()
+        #expect(presenter.shown.last?.display == .hidden)
+        #expect(presenter.shown.last?.sessions.totalCount == 1)
     }
 }
