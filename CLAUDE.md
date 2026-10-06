@@ -45,7 +45,7 @@ Workdeck is a macOS menu bar toolbox for developers. Each tool is one row in the
 
 ## Documentation Layout
 
-- `specs/` design specs, `plans/` implementation plans, `docs/` other documentation, `README.md` and `CLAUDE.md` in the root.
+- `specs/` design specs, `plans/` implementation plans, `docs/` other documentation, `README.md`, `CLAUDE.md`, and `TODO.md` (ideas and deferred work) in the root.
 
 ## Git
 
