@@ -3,7 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var settings: AppSettings
     let controller: LidSleepController
-    let claudeLimits: ClaudeLimitsController
+    let claudeCode: ClaudeCodeController
 
     var body: some View {
         Form {
@@ -30,8 +30,8 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            ClaudeLimitsSettingsSection(controller: claudeLimits)
-            ClaudeSessionsSettingsSection(controller: claudeLimits)
+            ClaudeLimitsSettingsSection(controller: claudeCode.limits)
+            ClaudeSessionsSettingsSection(controller: claudeCode.sessions)
 
             Section("About") {
                 LabeledContent("Version", value: HelperConstants.version(of: .main))

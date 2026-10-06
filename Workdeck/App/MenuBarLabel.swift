@@ -3,12 +3,12 @@ import SwiftUI
 /// The Workdeck menu bar icon, plus Claude Code usage text when no notch screen is available.
 struct MenuBarLabel: View {
     let lidSleep: LidSleepController
-    let claudeLimits: ClaudeLimitsController
+    let claudeCode: ClaudeCodeController
 
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: iconName)
-            if let text = claudeLimits.menuBarText {
+            if let text = claudeCode.menuBarText {
                 Text(text)
                     .monospacedDigit()
             }
@@ -18,7 +18,7 @@ struct MenuBarLabel: View {
 
     /// Menu bar items are rendered as templates, so threshold state is shown by the symbol rather than color.
     private var iconName: String {
-        switch claudeLimits.menuBarLevel {
+        switch claudeCode.menuBarLevel {
         case .warning, .critical:
             "exclamationmark.triangle.fill"
         case .noData, .normal:

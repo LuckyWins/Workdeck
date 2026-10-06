@@ -1,7 +1,7 @@
 import SwiftUI
 
-struct ClaudeLimitsRow: View {
-    @Bindable var controller: ClaudeLimitsController
+struct ClaudeCodeRow: View {
+    @Bindable var controller: ClaudeCodeController
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -12,9 +12,9 @@ struct ClaudeLimitsRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Claude Code")
-                Text(controller.connectError ?? controller.rowSubtitle)
+                Text(controller.limits.connectError ?? controller.rowSubtitle)
                     .font(.caption)
-                    .foregroundStyle(controller.connectError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
+                    .foregroundStyle(controller.limits.connectError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -28,7 +28,7 @@ struct ClaudeLimitsRow: View {
             .labelsHidden()
             .controlSize(.small)
         }
-        .claudeConnectConfirmation(controller)
+        .claudeConnectConfirmation(controller.limits)
     }
 }
 

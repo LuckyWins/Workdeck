@@ -10,28 +10,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings: settings,
         appVersion: HelperConstants.version(of: .main)
     )
-    private(set) lazy var claudeLimits = ClaudeLimitsController(
-        settings: ClaudeLimitsSettings(),
-        store: ClaudeUsageStore(fileURL: WorkdeckPaths.standard().snapshotURL),
-        connector: ClaudeCodeConnector.standard(),
-        presenter: NotchPresenter(),
-        poller: UsagePoller(
-            credentials: SecurityCLICredentialsReader(),
-            client: UsageAPIClient(transport: URLSessionTransport()),
-            snapshotURL: WorkdeckPaths.standard().snapshotURL
-        ),
-        activity: SessionActivityMonitor(),
-        sessions: ClaudeSessionStore(directory: SessionsDirectory.standard(), liveness: SystemProcessLiveness()),
-        hooksConnector: SessionHooksConnector.standard(),
-        activator: WindowActivator(workspace: SystemWorkspace()),
-        sleepPreventer: PowerAssertionSleepPreventer()
-    )
+    private(set) lazy var claudeCode: ClaudeCodeController = {
+        let settings = ClaudeCodeSettings()
+        return ClaudeCodeController(
+            settings: settings,
+            limits: ClaudeLimitsController(
+                settings: settings,
+                store: ClaudeUsageStore(fileURL: WorkdeckPaths.standard().snapshotURL),
+                connector: ClaudeCodeConnector.standard(),
+                poller: UsagePoller(
+                    credentials: SecurityCLICredentialsReader(),
+                    client: UsageAPIClient(transport: URLSessionTransport()),
+                    snapshotURL: WorkdeckPaths.standard().snapshotURL
+                ),
+                activity: SessionActivityMonitor()
+            ),
+            sessions: ClaudeSessionsController(
+                settings: settings,
+                store: ClaudeSessionStore(directory: SessionsDirectory.standard(), liveness: SystemProcessLiveness()),
+                hooksConnector: SessionHooksConnector.standard(),
+                activator: WindowActivator(workspace: SystemWorkspace()),
+                sleepPreventer: PowerAssertionSleepPreventer()
+            ),
+            presenter: NotchPresenter()
+        )
+    }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Unit tests are hosted in this app; keep them away from the real privileged helper.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
         Task { await lidSleep.refresh() }
-        claudeLimits.start()
+        claudeCode.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

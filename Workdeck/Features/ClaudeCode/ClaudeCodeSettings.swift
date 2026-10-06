@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 @Observable
-final class ClaudeLimitsSettings {
+final class ClaudeCodeSettings {
     static let firstThresholdOptions = Array(stride(from: 50, through: 95, by: 5))
     static let finishedAfterOptions = [1, 2, 5, 10, 15, 30]
 

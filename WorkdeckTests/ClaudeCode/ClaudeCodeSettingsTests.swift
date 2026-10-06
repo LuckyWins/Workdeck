@@ -3,13 +3,13 @@ import Testing
 @testable import Workdeck
 
 @MainActor
-struct ClaudeLimitsSettingsTests {
+struct ClaudeCodeSettingsTests {
     private func makeDefaults() -> UserDefaults {
         UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!
     }
 
     @Test func defaults() {
-        let settings = ClaudeLimitsSettings(defaults: makeDefaults())
+        let settings = ClaudeCodeSettings(defaults: makeDefaults())
         #expect(!settings.isEnabled)
         #expect(settings.mode == .always)
         #expect(settings.thresholds == [80, 95])
@@ -26,7 +26,7 @@ struct ClaudeLimitsSettingsTests {
 
     @Test func persistsEverything() {
         let defaults = makeDefaults()
-        let settings = ClaudeLimitsSettings(defaults: defaults)
+        let settings = ClaudeCodeSettings(defaults: defaults)
         settings.isEnabled = true
         settings.mode = .nearLimits
         settings.firstThreshold = 70
@@ -41,7 +41,7 @@ struct ClaudeLimitsSettingsTests {
         settings.finishedAfterMinutes = 2
         settings.notifyWhenNeedsYou = true
 
-        let reloaded = ClaudeLimitsSettings(defaults: defaults)
+        let reloaded = ClaudeCodeSettings(defaults: defaults)
         #expect(reloaded.isEnabled)
         #expect(reloaded.mode == .nearLimits)
         #expect(reloaded.thresholds == [70, 90])
@@ -57,26 +57,26 @@ struct ClaudeLimitsSettingsTests {
     }
 
     @Test func raisingFirstAboveSecondPushesSecondUp() {
-        let settings = ClaudeLimitsSettings(defaults: makeDefaults())
+        let settings = ClaudeCodeSettings(defaults: makeDefaults())
         settings.firstThreshold = 95
         #expect(settings.thresholds == [95, 100])
     }
 
     @Test func secondCannotDropToOrBelowFirst() {
-        let settings = ClaudeLimitsSettings(defaults: makeDefaults())
+        let settings = ClaudeCodeSettings(defaults: makeDefaults())
         settings.secondThreshold = 60
         #expect(settings.thresholds == [80, 85])
     }
 
     @Test func optionLists() {
-        #expect(ClaudeLimitsSettings.firstThresholdOptions == [50, 55, 60, 65, 70, 75, 80, 85, 90, 95])
-        #expect(ClaudeLimitsSettings.secondThresholdOptions(above: 85) == [90, 95, 100])
+        #expect(ClaudeCodeSettings.firstThresholdOptions == [50, 55, 60, 65, 70, 75, 80, 85, 90, 95])
+        #expect(ClaudeCodeSettings.secondThresholdOptions(above: 85) == [90, 95, 100])
     }
 
     @Test func unknownFinishedAfterFallsBackToTenMinutes() {
         let defaults = makeDefaults()
         defaults.set(7, forKey: "claudeSessions.finishedAfterMinutes")
-        #expect(ClaudeLimitsSettings(defaults: defaults).finishedAfterMinutes == 10)
-        #expect(ClaudeLimitsSettings.finishedAfterOptions == [1, 2, 5, 10, 15, 30])
+        #expect(ClaudeCodeSettings(defaults: defaults).finishedAfterMinutes == 10)
+        #expect(ClaudeCodeSettings.finishedAfterOptions == [1, 2, 5, 10, 15, 30])
     }
 }

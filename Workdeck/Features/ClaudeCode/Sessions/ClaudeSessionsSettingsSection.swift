@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ClaudeSessionsSettingsSection: View {
-    @Bindable var controller: ClaudeLimitsController
+    @Bindable var controller: ClaudeSessionsController
 
     var body: some View {
         @Bindable var settings = controller.settings
@@ -21,7 +21,7 @@ struct ClaudeSessionsSettingsSection: View {
                     Toggle("Notify when a session finishes", isOn: $settings.notifyWhenFinished)
                     if settings.notifyWhenFinished {
                         Picker("After working for", selection: $settings.finishedAfterMinutes) {
-                            ForEach(ClaudeLimitsSettings.finishedAfterOptions, id: \.self) { minutes in
+                            ForEach(ClaudeCodeSettings.finishedAfterOptions, id: \.self) { minutes in
                                 Text("\(minutes) min").tag(minutes)
                             }
                         }
@@ -48,7 +48,7 @@ struct ClaudeSessionsSettingsSection: View {
         } message: {
             Text("Workdeck will add hooks to ~/.claude/settings.json that record when Claude Code sessions and agents start, stop and which tool they run. A backup will be saved next to it.")
         }
-        .onChange(of: settings.keepAwakeWhileWorking) { controller.refresh() }
+        .onChange(of: settings.keepAwakeWhileWorking) { controller.settingsChanged() }
     }
 
     private var footer: String {

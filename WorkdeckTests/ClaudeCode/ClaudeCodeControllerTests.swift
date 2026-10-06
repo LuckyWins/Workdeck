@@ -123,7 +123,7 @@ final class FakeSleepPreventer: SleepPreventing {
 }
 
 @MainActor
-struct ClaudeLimitsControllerTests {
+struct ClaudeCodeControllerTests {
     let fileURL = makeTemporaryDirectory().appending(path: "Workdeck/claude-usage.json")
     let connector = FakeConnector()
     let presenter = FakePresenter()
@@ -134,24 +134,20 @@ struct ClaudeLimitsControllerTests {
     let hooksConnector = FakeHooksConnector()
     let activator = FakeActivator()
     let sleepPreventer = FakeSleepPreventer()
-    let settings = ClaudeLimitsSettings(defaults: UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!)
+    let settings = ClaudeCodeSettings(defaults: UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!)
 
-    private func makeController(notch: Bool = true) -> (ClaudeLimitsController, ClaudeUsageStore) {
+    private func makeController(notch: Bool = true) -> (ClaudeCodeController, ClaudeUsageStore) {
         let store = ClaudeUsageStore(fileURL: fileURL) { fixedNow }
-        let controller = ClaudeLimitsController(
+        let limits = ClaudeLimitsController(settings: settings, store: store, connector: connector, poller: poller, activity: activity)
+        let sessions = ClaudeSessionsController(
             settings: settings,
-            store: store,
-            connector: connector,
-            presenter: presenter,
-            poller: poller,
-            activity: activity,
-            sessions: ClaudeSessionStore(directory: sessionsDirectory, liveness: liveness) { fixedNow },
+            store: ClaudeSessionStore(directory: sessionsDirectory, liveness: liveness) { fixedNow },
             hooksConnector: hooksConnector,
             activator: activator,
             sleepPreventer: sleepPreventer,
-            hasNotchScreen: { notch },
             frontmostBundleID: { nil }
         )
+        let controller = ClaudeCodeController(settings: settings, limits: limits, sessions: sessions, presenter: presenter, hasNotchScreen: { notch })
         return (controller, store)
     }
 
@@ -167,25 +163,25 @@ struct ClaudeLimitsControllerTests {
     @Test func enablingWhileDisconnectedAsksForConfirmation() {
         let (controller, _) = makeController()
         controller.setEnabled(true)
-        #expect(controller.isConfirmingConnect)
+        #expect(controller.limits.isConfirmingConnect)
         #expect(!settings.isEnabled)
     }
 
     @Test func connectEnablesAndRecordsTime() {
         let (controller, _) = makeController()
-        controller.connect()
-        #expect(controller.isConnected)
+        controller.limits.connect()
+        #expect(controller.limits.isConnected)
         #expect(settings.isEnabled)
         #expect(settings.connectedAt == fixedNow)
-        #expect(controller.connectError == nil)
+        #expect(controller.limits.connectError == nil)
     }
 
     @Test func connectFailureIsShown() {
         connector.connectError = ClaudeConnectorError.invalidSettings
         let (controller, _) = makeController()
-        controller.connect()
-        #expect(!controller.isConnected)
-        #expect(controller.connectError == ClaudeConnectorError.invalidSettings.localizedDescription)
+        controller.limits.connect()
+        #expect(!controller.limits.isConnected)
+        #expect(controller.limits.connectError == ClaudeConnectorError.invalidSettings.localizedDescription)
     }
 
     @Test func startRepairsPathAndReadsStatus() {
@@ -193,7 +189,7 @@ struct ClaudeLimitsControllerTests {
         let (controller, _) = makeController()
         controller.start()
         #expect(connector.repairCount == 1)
-        #expect(controller.isConnected)
+        #expect(controller.limits.isConnected)
     }
 
     @Test func showsNotchWithUsage() throws {
@@ -249,8 +245,8 @@ struct ClaudeLimitsControllerTests {
         let (controller, store) = makeController()
         controller.start()
         store.reload()
-        controller.disconnect()
-        #expect(!controller.isConnected)
+        controller.limits.disconnect()
+        #expect(!controller.limits.isConnected)
         #expect(controller.state.display == .hidden)
         #expect(settings.connectedAt == nil)
     }
@@ -262,8 +258,8 @@ struct ClaudeLimitsControllerTests {
         let (controller, store) = makeController()
         controller.start()
         store.reload()
-        #expect(!controller.isConnected)
-        #expect(controller.hasDataSource)
+        #expect(!controller.limits.isConnected)
+        #expect(controller.limits.hasDataSource)
         #expect(controller.state.display == .notch(.normal))
         #expect(poller.startCount == 1)
     }
@@ -272,16 +268,16 @@ struct ClaudeLimitsControllerTests {
         settings.fetchFromAPI = true
         let (controller, _) = makeController()
         controller.setEnabled(true)
-        #expect(!controller.isConfirmingConnect)
+        #expect(!controller.limits.isConfirmingConnect)
         #expect(settings.isEnabled)
     }
 
     @Test func togglingUsageAPIStartsAndStopsPoller() {
         let (controller, _) = makeController()
-        controller.setFetchFromAPI(true)
+        controller.limits.setFetchFromAPI(true)
         #expect(settings.fetchFromAPI)
         #expect(poller.startCount == 1)
-        controller.setFetchFromAPI(false)
+        controller.limits.setFetchFromAPI(false)
         #expect(poller.stopCount == 1)
     }
 
@@ -336,10 +332,10 @@ struct ClaudeLimitsControllerTests {
 
     @Test func refreshNowOnlyWithUsageAPI() {
         let (controller, _) = makeController()
-        controller.refreshNow()
+        controller.limits.refreshNow()
         #expect(poller.refreshCount == 0)
         settings.fetchFromAPI = true
-        controller.refreshNow()
+        controller.limits.refreshNow()
         #expect(poller.refreshCount == 1)
     }
 
@@ -347,7 +343,7 @@ struct ClaudeLimitsControllerTests {
         let (controller, _) = makeController()
         controller.start()
         #expect(presenter.shown.last?.refresh == .hidden)
-        controller.setFetchFromAPI(true)
+        controller.limits.setFetchFromAPI(true)
         #expect(presenter.shown.last?.refresh == .ready)
         poller.isFetching = true
         poller.onChange?()
@@ -401,8 +397,8 @@ struct ClaudeLimitsControllerTests {
 
     @Test func connectingHooksEnablesTheIndicator() {
         let (controller, _) = makeController()
-        controller.connectHooks()
-        #expect(controller.isHooksConnected)
+        controller.sessions.connectHooks()
+        #expect(controller.sessions.isHooksConnected)
         #expect(settings.isEnabled)
         #expect(controller.hasAnySource)
     }
@@ -412,7 +408,7 @@ struct ClaudeLimitsControllerTests {
         let (controller, _) = makeController()
         controller.start()
         controller.setEnabled(true)
-        #expect(!controller.isConfirmingConnect)
+        #expect(!controller.limits.isConfirmingConnect)
         #expect(settings.isEnabled)
     }
 
@@ -478,8 +474,8 @@ struct ClaudeLimitsControllerTests {
         let (controller, _) = makeController()
         controller.start()
         #expect(presenter.shown.last?.sessions.totalCount == 1)
-        controller.disconnectHooks()
-        #expect(!controller.isHooksConnected)
+        controller.sessions.disconnectHooks()
+        #expect(!controller.sessions.isHooksConnected)
         #expect(presenter.shown.last?.sessions == SessionsViewState.none)
     }
 
@@ -488,7 +484,7 @@ struct ClaudeLimitsControllerTests {
         controller.start()
         let shown = presenter.shown.count
         addLiveSession()
-        controller.sessions.reload()
+        controller.sessions.store.reload()
         #expect(presenter.shown.count == shown)
     }
 
@@ -500,10 +496,10 @@ struct ClaudeLimitsControllerTests {
         #expect(!sleepPreventer.isPreventing)
         settings.keepAwakeWhileWorking = true
         writeSessionEvent(hookEvent(.userPromptSubmit, at: 5, session: "s1"), to: sessionsDirectory)
-        controller.sessions.reload()
+        controller.sessions.store.reload()
         #expect(sleepPreventer.isPreventing)
         writeSessionEvent(hookEvent(.stop, at: 9, session: "s1"), to: sessionsDirectory)
-        controller.sessions.reload()
+        controller.sessions.store.reload()
         #expect(!sleepPreventer.isPreventing)
     }
 
@@ -515,7 +511,7 @@ struct ClaudeLimitsControllerTests {
         let (controller, _) = makeController()
         controller.start()
         #expect(sleepPreventer.isPreventing)
-        controller.disconnectHooks()
+        controller.sessions.disconnectHooks()
         #expect(!sleepPreventer.isPreventing)
     }
 
@@ -529,7 +525,7 @@ struct ClaudeLimitsControllerTests {
         let (controller, _) = makeController()
         controller.start()
         writeSessionEvent(hookEvent(.stop, at: 600, session: "s1"), to: sessionsDirectory)
-        controller.sessions.reload()
+        controller.sessions.store.reload()
         #expect(presenter.alerts == [.sessionFinished(project: "Workdeck", worked: 595)])
     }
 
@@ -540,7 +536,7 @@ struct ClaudeLimitsControllerTests {
         let (controller, _) = makeController()
         controller.start()
         writeSessionEvent(hookEvent(.notification, at: 5, session: "s1") { $0.notificationType = "permission_prompt" }, to: sessionsDirectory)
-        controller.sessions.reload()
+        controller.sessions.store.reload()
         #expect(presenter.alerts.isEmpty)
     }
 
@@ -553,7 +549,7 @@ struct ClaudeLimitsControllerTests {
         liveness.startTimes[42] = fixedNow.addingTimeInterval(-9000)
         let (controller, _) = makeController()
         controller.start()
-        #expect(controller.sessions.sessions.count == 1)
+        #expect(controller.sessions.store.sessions.count == 1)
         #expect(!sleepPreventer.isPreventing)
     }
 
@@ -577,5 +573,21 @@ struct ClaudeLimitsControllerTests {
         let (second, _) = makeController()
         second.start()
         #expect(hooksConnector.repairs == [true, false])
+    }
+
+    @Test func settingsChangesRedraw() {
+        hooksConnector.status = .connected
+        let (controller, _) = makeController()
+        controller.start()
+        let shown = presenter.shown.count
+        controller.limits.settingsChanged()
+        controller.sessions.settingsChanged()
+        #expect(presenter.shown.count == shown + 2)
+        settings.keepAwakeWhileWorking = true
+        addLiveSession()
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 5, session: "s1"), to: sessionsDirectory)
+        controller.sessions.store.reload()
+        controller.sessions.settingsChanged()
+        #expect(sleepPreventer.isPreventing)
     }
 }

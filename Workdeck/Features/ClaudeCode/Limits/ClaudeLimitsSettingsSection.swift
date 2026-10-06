@@ -31,12 +31,12 @@ struct ClaudeLimitsSettingsSection: View {
                     }
                 }
                 Picker("First alert at", selection: $settings.firstThreshold) {
-                    ForEach(ClaudeLimitsSettings.firstThresholdOptions, id: \.self) { value in
+                    ForEach(ClaudeCodeSettings.firstThresholdOptions, id: \.self) { value in
                         Text("\(value)%").tag(value)
                     }
                 }
                 Picker("Second alert at", selection: $settings.secondThreshold) {
-                    ForEach(ClaudeLimitsSettings.secondThresholdOptions(above: settings.firstThreshold), id: \.self) { value in
+                    ForEach(ClaudeCodeSettings.secondThresholdOptions(above: settings.firstThreshold), id: \.self) { value in
                         Text("\(value)%").tag(value)
                     }
                 }
@@ -53,10 +53,10 @@ struct ClaudeLimitsSettingsSection: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .onChange(of: settings.mode) { controller.refresh() }
-        .onChange(of: settings.firstThreshold) { controller.refresh() }
-        .onChange(of: settings.secondThreshold) { controller.refresh() }
-        .onChange(of: settings.showForecast) { controller.refresh() }
+        .onChange(of: settings.mode) { controller.settingsChanged() }
+        .onChange(of: settings.firstThreshold) { controller.settingsChanged() }
+        .onChange(of: settings.secondThreshold) { controller.settingsChanged() }
+        .onChange(of: settings.showForecast) { controller.settingsChanged() }
         .claudeConnectConfirmation(controller)
     }
 

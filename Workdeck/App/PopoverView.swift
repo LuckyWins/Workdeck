@@ -3,7 +3,7 @@ import SwiftUI
 
 struct PopoverView: View {
     let controller: LidSleepController
-    let claudeLimits: ClaudeLimitsController
+    let claudeCode: ClaudeCodeController
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -32,7 +32,7 @@ struct PopoverView: View {
 
             Divider()
 
-            ClaudeLimitsRow(controller: claudeLimits)
+            ClaudeCodeRow(controller: claudeCode)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
 
@@ -56,7 +56,7 @@ struct PopoverView: View {
         }
         .frame(width: 300)
         .task {
-            claudeLimits.popoverOpened()
+            claudeCode.popoverOpened()
             await controller.refresh()
         }
     }
