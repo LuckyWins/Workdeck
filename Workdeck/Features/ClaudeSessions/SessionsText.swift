@@ -26,6 +26,11 @@ nonisolated enum SessionsText {
         return state.waitingCount > 0 ? "\(count), \(state.waitingCount) waiting" : count
     }
 
+    /// Tree branches for agents under their session.
+    static func branch(isLast: Bool) -> String {
+        isLast ? "└" : "├"
+    }
+
     static func moreSessions(_ count: Int) -> String {
         "+\(count) more"
     }

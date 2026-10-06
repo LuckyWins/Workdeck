@@ -210,3 +210,13 @@ Manual (`docs/testing.md`, new rows S1–S8): connect and backup; sessions in th
 - `README.md`: rename the tool to Claude Code, describe Sessions, what the hooks add and store.
 - `CLAUDE.md`: `WorkdeckHook/`, `ClaudeHooks/`, `Features/ClaudeSessions/`; the hook must exit 0, stay fast, and never store prompt, answer or tool content.
 - `docs/testing.md`: S1–S8.
+
+## 9. Amendment: Terminal Look (2026-10-06)
+
+After trying the first version, the user chose a terminal-style notch (htop-like):
+
+- **Compact:** left — the limits ring and the most pressing window's percent (`42%`, labeled only for the weekly window: `7d 91%`); right — `●N` live sessions (dot colored by the most urgent session) and `✦N` running subagents across all sessions, shown only when there are any. Both sides are static. The menu bar fallback text is unchanged (`5h 42%`).
+- **Expanded:** monospaced (SF Mono) text. A `─ limits ─` header, one row per window with a 16-cell block bar (`5h [███████░░░░░░░░░]  42%  ↺ 1h 20m`) colored by threshold, the forecast as an orange line below its window, then the age line. A `─ sessions ─ N ─` header and the session list: `●`/`○` dot, project, status, duration; agents as a tree (`├`/`└`) with a braille spinner, type, and dimmed description; "+N agents" as the last branch.
+- **Motion (expanded only, up to 10 frames per second):** working session dots pulse, waiting dots blink slowly, agent spinners turn. Idle sessions are static and dimmed.
+- **Clickable cues:** hovering a session highlights its block, shows a pointing-hand cursor, and replaces the duration with `↗ open`. With the usage API on, the age line itself is the refresh control: hovering highlights it and shows `click to refresh ↻`; it shows `refreshing…` with a spinner while fetching and is dimmed and disabled during a 429 pause.
+- Alerts use the same style: `! 5-hour limit at 80%` with the reset time below.

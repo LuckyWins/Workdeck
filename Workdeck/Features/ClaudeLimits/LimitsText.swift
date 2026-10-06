@@ -4,17 +4,23 @@ import Foundation
 nonisolated enum LimitsText {
     /// "resets in 1h 20m" within a day, otherwise "resets Thu 09:00".
     static func resetText(_ resetsAt: Date, now: Date, calendar: Calendar = .current) -> String {
+        let short = shortResetText(resetsAt, now: now, calendar: calendar)
+        return resetsAt.timeIntervalSince(now) < 24 * 60 * 60 ? "resets in \(short)" : "resets \(short)"
+    }
+
+    /// "1h 20m" within a day, otherwise "Thu 09:00".
+    static func shortResetText(_ resetsAt: Date, now: Date, calendar: Calendar = .current) -> String {
         let remaining = resetsAt.timeIntervalSince(now)
         guard remaining < 24 * 60 * 60 else {
-            return "resets \(formatted(resetsAt, "EEE HH:mm", calendar: calendar))"
+            return formatted(resetsAt, "EEE HH:mm", calendar: calendar)
         }
         let minutes = max(Int((remaining / 60).rounded(.up)), 1)
         if minutes < 60 {
-            return "resets in \(minutes)m"
+            return "\(minutes)m"
         }
         let hours = minutes / 60
         let rest = minutes % 60
-        return rest == 0 ? "resets in \(hours)h" : "resets in \(hours)h \(rest)m"
+        return rest == 0 ? "\(hours)h" : "\(hours)h \(rest)m"
     }
 
     /// For a window that is not running: it begins with the next Claude Code message.

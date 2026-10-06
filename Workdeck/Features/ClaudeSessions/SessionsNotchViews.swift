@@ -21,94 +21,138 @@ extension SessionsLevel {
     }
 }
 
-/// "● 2" on the right of the compact notch.
+/// "●2 ✦3" on the right of the compact notch: live sessions, and running subagents when there are any.
 struct SessionsCounter: View {
     let state: SessionsViewState
 
     var body: some View {
         if let color = state.level.notchColor {
-            HStack(spacing: 3) {
-                Circle()
-                    .fill(color)
-                    .frame(width: 6, height: 6)
-                Text("\(state.totalCount)")
-                    .font(.system(size: 12, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
+            HStack(spacing: 6) {
+                HStack(spacing: 1) {
+                    Text("●")
+                        .foregroundStyle(color)
+                    Text("\(state.totalCount)")
+                        .foregroundStyle(.white)
+                }
+                if state.agentCount > 0 {
+                    HStack(spacing: 1) {
+                        Text("✦")
+                            .foregroundStyle(.cyan)
+                        Text("\(state.agentCount)")
+                            .foregroundStyle(.white)
+                    }
+                }
             }
         }
     }
 }
 
-/// Sessions and their running agents in the expanded notch; a click brings the session's window forward.
+/// Sessions with their running agents as a tree; a click brings the session's window forward.
+/// Shown only in the expanded notch, so its animations run only while someone is looking.
 struct SessionsList: View {
     let state: SessionsViewState
     let onActivate: (String) -> Void
 
-    private let agentIndent: CGFloat = 13
+    @State private var hoveredID: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(state.rows) { row in
-                Button {
-                    onActivate(row.id)
-                } label: {
-                    rowView(row)
+        TimelineView(.animation(minimumInterval: TerminalSpinner.frameInterval)) { context in
+            VStack(alignment: .leading, spacing: 3) {
+                ForEach(state.rows) { row in
+                    Button {
+                        onActivate(row.id)
+                    } label: {
+                        rowView(row, at: context.date)
+                    }
+                    .buttonStyle(.plain)
+                    .pointerStyle(.link)
+                    .onHover { hovering in
+                        if hovering {
+                            hoveredID = row.id
+                        } else if hoveredID == row.id {
+                            hoveredID = nil
+                        }
+                    }
+                    .help("Open \(row.projectName)")
                 }
-                .buttonStyle(.plain)
-            }
-            if state.hiddenSessionCount > 0 {
-                Text(SessionsText.moreSessions(state.hiddenSessionCount))
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.5))
+                if state.hiddenSessionCount > 0 {
+                    Text(SessionsText.moreSessions(state.hiddenSessionCount))
+                        .foregroundStyle(Terminal.dim)
+                }
             }
         }
     }
 
-    private func rowView(_ row: SessionRow) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+    private func rowView(_ row: SessionRow, at date: Date) -> some View {
+        let isHovered = hoveredID == row.id
+        return VStack(alignment: .leading, spacing: 1) {
             HStack(spacing: 6) {
-                Circle()
-                    .fill(row.status.notchColor)
-                    .frame(width: 7, height: 7)
+                Text(row.status == .idle ? "○" : "●")
+                    .foregroundStyle(row.status.notchColor)
+                    .opacity(dotOpacity(row.status, at: date))
                 Text(row.projectName)
-                    .font(.caption.weight(.semibold))
+                    .fontWeight(.semibold)
                     .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 6)
                 Text(SessionsText.statusText(row.status))
-                    .font(.caption2)
-                    .foregroundStyle(row.status == .waiting ? AnyShapeStyle(.orange) : AnyShapeStyle(.white.opacity(0.6)))
-                Spacer(minLength: 8)
-                if row.status != .waiting {
-                    durationText(since: row.since)
-                }
+                    .foregroundStyle(row.status == .idle ? Terminal.dim : row.status.notchColor)
+                Text(isHovered ? "↗ open" : (row.status == .waiting ? "" : SessionsText.duration(from: row.since, to: state.now)))
+                    .foregroundStyle(isHovered ? Terminal.text : Terminal.dim)
+                    .frame(minWidth: 44, alignment: .trailing)
             }
-            ForEach(row.agents) { agent in
-                HStack(spacing: 6) {
-                    Text(agent.title)
-                        .font(.caption2)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .foregroundStyle(.white.opacity(0.8))
-                    Spacer(minLength: 8)
-                    durationText(since: agent.startedAt)
-                }
-                .padding(.leading, agentIndent)
+            ForEach(Array(row.agents.enumerated()), id: \.element.id) { index, agent in
+                agentView(agent, isLast: index == row.agents.count - 1 && row.hiddenAgentCount == 0, at: date)
             }
             if row.hiddenAgentCount > 0 {
-                Text(SessionsText.moreAgents(row.hiddenAgentCount))
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.5))
-                    .padding(.leading, agentIndent)
+                HStack(spacing: 6) {
+                    Text(SessionsText.branch(isLast: true))
+                        .foregroundStyle(Terminal.faint)
+                    Text(SessionsText.moreAgents(row.hiddenAgentCount))
+                        .foregroundStyle(Terminal.dim)
+                }
+                .font(Terminal.font(10))
             }
         }
-        .opacity(row.status == .idle ? 0.6 : 1)
+        .opacity(row.status == .idle && !isHovered ? 0.7 : 1)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(.white.opacity(isHovered ? 0.1 : 0))
+        )
+        .padding(.horizontal, -4)
         .contentShape(Rectangle())
+        .animation(.easeOut(duration: 0.12), value: isHovered)
     }
 
-    private func durationText(since start: Date) -> some View {
-        Text(SessionsText.duration(from: start, to: state.now))
-            .font(.caption2)
-            .monospacedDigit()
-            .foregroundStyle(.white.opacity(0.6))
+    private func agentView(_ agent: AgentRow, isLast: Bool, at date: Date) -> some View {
+        HStack(spacing: 6) {
+            Text(SessionsText.branch(isLast: isLast))
+                .foregroundStyle(Terminal.faint)
+            Text(TerminalSpinner.frame(at: date))
+                .foregroundStyle(.cyan)
+            Text(agent.type)
+                .foregroundStyle(Terminal.text)
+            if let description = agent.description {
+                Text(description)
+                    .foregroundStyle(Terminal.dim)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            Spacer(minLength: 6)
+            Text(SessionsText.duration(from: agent.startedAt, to: state.now))
+                .foregroundStyle(Terminal.dim)
+        }
+        .font(Terminal.font(10))
+    }
+
+    /// Working sessions pulse, sessions waiting for you blink slowly, idle ones stay still.
+    private func dotOpacity(_ status: SessionStatus, at date: Date) -> Double {
+        switch status {
+        case .working: TerminalPulse.opacity(at: date, period: 1.2, minimum: 0.4)
+        case .waiting: TerminalPulse.opacity(at: date, period: 2, minimum: 0.25)
+        case .idle: 1
+        }
     }
 }

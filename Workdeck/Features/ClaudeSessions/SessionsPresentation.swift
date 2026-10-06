@@ -10,9 +10,14 @@ nonisolated enum SessionsLevel: Equatable, Sendable {
 
 nonisolated struct AgentRow: Equatable, Sendable, Identifiable {
     var id: String
-    /// "Explore · Find NotchPresenter usages", or the type alone.
-    var title: String
+    var type: String
+    var description: String?
     var startedAt: Date
+
+    /// "Explore · Find NotchPresenter usages", or the type alone.
+    var title: String {
+        [type, description].compactMap { $0 }.joined(separator: " · ")
+    }
 }
 
 nonisolated struct SessionRow: Equatable, Sendable, Identifiable {
@@ -30,6 +35,8 @@ nonisolated struct SessionsViewState: Equatable, Sendable {
     var hiddenSessionCount = 0
     var totalCount = 0
     var waitingCount = 0
+    /// Subagents running in all sessions, including ones not listed.
+    var agentCount = 0
     var level = SessionsLevel.none
     var now = Date.distantPast
 
@@ -50,11 +57,7 @@ nonisolated enum SessionsPresentation {
                 status: session.status,
                 since: session.since,
                 agents: agents.prefix(maxAgentsPerSession).map { agent in
-                    AgentRow(
-                        id: agent.id,
-                        title: [agent.type, agent.description].compactMap { $0 }.joined(separator: " · "),
-                        startedAt: agent.startedAt
-                    )
+                    AgentRow(id: agent.id, type: agent.type, description: agent.description, startedAt: agent.startedAt)
                 },
                 hiddenAgentCount: max(0, agents.count - maxAgentsPerSession)
             )
@@ -64,6 +67,7 @@ nonisolated enum SessionsPresentation {
             hiddenSessionCount: max(0, sessions.count - maxSessions),
             totalCount: sessions.count,
             waitingCount: sessions.filter { $0.status == .waiting }.count,
+            agentCount: sessions.reduce(0) { $0 + $1.agents.count },
             level: level(of: sessions),
             now: now
         )

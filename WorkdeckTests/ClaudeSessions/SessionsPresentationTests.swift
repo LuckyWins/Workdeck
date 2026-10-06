@@ -44,6 +44,14 @@ struct SessionsPresentationTests {
         #expect(row.hiddenAgentCount == 1)
         #expect(row.projectName == "a")
     }
+
+    @Test func countsEveryRunningAgent() {
+        let busy = session("a", .working, agents: [agent("1", startedSecondsAgo: 1), agent("2", startedSecondsAgo: 2), agent("3", startedSecondsAgo: 3)])
+        let sessions = [busy, session("b", .working, agents: [agent("4", startedSecondsAgo: 1)]), session("c", .idle), session("d", .idle, agents: [agent("5", startedSecondsAgo: 1)])]
+        let state = SessionsPresentation.viewState(sessions: sessions, now: fixedNow)
+        #expect(state.agentCount == 5)
+        #expect(SessionsPresentation.viewState(sessions: [], now: fixedNow).agentCount == 0)
+    }
 }
 
 struct SessionsTextTests {

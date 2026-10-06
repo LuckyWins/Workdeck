@@ -20,7 +20,7 @@ Keeps your Mac awake while the lid is closed — for long builds, remote session
 
 Shows how much of your Claude Code plan limits you have used — the 5-hour window and the weekly window — in the MacBook notch, Dynamic Island style.
 
-- The compact view shows the window closest to its limit, e.g. `5h 42%`; hover to see both windows and when they reset.
+- The compact view shows a ring and the percent of the window closest to its limit, e.g. `42%` (labeled `7d 91%` when the weekly window is closer); hover to expand a terminal-style panel with a usage bar per window and when it resets.
 - Two modes: always visible, or only near limits.
 - Alerts at two configurable thresholds (80 % and 95 % by default) and, optionally, when a limit resets.
 - A forecast in the expanded view, e.g. `runs out ~16:40 · resets 18:00`, when a limit will run out before it resets at your current pace (can be turned off in Settings).
@@ -34,7 +34,7 @@ Shows how much of your Claude Code plan limits you have used — the 5-hour wind
 
 #### Sessions
 
-Connect **Session hooks** in Settings to see every live Claude Code session in the expanded notch: whether it is working, waiting for you (a permission prompt), or idle, and which subagents are running inside it. The compact notch shows how many sessions are live; the dot is orange when one waits for you. Click a session to bring its window to the front (VS Code, Cursor and Windsurf open the project's window; terminals are activated).
+Connect **Session hooks** in Settings to see every live Claude Code session in the expanded notch: whether it is working, waiting for you (a permission prompt), or idle, and which subagents are running inside it. The compact notch shows how many sessions are live (`●2`, orange when one waits for you) and how many subagents are running (`✦3`). In the expanded panel, agents appear as a tree under their session with a spinner, and working sessions pulse. Click a session to bring its window to the front (VS Code, Cursor and Windsurf open the project's window; terminals are activated).
 
 Workdeck adds asynchronous hooks for `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PostToolUse`, `Notification`, `Stop`, `SubagentStart` and `SubagentStop` to `~/.claude/settings.json` (with the same backup as the status line). The hook command, `workdeck-hook`, keeps only the event name, session and agent IDs, the project folder, the agent type and task description, and which app hosts the session, in `~/Library/Application Support/Workdeck/sessions`. Prompts, answers and tool input are never stored. **Disconnect** removes only Workdeck's hooks.
 

@@ -115,6 +115,14 @@ nonisolated enum LimitsPresentation {
         return !(mode == .nearLimits && (level == .noData || level == .normal))
     }
 
+    /// Next to the ring in the compact notch: "42%", labeled only for the weekly window ("7d 91%"),
+    /// since the 5-hour window is the usual one.
+    static func compactNotchText(pressing: UsageWindow?, hasData: Bool) -> String {
+        guard let pressing else { return hasData ? "0%" : "—" }
+        let percent = UsageFormatting.percentText(pressing.usedPercent)
+        return pressing.kind == .fiveHour ? percent : "\(pressing.kind.shortLabel) \(percent)"
+    }
+
     /// "5h 42%"; "5h 0%" when no window is running (after a reset or before the first message);
     /// "—" only when nothing has ever been recorded.
     static func compactText(pressing: UsageWindow?, hasData: Bool) -> String {
