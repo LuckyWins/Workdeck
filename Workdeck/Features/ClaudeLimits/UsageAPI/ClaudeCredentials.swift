@@ -1,5 +1,4 @@
 import Foundation
-import Security
 
 nonisolated enum ClaudeCredentialsError: Error, Equatable, Sendable {
     case notFound
@@ -8,7 +7,7 @@ nonisolated enum ClaudeCredentialsError: Error, Equatable, Sendable {
 }
 
 nonisolated protocol ClaudeCredentialsReading: Sendable {
-    /// May block while macOS shows the Keychain access prompt; call it off the main actor.
+    /// Blocks while the token is read; call it off the main actor.
     func accessToken() throws -> String
 }
 
@@ -26,22 +25,26 @@ nonisolated enum ClaudeCredentials {
     }
 }
 
-/// Reads Claude Code's OAuth token. The token is returned to the caller only and never stored.
-nonisolated struct KeychainCredentialsReader: ClaudeCredentialsReading {
+/// Reads Claude Code's OAuth token by running `security`. Claude Code recreates its Keychain item on every
+/// token refresh, which drops apps from the item's partition list and makes `SecItemCopyMatching` ask for the
+/// login password; `/usr/bin/security` stays in that list, so it never prompts. The token is returned to the
+/// caller only and never stored.
+nonisolated struct SecurityCLICredentialsReader: ClaudeCredentialsReading {
+    static let executable = URL(filePath: "/usr/bin/security")
+    static let arguments = ["find-generic-password", "-s", ClaudeCredentials.keychainService, "-w"]
+    static let timeout: TimeInterval = 10
+    /// `security` exits with 44 (errSecItemNotFound truncated) when there is no such item.
+    static let itemNotFoundExitCode: Int32 = 44
+
+    var runner: any ProcessRunning = SystemProcessRunner()
+
     func accessToken() throws -> String {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: ClaudeCredentials.keychainService,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        switch status {
-        case errSecSuccess:
-            guard let data = result as? Data else { throw ClaudeCredentialsError.malformed }
-            return try ClaudeCredentials.accessToken(fromCredentialsJSON: data)
-        case errSecItemNotFound:
+        let result = runner.run(Self.executable, arguments: Self.arguments, timeout: Self.timeout)
+        guard !result.timedOut else { throw ClaudeCredentialsError.accessDenied }
+        switch result.exitCode {
+        case 0:
+            return try ClaudeCredentials.accessToken(fromCredentialsJSON: result.stdout)
+        case Self.itemNotFoundExitCode:
             throw ClaudeCredentialsError.notFound
         default:
             throw ClaudeCredentialsError.accessDenied

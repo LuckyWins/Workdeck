@@ -16,7 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         connector: ClaudeCodeConnector.standard(),
         presenter: NotchPresenter(),
         poller: UsagePoller(
-            credentials: KeychainCredentialsReader(),
+            credentials: SecurityCLICredentialsReader(),
             client: UsageAPIClient(transport: URLSessionTransport()),
             snapshotURL: WorkdeckPaths.standard().snapshotURL
         )
