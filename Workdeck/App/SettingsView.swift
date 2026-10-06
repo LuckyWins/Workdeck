@@ -6,7 +6,7 @@ struct SettingsView: View {
     let controller: LidSleepController
     let claudeCode: ClaudeCodeController
 
-    @State private var copiedDiagnostics = false
+    @State private var diagnosticsState = DiagnosticsCopyState.idle
 
     var body: some View {
         Form {
@@ -39,12 +39,10 @@ struct SettingsView: View {
             Section {
                 LabeledContent("Version", value: HelperConstants.version(of: .main))
                 LabeledContent("Diagnostics") {
-                    Button(copiedDiagnostics ? "Copied" : "Copy Diagnostics") {
-                        let text = claudeCode.diagnosticsText(logLines: DiagnosticsReport.recentLogLines(since: Date().addingTimeInterval(-3600)))
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(text, forType: .string)
-                        copiedDiagnostics = true
+                    Button(diagnosticsButtonTitle) {
+                        copyDiagnostics()
                     }
+                    .disabled(diagnosticsState == .copying)
                 }
             } header: {
                 Text("About")
@@ -79,6 +77,35 @@ struct SettingsView: View {
         case let .unavailable(message):
             Text(message)
                 .foregroundStyle(.red)
+        }
+    }
+
+    private enum DiagnosticsCopyState {
+        case idle
+        case copying
+        case copied
+    }
+
+    private var diagnosticsButtonTitle: String {
+        switch diagnosticsState {
+        case .idle: "Copy Diagnostics"
+        case .copying: "Copying…"
+        case .copied: "Copied"
+        }
+    }
+
+    /// Reading the log store takes seconds, so it runs off the main thread.
+    private func copyDiagnostics() {
+        diagnosticsState = .copying
+        Task {
+            let since = Date().addingTimeInterval(-3600)
+            let lines = await Task.detached { DiagnosticsReport.recentLogLines(since: since) }.value
+            let text = claudeCode.diagnosticsText(logLines: lines)
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            diagnosticsState = .copied
+            try? await Task.sleep(for: .seconds(2))
+            diagnosticsState = .idle
         }
     }
 }

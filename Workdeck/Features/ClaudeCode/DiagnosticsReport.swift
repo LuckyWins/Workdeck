@@ -34,8 +34,9 @@ enum DiagnosticsReport {
         return lines.joined(separator: "\n")
     }
 
-    /// This process's Workdeck log entries since `date`, as "HH:mm:ss [category] message".
-    static func recentLogLines(since date: Date) -> [String] {
+    /// This process's Workdeck log entries since `date`, as "HH:mm:ss [category] message". Takes seconds:
+    /// call it off the main actor.
+    nonisolated static func recentLogLines(since date: Date) -> [String] {
         guard let store = try? OSLogStore(scope: .currentProcessIdentifier),
               let entries = try? store.getEntries(at: store.position(date: date), matching: NSPredicate(format: "subsystem == %@", WorkdeckLog.subsystem))
         else { return [] }

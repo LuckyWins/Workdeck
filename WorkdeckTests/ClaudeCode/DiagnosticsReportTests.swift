@@ -29,3 +29,11 @@ struct DiagnosticsReportTests {
         #expect(!text.contains("SECRET"))
     }
 }
+
+/// Not on the main actor on purpose: reading the log store takes seconds and must run off the main thread.
+struct DiagnosticsLogReadingTests {
+    @Test func recentLogLinesCanRunOffTheMainActor() {
+        let lines = DiagnosticsReport.recentLogLines(since: Date().addingTimeInterval(-60))
+        #expect(lines.allSatisfy { !$0.isEmpty })
+    }
+}

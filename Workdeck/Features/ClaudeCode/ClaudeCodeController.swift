@@ -1,4 +1,5 @@
 import AppKit
+import OSLog
 import Observation
 
 /// The Claude Code tool: combines Limits and Sessions into the notch, the popover row, and the menu bar.
@@ -126,6 +127,7 @@ final class ClaudeCodeController {
         )
         presenter.show(state)
         for alert in limits.takeAlerts() {
+            WorkdeckLog.alerts.notice("\(LimitsText.alertTitle(alert), privacy: .public), shown")
             presenter.present(alert)
         }
     }

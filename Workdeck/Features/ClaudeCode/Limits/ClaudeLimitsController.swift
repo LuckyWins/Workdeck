@@ -102,7 +102,7 @@ final class ClaudeLimitsController {
             guard let self else { return }
             if self.poller.status != self.lastLoggedPollerStatus {
                 self.lastLoggedPollerStatus = self.poller.status
-                WorkdeckLog.limits.info("Usage API: \(String(describing: self.poller.status), privacy: .public)")
+                WorkdeckLog.limits.notice("Usage API: \(String(describing: self.poller.status), privacy: .public)")
             }
             self.onChange?()
         }

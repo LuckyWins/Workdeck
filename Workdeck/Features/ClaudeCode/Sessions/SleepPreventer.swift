@@ -29,6 +29,6 @@ final class PowerAssertionSleepPreventer: SleepPreventing {
             IOPMAssertionRelease(assertionID)
         }
         isPreventing = preventing
-        WorkdeckLog.keepAwake.info("\(preventing ? "Holding" : "Released", privacy: .public) the power assertion")
+        WorkdeckLog.keepAwake.notice("\(preventing ? "Holding" : "Released", privacy: .public) the power assertion")
     }
 }

@@ -117,7 +117,7 @@ final class ClaudeSessionsController {
         let current = store.sessions
         defer { previousSessions = current }
         for line in SessionChangeLog.lines(previous: previousSessions, current: current) {
-            WorkdeckLog.sessions.info("\(line, privacy: .public)")
+            WorkdeckLog.sessions.notice("\(line, privacy: .public)")
         }
         let outcome = SessionAlertPolicy.evaluate(
             previous: previousSessions,
@@ -128,7 +128,7 @@ final class ClaudeSessionsController {
             frontmostBundleID: frontmostBundleID()
         )
         for note in outcome.notes {
-            WorkdeckLog.alerts.info("\(note, privacy: .public)\(self.settings.isEnabled ? "" : " (indicator off, nothing shown)", privacy: .public)")
+            WorkdeckLog.alerts.notice("\(note, privacy: .public)\(self.settings.isEnabled ? "" : " (indicator off, nothing shown)", privacy: .public)")
         }
         if settings.isEnabled, !outcome.alerts.isEmpty {
             onAlerts?(outcome.alerts)
