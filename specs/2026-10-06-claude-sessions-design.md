@@ -117,7 +117,7 @@ All file-system, clock, process, and workspace access is injected so units are t
 ### 5.1 Hook Command (`workdeck-hook`)
 
 - Configured for `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PostToolUse`, `Notification`, `Stop`, `SubagentStart`, `SubagentStop`, each as `{"type": "command", "command": "'<app>/Contents/Helpers/workdeck-hook'", "async": true, "timeout": 5}` with no matcher.
-- Reads stdin (at most 1 MiB), filters (§4.2), appends one line, exits 0 with no output. Any error → exit 0 silently.
+- Reads stdin (at most 4 MiB: `PostToolUse` payloads carry the tool output, which Workdeck never reads), filters (§4.2), appends one line, exits 0 with no output. Larger input or any error → exit 0 silently.
 - Environment fields: `CLAUDE_PID` → `pid`, `CLAUDE_CODE_ENTRYPOINT` → `entrypoint`, `__CFBundleIdentifier` → `hostBundleID`, `TERM_PROGRAM` → `termProgram`.
 - `transcript_path` is used only to locate the agent's `meta.json` and is not stored.
 
