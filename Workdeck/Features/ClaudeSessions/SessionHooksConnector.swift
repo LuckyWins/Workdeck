@@ -52,12 +52,14 @@ struct SessionHooksConnector: SessionHooksConnecting {
         try file.write(root)
     }
 
-    /// Points the hooks at this app bundle if they were connected from another location.
+    /// Points the hooks at this app bundle and adds events a newer Workdeck subscribes to.
     func repairPathIfNeeded() {
         guard let hooks = (try? file.read())?["hooks"] as? [String: Any] else { return }
         let commands = Self.events.flatMap { Self.workdeckCommands(in: hooks[$0]) }
+        // Workdeck was connected but points elsewhere, or a newer version subscribes to more events.
+        let isComplete = Self.events.allSatisfy { !Self.workdeckCommands(in: hooks[$0]).isEmpty }
         guard !commands.isEmpty,
-              commands.contains(where: { $0 != ClaudeCodeConnector.command(for: binaryPath) }),
+              !isComplete || commands.contains(where: { $0 != ClaudeCodeConnector.command(for: binaryPath) }),
               !ClaudeCodeConnector.isTemporaryLocation(binaryPath),
               canConnect
         else { return }

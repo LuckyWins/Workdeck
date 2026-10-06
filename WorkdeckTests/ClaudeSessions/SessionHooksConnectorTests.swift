@@ -158,4 +158,18 @@ struct SessionHooksConnectorTests {
         connector(try makeFakeBinary(app: "Other.app")).repairPathIfNeeded()
         #expect(try readSettings()["hooks"] == nil)
     }
+
+    @Test func repairAddsMissingEvents() throws {
+        let binary = try makeFakeBinary()
+        var hooks: [String: Any] = [:]
+        for event in SessionHooksConnector.events.prefix(8) {
+            hooks[event] = [["hooks": [SessionHooksConnector.hook(for: binary)]]]
+        }
+        try writeSettings(["hooks": hooks])
+        #expect(connector(binary).status == .notConnected)
+        connector(binary).repairPathIfNeeded()
+        #expect(connector(binary).status == .connected)
+        #expect(try commands("PreToolUse") == ["'\(binary)'"])
+        #expect(try commands("Stop") == ["'\(binary)'"])
+    }
 }
