@@ -44,7 +44,7 @@ struct ClaudeLimitsSettingsSection: View {
                 Toggle("Forecast when limits run out", isOn: $settings.showForecast)
             }
         } header: {
-            Text("Claude Code Limits")
+            Text("Claude Code · Limits")
         } footer: {
             VStack(alignment: .leading, spacing: 6) {
                 Text(footer)

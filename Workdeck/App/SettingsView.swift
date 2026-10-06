@@ -31,6 +31,7 @@ struct SettingsView: View {
             }
 
             ClaudeLimitsSettingsSection(controller: claudeLimits)
+            ClaudeSessionsSettingsSection(controller: claudeLimits)
 
             Section("About") {
                 LabeledContent("Version", value: HelperConstants.version(of: .main))

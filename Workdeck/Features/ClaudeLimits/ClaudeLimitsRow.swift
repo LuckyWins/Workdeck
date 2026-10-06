@@ -11,7 +11,7 @@ struct ClaudeLimitsRow: View {
                 .frame(width: 24)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Claude Code Limits")
+                Text("Claude Code")
                 Text(controller.connectError ?? controller.rowSubtitle)
                     .font(.caption)
                     .foregroundStyle(controller.connectError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
@@ -20,7 +20,7 @@ struct ClaudeLimitsRow: View {
 
             Spacer(minLength: 8)
 
-            Toggle("Claude Code Limits", isOn: Binding(
+            Toggle("Claude Code", isOn: Binding(
                 get: { controller.settings.isEnabled && controller.hasAnySource },
                 set: { controller.setEnabled($0) }
             ))

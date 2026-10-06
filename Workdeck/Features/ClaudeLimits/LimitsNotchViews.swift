@@ -61,11 +61,13 @@ struct LimitsCompactLeading: View {
     let model: LimitsNotchModel
 
     var body: some View {
-        UsageRing(
-            percent: model.state.pressing?.usedPercent ?? (model.state.hasData ? 0 : nil),
-            color: level(of: model.state).notchColor
-        )
+        if model.state.showsLimits {
+            UsageRing(
+                percent: model.state.pressing?.usedPercent ?? (model.state.hasData ? 0 : nil),
+                color: level(of: model.state).notchColor
+            )
             .frame(width: 14, height: 14)
+        }
     }
 }
 
@@ -73,10 +75,15 @@ struct LimitsCompactTrailing: View {
     let model: LimitsNotchModel
 
     var body: some View {
-        Text(LimitsPresentation.compactText(pressing: model.state.pressing, hasData: model.state.hasData))
-            .font(.system(size: 12, weight: .semibold))
-            .monospacedDigit()
-            .foregroundStyle(level(of: model.state).compactTextColor)
+        HStack(spacing: 8) {
+            if model.state.showsLimits {
+                Text(LimitsPresentation.compactText(pressing: model.state.pressing, hasData: model.state.hasData))
+                    .font(.system(size: 12, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(level(of: model.state).compactTextColor)
+            }
+            SessionsCounter(state: model.state.sessions)
+        }
     }
 }
 
@@ -116,18 +123,29 @@ struct LimitsExpandedView: View {
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(UsageWindowKind.allCases, id: \.self) { kind in
-                windowRow(kind)
-            }
-            if model.state.age != nil || model.state.refresh != .hidden {
-                HStack(spacing: 6) {
-                    if let age = model.state.age {
-                        Text(LimitsText.ageText(age))
-                            .font(.caption2)
-                            .foregroundStyle(.white.opacity(0.6))
+            if model.state.showsLimits {
+                ForEach(UsageWindowKind.allCases, id: \.self) { kind in
+                    windowRow(kind)
+                }
+                if model.state.age != nil || model.state.refresh != .hidden {
+                    HStack(spacing: 6) {
+                        if let age = model.state.age {
+                            Text(LimitsText.ageText(age))
+                                .font(.caption2)
+                                .foregroundStyle(.white.opacity(0.6))
+                        }
+                        Spacer(minLength: 8)
+                        refreshButton
                     }
-                    Spacer(minLength: 8)
-                    refreshButton
+                }
+            }
+            if !model.state.sessions.rows.isEmpty {
+                if model.state.showsLimits {
+                    Divider()
+                        .overlay(.white.opacity(0.2))
+                }
+                SessionsList(state: model.state.sessions) { id in
+                    model.onActivateSession?(id)
                 }
             }
         }
