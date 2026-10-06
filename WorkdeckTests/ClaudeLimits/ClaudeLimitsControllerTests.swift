@@ -294,4 +294,26 @@ struct ClaudeLimitsControllerTests {
         poller.status = .rateLimited(until: fixedNow.addingTimeInterval(-1))
         #expect(controller.canRefreshNow)
     }
+
+    @Test func passesForecastWhenEnabled() throws {
+        connector.status = .connected
+        settings.isEnabled = true
+        try writeUsage(fiveHour: 90)
+        let (controller, store) = makeController()
+        controller.start()
+        store.reload()
+        let forecast = try #require(presenter.shown.last?.forecasts[.fiveHour])
+        #expect(abs(forecast.timeIntervalSince(fixedNow.addingTimeInterval(1600))) < 0.01)
+    }
+
+    @Test func noForecastWhenDisabled() throws {
+        connector.status = .connected
+        settings.isEnabled = true
+        settings.showForecast = false
+        try writeUsage(fiveHour: 90)
+        let (controller, store) = makeController()
+        controller.start()
+        store.reload()
+        #expect(presenter.shown.last?.forecasts.isEmpty == true)
+    }
 }

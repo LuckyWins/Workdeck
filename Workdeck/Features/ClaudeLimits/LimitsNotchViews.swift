@@ -137,7 +137,12 @@ struct LimitsExpandedView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(kind.title)
                     .font(.caption.weight(.semibold))
-                if let window, isCurrent {
+                if let window, isCurrent, let forecast = model.state.forecasts[kind] {
+                    let runsOut = Text(LimitsText.forecastText(forecast, now: model.state.now)).foregroundStyle(.orange)
+                    Text("\(runsOut) · \(LimitsText.resetClockText(window.resetsAt, now: model.state.now))")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.6))
+                } else if let window, isCurrent {
                     Text(LimitsText.resetText(window.resetsAt, now: model.state.now))
                         .font(.caption2)
                         .foregroundStyle(.white.opacity(0.6))

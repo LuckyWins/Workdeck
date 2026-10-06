@@ -35,6 +35,8 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
     var now: Date
     var age: TimeInterval?
     var thresholds: [Int]
+    /// When each window runs out at the current pace; only windows that run out before their reset.
+    var forecasts: [UsageWindowKind: Date] = [:]
 
     static let hidden = LimitsViewState(display: .hidden, windows: [], now: .distantPast, age: nil, thresholds: [80, 95])
 
