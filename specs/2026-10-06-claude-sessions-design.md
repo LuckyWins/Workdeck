@@ -241,7 +241,7 @@ After trying the first version, the user chose a terminal-style notch (htop-like
 |---|---|
 | `UserPromptSubmit` | As before. Work (`workStartedAt`) starts whenever a quiet session gets busy (see §10.5). |
 | `PreToolUse` | Sets the action of the agent with that `agent_id` when it is running; an `agent_id` of an agent not running (stopped, or not read yet) changes nothing; no `agent_id` sets the session's action. Status working unless the session is waiting. |
-| `PostToolUse` | As before; also clears the action it belongs to. |
+| `PostToolUse` | As before. The action stays until the next `PreToolUse` replaces it (no flicker between commands); "starting…" shows only before an agent's first command. |
 | `Stop` | As before; clears the session action and records `lastStopAt`. |
 | `PreCompact` | Status compacting; remembers the status it interrupted. |
 | `SessionStart` with `source == "compact"` | A compacting session returns to idle if compaction interrupted an idle session (manual `/compact`), otherwise to working (idle follows on `Stop` or `idle_prompt`). |

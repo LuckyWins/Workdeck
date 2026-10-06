@@ -82,7 +82,8 @@ nonisolated enum SessionReducer {
                 setStatus(.working, at: event.time, on: &session)
             }
         case .postToolUse:
-            setAction(nil, for: event.agentID, at: event.time, on: &session)
+            // The finished command stays on screen until the next one starts; only mark the agent as heard from.
+            markSeen(event.agentID, at: event.time, on: &session)
             // Agents run in parallel: only the agent that asked for permission ends the wait.
             if session.status != .waiting || event.agentID == session.waitingAgentID {
                 setStatus(.working, at: event.time, on: &session)
@@ -144,6 +145,11 @@ nonisolated enum SessionReducer {
             session.agents[index].action = action
             session.agents[index].lastSeenAt = max(session.agents[index].lastSeenAt ?? .distantPast, time)
         }
+    }
+
+    private static func markSeen(_ agentID: String?, at time: Date, on session: inout ClaudeSession) {
+        guard let agentID, let index = session.agents.firstIndex(where: { $0.id == agentID }) else { return }
+        session.agents[index].lastSeenAt = max(session.agents[index].lastSeenAt ?? .distantPast, time)
     }
 
     private static func setStatus(_ status: SessionStatus, at time: Date, on session: inout ClaudeSession) {

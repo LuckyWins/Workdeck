@@ -178,8 +178,9 @@ struct SessionReducerTests {
         let running = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10), tool]))
         #expect(running.action == "Bash ls")
         #expect(running.status == .working)
+        // The last command stays until the next one starts, so nothing flickers between commands.
         let done = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10), tool, hookEvent(.postToolUse, at: 12)]))
-        #expect(done.action == nil)
+        #expect(done.action == "Bash ls")
     }
 
     @Test func preToolUseOfAnAgentSetsItsAction() throws {
@@ -189,7 +190,8 @@ struct SessionReducerTests {
         #expect(running.agents.first?.action == "Read x.swift")
         #expect(running.action == nil)
         let done = try #require(SessionReducer.reduce([start, agent, tool, hookEvent(.postToolUse, at: 7) { $0.agentID = "a1" }]))
-        #expect(done.agents.first?.action == nil)
+        #expect(done.agents.first?.action == "Read x.swift")
+        #expect(done.agents.first?.lastSeenAt == fixedNow.addingTimeInterval(7))
     }
 
     @Test func preToolUseDoesNotEndAWait() throws {
