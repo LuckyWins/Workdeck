@@ -318,4 +318,19 @@ struct SessionReducerTests {
         #expect(agent.transcriptPath == "/t/agent-a1.jsonl")
         #expect(agent.steps == 3)
     }
+
+    @Test func stopKeepsListedBackgroundAgentsOnly() throws {
+        let background = hookEvent(.subagentStart, at: 1) { $0.agentID = "bg1"; $0.agentType = "general-purpose" }
+        let stopped = hookEvent(.subagentStart, at: 2) { $0.agentID = "bg2"; $0.agentType = "general-purpose" }
+        let foreground = hookEvent(.subagentStart, at: 3) { $0.agentID = "fg1"; $0.agentType = "Explore" }
+        let stop = hookEvent(.stop, at: 30) { $0.backgroundAgentIDs = ["bg1"] }
+        let session = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 0), background, stopped, foreground, stop]))
+        #expect(session.agents.map(\.id) == ["bg1"])
+    }
+
+    @Test func stopWithoutTheListKeepsAgents() throws {
+        let agent = hookEvent(.subagentStart, at: 1) { $0.agentID = "a1"; $0.agentType = "Explore" }
+        let session = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 0), agent, hookEvent(.stop, at: 30)]))
+        #expect(session.agents.map(\.id) == ["a1"])
+    }
 }

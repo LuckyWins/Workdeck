@@ -82,6 +82,7 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | S12 | Needs-you alert | Turn on "Notify when a session needs you"; switch to another app; trigger a permission prompt. | "! <project> needs you · permission prompt" appears. |
 | S13 | Keep awake | Turn on "Keep Mac awake while Claude works"; while a session works run `pmset -g assertions \| grep Workdeck`. | "Workdeck: Claude Code is working" is listed while it works and gone a moment after it finishes. |
 | S14 | Agent cards | Start a background agent and a foreground agent in a session, then hover the notch. | Each agent shows two lines: type · model ("Opus" at once, "Opus 5.5" after its first answer), `bg` on the background one, duration; then its current action and `N steps`. |
+| S15 | Stopped background agent | Start two background agents, then ask Claude to stop one of them. | At the end of that turn the stopped agent disappears from the notch; the other stays. |
 | S8 | Disconnect | Disconnect in Settings. | Only Workdeck's hook entries are removed; your own hooks stay; the sessions disappear from the notch. |
 
 ## Results

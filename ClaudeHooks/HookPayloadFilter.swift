@@ -93,6 +93,12 @@ nonisolated enum HookPayloadFilter {
         if name == .preToolUse, let tool = root["tool_name"] as? String {
             event.action = action(toolName: String(tool.prefix(maxFieldLength)), input: root["tool_input"] as? [String: Any])
         }
+        if name == .stop, agentID == nil, let tasks = root["background_tasks"] as? [[String: Any]] {
+            event.backgroundAgentIDs = tasks
+                .filter { $0["type"] as? String == "subagent" }
+                .compactMap { $0["id"] as? String }
+                .filter(isSafeIdentifier)
+        }
         return HookPayload(event: event, transcriptPath: root["transcript_path"] as? String)
     }
 

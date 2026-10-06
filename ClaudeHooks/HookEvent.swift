@@ -41,6 +41,8 @@ nonisolated struct HookEvent: Codable, Equatable, Sendable {
     var agentBackground: Bool?
     /// Where the agent's transcript is; the app reads only the model ID from it.
     var agentTranscriptPath: String?
+    /// Main `Stop` only: the background agents still running, from `background_tasks` (IDs only).
+    var backgroundAgentIDs: [String]?
     /// `PreToolUse` only: the tool and a short target, e.g. "Read NotchPresenter.swift".
     var action: String?
 }

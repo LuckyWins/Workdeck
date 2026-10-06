@@ -155,4 +155,26 @@ struct HookPayloadFilterTests {
     func bashSecretsAreMasked(command: String, expected: String) {
         #expect(HookPayloadFilter.action(toolName: "Bash", input: ["command": command]) == expected)
     }
+
+    @Test func mainStopRecordsLiveBackgroundAgentIDsOnly() throws {
+        let payload = try #require(parse([
+            "hook_event_name": "Stop",
+            "session_id": sessionID,
+            "background_tasks": [
+                ["id": "a2f89c7cf4ec265de", "type": "subagent", "status": "running", "agent_type": "Explore", "description": "SECRET-CONTENT"],
+                ["id": "b1", "type": "shell", "status": "running", "description": "npm run dev"],
+                ["id": "../bad", "type": "subagent"],
+            ],
+        ]))
+        #expect(payload.event.backgroundAgentIDs == ["a2f89c7cf4ec265de"])
+        let encoded = String(decoding: try JSONEncoder().encode(payload.event), as: UTF8.self)
+        #expect(!encoded.contains("SECRET-CONTENT"))
+    }
+
+    @Test func backgroundAgentsOnlyFromTheMainStop() throws {
+        #expect(try #require(parse(["hook_event_name": "Stop", "session_id": sessionID])).event.backgroundAgentIDs == nil)
+        #expect(try #require(parse(["hook_event_name": "Stop", "session_id": sessionID, "background_tasks": []])).event.backgroundAgentIDs == [])
+        let subagent = try #require(parse(["hook_event_name": "SubagentStop", "session_id": sessionID, "agent_id": "a1", "background_tasks": [["id": "a1", "type": "subagent"]]]))
+        #expect(subagent.event.backgroundAgentIDs == nil)
+    }
 }

@@ -105,6 +105,11 @@ nonisolated enum SessionReducer {
         case .stop:
             session.action = nil
             session.lastStopAt = event.time
+            // Claude Code lists the background agents alive at this Stop; foreground agents have finished,
+            // and a background agent missing from the list was stopped (e.g. with TaskStop).
+            if let alive = event.backgroundAgentIDs {
+                session.agents.removeAll { !alive.contains($0.id) }
+            }
             setStatus(.idle, at: event.time, on: &session)
         case .subagentStart:
             if let agentID = event.agentID, !session.agents.contains(where: { $0.id == agentID }) {
