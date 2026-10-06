@@ -14,6 +14,8 @@ nonisolated struct RunningAgent: Equatable, Sendable, Identifiable {
     var startedAt: Date
     /// What the agent is doing now, e.g. "Read NotchPresenter.swift".
     var action: String?
+    /// The agent's latest own event; `nil` means only its start was seen.
+    var lastSeenAt: Date?
 }
 
 /// A Claude Code session reconstructed from its hook events.
@@ -50,6 +52,29 @@ nonisolated struct ClaudeSession: Equatable, Sendable, Identifiable {
     /// Work in progress: keeps the Mac awake when that setting is on.
     var isBusy: Bool {
         status == .working || status == .compacting || !agents.isEmpty
+    }
+
+    /// An agent stopped with `TaskStop` sends no `SubagentStop`.
+    var lastTaskStopAt: Date?
+
+    /// How long after a `TaskStop` an agent may stay silent before it counts as the stopped one.
+    static let taskStopGrace: TimeInterval = 30
+    /// Agents silent this long are hidden whatever stopped them.
+    static let silentAgentLimit: TimeInterval = 30 * 60
+
+    /// The session without agents that were evidently stopped: silent since a `TaskStop`, or silent for
+    /// half an hour. Hidden, not forgotten: an agent that is heard from again comes back.
+    func withoutStoppedAgents(now: Date) -> ClaudeSession {
+        var session = self
+        session.agents.removeAll { agent in
+            let seen = agent.lastSeenAt ?? agent.startedAt
+            if now.timeIntervalSince(seen) >= Self.silentAgentLimit {
+                return true
+            }
+            guard let stop = lastTaskStopAt else { return false }
+            return seen <= stop && now.timeIntervalSince(stop) >= Self.taskStopGrace
+        }
+        return session
     }
 
     var projectName: String {

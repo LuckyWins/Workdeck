@@ -211,6 +211,16 @@ struct ClaudeSessionStoreTests {
         store.reload()
         #expect(calls == 3)
     }
+
+    @Test func storeHidesStoppedAgents() {
+        start("s1", at: -3600)
+        liveness.startTimes[42] = fixedNow.addingTimeInterval(-7200)
+        writeSessionEvent(hookEvent(.subagentStart, at: -3590) { $0.agentID = "a1"; $0.agentType = "Explore" }, to: directory)
+        let store = makeStore()
+        store.reload()
+        #expect(store.sessions.first?.agents.isEmpty == true)
+        #expect(store.sessions.first?.isBusy == false)
+    }
 }
 
 struct SystemProcessLivenessTests {

@@ -268,4 +268,37 @@ struct SessionReducerTests {
         let next = try #require(SessionReducer.reduce(events + [hookEvent(.userPromptSubmit, at: 900)]))
         #expect(next.workStartedAt == fixedNow.addingTimeInterval(900))
     }
+
+    private var twoAgentsAndATaskStop: [HookEvent] {
+        [
+            start,
+            hookEvent(.subagentStart, at: 0) { $0.agentID = "a1"; $0.agentType = "general-purpose" },
+            hookEvent(.subagentStart, at: 0) { $0.agentID = "a2"; $0.agentType = "general-purpose" },
+            hookEvent(.preToolUse, at: 10) { $0.agentID = "a1"; $0.action = "WebFetch x.com" },
+            hookEvent(.preToolUse, at: 10) { $0.agentID = "a2"; $0.action = "Bash ls" },
+            // The main agent stops a1 with TaskStop; no SubagentStop arrives for it.
+            hookEvent(.preToolUse, at: 20) { $0.action = "TaskStop" },
+            hookEvent(.postToolUse, at: 25) { $0.agentID = "a2" },
+        ]
+    }
+
+    @Test func agentsSilentSinceATaskStopAreHidden() throws {
+        let session = try #require(SessionReducer.reduce(twoAgentsAndATaskStop))
+        #expect(session.withoutStoppedAgents(now: fixedNow.addingTimeInterval(60)).agents.map(\.id) == ["a2"])
+        #expect(session.withoutStoppedAgents(now: fixedNow.addingTimeInterval(40)).agents.map(\.id) == ["a1", "a2"])
+    }
+
+    @Test func aHiddenAgentReturnsWhenItIsHeardFrom() throws {
+        let events = twoAgentsAndATaskStop + [hookEvent(.preToolUse, at: 90) { $0.agentID = "a1"; $0.action = "Read y.swift" }]
+        let session = try #require(SessionReducer.reduce(events))
+        #expect(session.withoutStoppedAgents(now: fixedNow.addingTimeInterval(120)).agents.map(\.id) == ["a1", "a2"])
+    }
+
+    @Test func agentsSilentForHalfAnHourAreHidden() throws {
+        let session = try #require(SessionReducer.reduce([
+            start, hookEvent(.subagentStart, at: 0) { $0.agentID = "a1"; $0.agentType = "Explore" },
+        ]))
+        #expect(session.withoutStoppedAgents(now: fixedNow.addingTimeInterval(1700)).agents.count == 1)
+        #expect(session.withoutStoppedAgents(now: fixedNow.addingTimeInterval(1801)).agents.isEmpty)
+    }
 }

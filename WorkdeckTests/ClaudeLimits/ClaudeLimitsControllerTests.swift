@@ -553,7 +553,7 @@ struct ClaudeLimitsControllerTests {
         liveness.startTimes[42] = fixedNow.addingTimeInterval(-9000)
         let (controller, _) = makeController()
         controller.start()
-        #expect(controller.sessions.sessions.first?.isBusy == true)
+        #expect(controller.sessions.sessions.count == 1)
         #expect(!sleepPreventer.isPreventing)
     }
 

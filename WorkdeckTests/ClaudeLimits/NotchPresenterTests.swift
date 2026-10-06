@@ -37,7 +37,7 @@ final class FakeNotchSurface: NotchSurface {
 struct NotchPresenterTests {
     let surface = FakeNotchSurface()
 
-    private func makePresenter(screen: NSScreen? = NSScreen.screens.first) -> (NotchPresenter, () -> Int) {
+    private func makePresenter(screen: NSScreen? = NSScreen.screens.first, alertDuration: Duration = .milliseconds(100)) -> (NotchPresenter, () -> Int) {
         var created = 0
         let presenter = NotchPresenter(
             makeSurface: { model in
@@ -46,7 +46,7 @@ struct NotchPresenterTests {
                 return surface
             },
             screen: { screen },
-            alertDuration: .milliseconds(100),
+            alertDuration: alertDuration,
             rebuildDelay: .zero,
             observeScreenChanges: false
         )
@@ -164,7 +164,7 @@ struct NotchPresenterTests {
 
     @Test(.timeLimit(.minutes(1)))
     func anAlertArrivingDuringAnotherJoinsIt() async throws {
-        let (presenter, _) = makePresenter()
+        let (presenter, _) = makePresenter(alertDuration: .seconds(1))
         presenter.present(.reset(.fiveHour))
         while surface.batchesAtExpand.isEmpty {
             try await Task.sleep(for: .milliseconds(5))

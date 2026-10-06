@@ -248,6 +248,8 @@ After trying the first version, the user chose a terminal-style notch (htop-like
 
 Compacting counts as working for the counter color, ordering and keep-awake.
 
+Stopped agents: an agent stopped by the main agent's `TaskStop` tool sends no `SubagentStop` (seen live on 2026-10-06). Each agent remembers its latest own event (`PreToolUse`/`PostToolUse` carry the subagent's `agent_id`, confirmed live). The store hides an agent that has been silent since the session's last `TaskStop` for at least 30 seconds, or silent for 30 minutes whatever the reason. Hidden agents return as soon as they send an event. Hidden agents do not count as running for the counter, keep-awake, or alerts.
+
 ### 10.3 Display
 
 - Session row: while working with an action, the action replaces the word "working" (`● Workdeck   Bash xcodebuild -sch…  12m`). Compacting shows a cyan dot and "compacting".

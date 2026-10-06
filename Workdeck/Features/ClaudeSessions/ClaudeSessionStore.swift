@@ -92,7 +92,7 @@ final class ClaudeSessionStore {
 
         var live: [ClaudeSession] = []
         for id in Array(events.keys) {
-            guard let session = currentSession(id) else { continue }
+            guard let session = currentSession(id)?.withoutStoppedAgents(now: now) else { continue }
             if isAlive(session) {
                 live.append(session)
             } else {

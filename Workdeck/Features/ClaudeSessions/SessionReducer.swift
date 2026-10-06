@@ -70,12 +70,15 @@ nonisolated enum SessionReducer {
         case .userPromptSubmit:
             setStatus(.working, at: event.time, on: &session)
         case .preToolUse:
-            setAction(event.action, for: event.agentID, on: &session)
+            setAction(event.action, for: event.agentID, at: event.time, on: &session)
+            if event.agentID == nil, event.action == "TaskStop" {
+                session.lastTaskStopAt = event.time
+            }
             if session.status != .waiting {
                 setStatus(.working, at: event.time, on: &session)
             }
         case .postToolUse:
-            setAction(nil, for: event.agentID, on: &session)
+            setAction(nil, for: event.agentID, at: event.time, on: &session)
             // Agents run in parallel: only the agent that asked for permission ends the wait.
             if session.status != .waiting || event.agentID == session.waitingAgentID {
                 setStatus(.working, at: event.time, on: &session)
@@ -118,7 +121,7 @@ nonisolated enum SessionReducer {
     }
 
     /// An agent's own tool call updates that agent; a call without an agent ID is the main agent's.
-    private static func setAction(_ action: String?, for agentID: String?, on session: inout ClaudeSession) {
+    private static func setAction(_ action: String?, for agentID: String?, at time: Date, on session: inout ClaudeSession) {
         guard let agentID else {
             session.action = action
             return
@@ -126,6 +129,7 @@ nonisolated enum SessionReducer {
         // An agent that already stopped, or whose start has not been read yet, leaves the session row alone.
         if let index = session.agents.firstIndex(where: { $0.id == agentID }) {
             session.agents[index].action = action
+            session.agents[index].lastSeenAt = max(session.agents[index].lastSeenAt ?? .distantPast, time)
         }
     }
 
