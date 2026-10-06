@@ -73,9 +73,9 @@ The Sessions footer: "Adds hooks to ~/.claude/settings.json that tell Workdeck w
 ```
 
 - One row per session: status dot, project name (last path component of `cwd`), status text, and time in the current state (working and idle; none for waiting).
-- Under a session, one indented row per running agent: `<agent_type> · <description>` (type only when there is no description) and how long it has run.
+- Under a session, one indented row per running agent: `<agent_type> · <description>` (type only when there is no description) and how long it has run. At most 2 agent rows per session, longest-running first; more → an indented row "+N agents".
 - Order: waiting, then working, then idle; within a group, most recent state change first.
-- At most 6 session rows; more → a last row "+3 more".
+- At most 3 session rows; more → a last row "+2 more".
 - Clicking a session row brings its window to the front (§5.4). The expanded view stays open while the pointer is over it.
 - When the limits part is hidden (not connected, or "Only near limits" below threshold) the expanded view shows only the sessions list.
 
@@ -179,7 +179,8 @@ All file-system, clock, process, and workspace access is injected so units are t
 | `meta.json` missing or late | Agent shown by type only. |
 | Invalid `settings.json` | Connect and Disconnect refuse with the existing message. |
 | App window not found | Activation does nothing. |
-| More than 6 sessions | "+N more" row. |
+| More than 3 sessions | "+N more" row. |
+| More than 2 agents in a session | "+N agents" row under it. |
 
 ## 7. Testing
 
@@ -190,7 +191,7 @@ Unit (Swift Testing; never the real `~/.claude`, the real sessions directory, or
 - `HookEventFile`: append and read from offset, partial last line, file and directory modes.
 - `HookRunner`: end to end into a temporary directory; never throws.
 - `SessionReducer`: every row of §5.2, ordering by time, resume, missing fields.
-- `ClaudeSessionStore`: incremental reads, liveness with a fake (`SessionEnd`, dead PID, wrong executable, 24-hour expiry), file deletion, sort order, "+N more".
+- `ClaudeSessionStore`: incremental reads, liveness with a fake (`SessionEnd`, dead PID, wrong executable, 24-hour expiry), file deletion, sort order, "+N more" sessions and "+N agents".
 - `SessionHooksConnector`: connect next to existing hooks, idempotent connect, partial repair, disconnect cleanup, symlink, backup, invalid JSON, path repair.
 - `WindowActivator` with a fake workspace: editor vs. terminal vs. none.
 - Controller and presentation: subtitle, counter level, visibility in "Only near limits", expanded view without limits.
