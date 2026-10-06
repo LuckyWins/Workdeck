@@ -81,4 +81,16 @@ struct LimitsTextTests {
         #expect(LimitsText.alertSymbol(.reset(.fiveHour)) == "✓")
         #expect(LimitsText.alertSymbol(.threshold(window(.fiveHour, 80), threshold: 80)) == "!")
     }
+
+    @Test func alertBatchTexts() {
+        let finishedA = LimitsAlert.sessionFinished(project: "vitastir", worked: 3 * 60 + 19)
+        let finishedB = LimitsAlert.sessionFinished(project: "Workdeck", worked: 2 * 60 + 55)
+        let waiting = LimitsAlert.sessionNeedsYou(project: "pokemon")
+        #expect(LimitsText.batchTitle([finishedA, finishedB]) == "2 sessions finished")
+        #expect(LimitsText.batchTitle([waiting, .sessionNeedsYou(project: "x")]) == "2 sessions need you")
+        #expect(LimitsText.batchTitle([finishedA, waiting]) == "2 alerts")
+        #expect(LimitsText.batchLine(finishedA, now: fixedNow) == "vitastir  worked 3m")
+        #expect(LimitsText.batchLine(waiting, now: fixedNow) == "pokemon  needs you")
+        #expect(LimitsText.batchLine(.reset(.sevenDay), now: fixedNow) == "Weekly limit reset")
+    }
 }

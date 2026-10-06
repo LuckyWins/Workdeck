@@ -15,8 +15,10 @@ nonisolated enum SessionAlertPolicy {
         for session in current {
             // A session seen for the first time has no transition to report.
             guard let old = before[session.id] else { continue }
-            // The user is already looking at that app.
-            if let host = session.hostBundleID, host == frontmostBundleID {
+            // The user is already looking at that session's app. With several sessions in one app
+            // (VS Code windows), which window is in front is unknown, so the alert shows.
+            if let host = session.hostBundleID, host == frontmostBundleID,
+               current.filter({ $0.hostBundleID == host }).count == 1 {
                 continue
             }
             if notifyFinished,

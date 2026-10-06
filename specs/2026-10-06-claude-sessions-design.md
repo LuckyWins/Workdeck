@@ -266,7 +266,8 @@ Compacting counts as working for the counter color, ordering and keep-awake.
 - `SessionAlertPolicy` (pure) compares the previous and current session lists:
   - finished: a session that was working or compacting is now idle because of `Stop` (`since == lastStopAt`), and `lastStopAt − turnStartedAt` (or the previous `since` without a turn start) is at least the threshold;
   - needs you: a session that was not waiting is now waiting;
-  - none for sessions seen for the first time (launch, connect) or when the session's host app is frontmost.
+  - none for sessions seen for the first time (launch, connect), or when the session's host app is frontmost and hosts no other live session (with several sessions in one app, such as VS Code windows, the window in front is unknown, so the alert shows).
+- Alerts that arrive together are shown together: a header ("2 sessions finished", "2 sessions need you", "3 alerts") and one line per alert (at most three, then "+N more"). An alert arriving while others are on screen joins them and restarts the 6-second display.
 
 ### 10.6 Keep Awake
 

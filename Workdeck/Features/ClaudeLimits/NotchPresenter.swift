@@ -45,6 +45,7 @@ final class NotchPresenter: LimitsPresenting {
     private var isHovering = false
     private var isShowingAlert = false
     private var pendingAlerts: [LimitsAlert] = []
+    private var isAlertExtended = false
     private var alertTask: Task<Void, Never>?
     private var reconcileTask: Task<Void, Never>?
     private var rebuildTask: Task<Void, Never>?
@@ -106,17 +107,28 @@ final class NotchPresenter: LimitsPresenting {
 
     func present(_ alert: LimitsAlert) {
         guard screen() != nil else { return }
+        // An alert arriving while others are on screen joins them and keeps them up a while longer.
+        if isShowingAlert {
+            model.alerts.append(alert)
+            isAlertExtended = true
+            return
+        }
         pendingAlerts.append(alert)
         guard alertTask == nil else { return }
         alertTask = Task {
+            // Alerts that arrive together are shown together.
             while !pendingAlerts.isEmpty, screen() != nil {
-                model.alert = pendingAlerts.removeFirst()
+                model.alerts = pendingAlerts
+                pendingAlerts.removeAll()
                 isShowingAlert = true
                 requestReconcile()
-                try? await Task.sleep(for: alertDuration)
+                repeat {
+                    isAlertExtended = false
+                    try? await Task.sleep(for: alertDuration)
+                } while isAlertExtended && screen() != nil
             }
             pendingAlerts.removeAll()
-            model.alert = nil
+            model.alerts = []
             isShowingAlert = false
             alertTask = nil
             requestReconcile()

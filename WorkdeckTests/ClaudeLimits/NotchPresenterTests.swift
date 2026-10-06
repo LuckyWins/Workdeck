@@ -10,6 +10,8 @@ final class FakeNotchSurface: NotchSurface {
     private(set) var calls: [String] = []
     /// The alert the model held at each expand, captured synchronously so timing cannot race it.
     private(set) var alertsAtExpand: [LimitsAlert?] = []
+    /// Every alert on screen at each expand.
+    private(set) var batchesAtExpand: [[LimitsAlert]] = []
     private(set) var overlapped = false
     private var busy = false
 
@@ -23,6 +25,7 @@ final class FakeNotchSurface: NotchSurface {
 
     func expand(on screen: NSScreen) async {
         alertsAtExpand.append(model?.alert)
+        batchesAtExpand.append(model?.alerts ?? [])
         await perform("expand")
     }
     func compact(on screen: NSScreen) async { await perform("compact") }
@@ -147,5 +150,29 @@ struct NotchPresenterTests {
         presenter.setSessionAction { activated.append($0) }
         presenter.model.onActivateSession?("s1")
         #expect(activated == ["s1"])
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func alertsArrivingTogetherShowAsOneBatch() async {
+        let (presenter, _) = makePresenter()
+        presenter.present(.sessionFinished(project: "vitastir", worked: 200))
+        presenter.present(.sessionFinished(project: "Workdeck", worked: 175))
+        await settle(presenter)
+        #expect(surface.batchesAtExpand == [[.sessionFinished(project: "vitastir", worked: 200), .sessionFinished(project: "Workdeck", worked: 175)]])
+        #expect(presenter.model.alerts.isEmpty)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func anAlertArrivingDuringAnotherJoinsIt() async throws {
+        let (presenter, _) = makePresenter()
+        presenter.present(.reset(.fiveHour))
+        while surface.batchesAtExpand.isEmpty {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        presenter.present(.sessionNeedsYou(project: "pokemon"))
+        #expect(presenter.model.alerts == [.reset(.fiveHour), .sessionNeedsYou(project: "pokemon")])
+        await settle(presenter)
+        #expect(surface.calls.filter { $0 == "expand" }.count == 1)
+        #expect(presenter.model.alerts.isEmpty)
     }
 }

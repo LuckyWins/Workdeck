@@ -4,12 +4,13 @@ import Testing
 
 private func session(
     _ status: SessionStatus,
+    id: String = "s1",
     since: TimeInterval,
     turn: TimeInterval? = 0,
     stop: TimeInterval? = nil,
     host: String? = "com.microsoft.VSCode"
 ) -> ClaudeSession {
-    var session = ClaudeSession(id: "s1", cwd: "/p/Workdeck", status: status, since: fixedNow.addingTimeInterval(since), hostBundleID: host, lastEventAt: fixedNow)
+    var session = ClaudeSession(id: id, cwd: "/p/\(id == "s1" ? "Workdeck" : id)", status: status, since: fixedNow.addingTimeInterval(since), hostBundleID: host, lastEventAt: fixedNow)
     session.turnStartedAt = turn.map { fixedNow.addingTimeInterval($0) }
     session.lastStopAt = stop.map { fixedNow.addingTimeInterval($0) }
     return session
@@ -71,5 +72,12 @@ struct SessionAlertPolicyTests {
     @Test func settingsOffAreQuiet() {
         #expect(alerts([session(.working, since: 0)], [session(.idle, since: 900, stop: 900)], finished: false).isEmpty)
         #expect(alerts([session(.working, since: 0)], [session(.waiting, since: 10)], needsYou: false).isEmpty)
+    }
+
+    @Test func aHostWithSeveralSessionsIsNotMuted() {
+        // Two VS Code windows: which one is in front is unknown, so the alert shows.
+        let previous = [session(.working, since: 0), session(.idle, id: "vitastir", since: 0)]
+        let current = [session(.waiting, since: 10), session(.idle, id: "vitastir", since: 0)]
+        #expect(alerts(previous, current, frontmost: "com.microsoft.VSCode") == [.sessionNeedsYou(project: "Workdeck")])
     }
 }

@@ -4,7 +4,11 @@ import SwiftUI
 @Observable
 final class LimitsNotchModel {
     var state = LimitsViewState.hidden
-    var alert: LimitsAlert?
+    /// Alerts on screen together; the first decides the single-alert layout.
+    var alerts: [LimitsAlert] = []
+    var alert: LimitsAlert? {
+        alerts.first
+    }
     @ObservationIgnored var onRefresh: (() -> Void)?
     @ObservationIgnored var onActivateSession: ((String) -> Void)?
 }
@@ -97,7 +101,9 @@ struct LimitsExpandedView: View {
 
     var body: some View {
         Group {
-            if let alert = model.alert {
+            if model.alerts.count > 1 {
+                batchView(model.alerts)
+            } else if let alert = model.alert {
                 alertView(alert)
             } else {
                 details
@@ -125,6 +131,38 @@ struct LimitsExpandedView: View {
             }
         }
     }
+
+    /// Several alerts that arrived together: a header and one line each, at most three.
+    private func batchView(_ alerts: [LimitsAlert]) -> some View {
+        let isUrgent = alerts.contains { LimitsText.alertSymbol($0) == "!" }
+        return VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Text(isUrgent ? "!" : "✓")
+                    .fontWeight(.bold)
+                    .foregroundStyle(isUrgent ? Color.orange : Color.green)
+                Text(LimitsText.batchTitle(alerts))
+                    .fontWeight(.semibold)
+            }
+            ForEach(Array(alerts.prefix(Self.maxBatchLines).enumerated()), id: \.offset) { _, alert in
+                HStack(spacing: 6) {
+                    Text(LimitsText.alertSymbol(alert))
+                        .foregroundStyle(alertColor(alert))
+                    Text(LimitsText.batchLine(alert, now: model.state.now))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .padding(.leading, 12)
+            }
+            if alerts.count > Self.maxBatchLines {
+                Text(SessionsText.moreSessions(alerts.count - Self.maxBatchLines))
+                    .foregroundStyle(Terminal.dim)
+                    .padding(.leading, 12)
+            }
+        }
+        .animation(.snappy, value: alerts.count)
+    }
+
+    static let maxBatchLines = 3
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 4) {

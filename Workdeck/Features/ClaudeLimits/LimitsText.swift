@@ -77,6 +77,30 @@ nonisolated enum LimitsText {
         }
     }
 
+    /// The header of several alerts shown together: "2 sessions finished", "2 sessions need you", "3 alerts".
+    static func batchTitle(_ alerts: [LimitsAlert]) -> String {
+        let count = alerts.count
+        if alerts.allSatisfy({ if case .sessionFinished = $0 { true } else { false } }) {
+            return "\(count) sessions finished"
+        }
+        if alerts.allSatisfy({ if case .sessionNeedsYou = $0 { true } else { false } }) {
+            return "\(count) sessions need you"
+        }
+        return "\(count) alerts"
+    }
+
+    /// One alert as a line under a batch header.
+    static func batchLine(_ alert: LimitsAlert, now: Date) -> String {
+        switch alert {
+        case let .sessionFinished(project, worked):
+            "\(project)  worked \(SessionsText.duration(from: now.addingTimeInterval(-worked), to: now))"
+        case let .sessionNeedsYou(project):
+            "\(project)  needs you"
+        case .threshold, .reset:
+            alertTitle(alert)
+        }
+    }
+
     /// "!" for something to act on, "✓" for good news.
     static func alertSymbol(_ alert: LimitsAlert) -> String {
         switch alert {
