@@ -143,7 +143,7 @@ final class ClaudeSessionStore {
         func rank(_ status: SessionStatus) -> Int {
             switch status {
             case .waiting: 0
-            case .working: 1
+            case .working, .compacting: 1
             case .idle: 2
             }
         }

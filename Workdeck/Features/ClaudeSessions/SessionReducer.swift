@@ -43,14 +43,26 @@ nonisolated enum SessionReducer {
 
         switch event.name {
         case .sessionStart:
-            break
+            // Compaction finished; the turn goes on (idle follows on Stop or the idle prompt).
+            if event.source == "compact", session.status == .compacting {
+                setStatus(.working, at: event.time, on: &session)
+            }
         case .userPromptSubmit:
+            session.turnStartedAt = event.time
             setStatus(.working, at: event.time, on: &session)
+        case .preToolUse:
+            setAction(event.action, for: event.agentID, on: &session)
+            if session.status != .waiting {
+                setStatus(.working, at: event.time, on: &session)
+            }
         case .postToolUse:
+            setAction(nil, for: event.agentID, on: &session)
             // Agents run in parallel: only the agent that asked for permission ends the wait.
             if session.status != .waiting || event.agentID == session.waitingAgentID {
                 setStatus(.working, at: event.time, on: &session)
             }
+        case .preCompact:
+            setStatus(.compacting, at: event.time, on: &session)
         case .notification:
             switch event.notificationType {
             case "permission_prompt":
@@ -63,6 +75,8 @@ nonisolated enum SessionReducer {
                 break
             }
         case .stop:
+            session.action = nil
+            session.lastStopAt = event.time
             setStatus(.idle, at: event.time, on: &session)
         case .subagentStart:
             if let agentID = event.agentID, !session.agents.contains(where: { $0.id == agentID }) {
@@ -79,6 +93,15 @@ nonisolated enum SessionReducer {
             session.hasEnded = true
         }
         return session
+    }
+
+    /// An agent's own tool call updates that agent; anything else is the main agent's.
+    private static func setAction(_ action: String?, for agentID: String?, on session: inout ClaudeSession) {
+        if let agentID, let index = session.agents.firstIndex(where: { $0.id == agentID }) {
+            session.agents[index].action = action
+        } else {
+            session.action = action
+        }
     }
 
     private static func setStatus(_ status: SessionStatus, at time: Date, on session: inout ClaudeSession) {

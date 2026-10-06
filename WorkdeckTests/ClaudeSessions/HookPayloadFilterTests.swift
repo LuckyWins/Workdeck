@@ -68,7 +68,7 @@ struct HookPayloadFilterTests {
     }
 
     @Test func dropsUnknownEventsAndInvalidInput() {
-        #expect(parse(["hook_event_name": "PreToolUse", "session_id": sessionID]) == nil)
+        #expect(parse(["hook_event_name": "PostCompact", "session_id": sessionID]) == nil)
         #expect(parse(["session_id": sessionID]) == nil)
         #expect(HookPayloadFilter.parse(Data("not json".utf8), environment: [:], now: fixedNow) == nil)
     }
@@ -103,5 +103,45 @@ struct HookPayloadFilterTests {
         let payload = try #require(parse(["hook_event_name": "Stop", "session_id": sessionID, "cwd": "/Users/me/Workdeck/sub"], environment: environment))
         #expect(payload.event.projectDir == "/Users/me/Workdeck")
         #expect(payload.event.cwd == "/Users/me/Workdeck/sub")
+    }
+
+    @Test(arguments: [
+        ("Read", ["file_path": "/Users/me/Workdeck/Workdeck/App/NotchPresenter.swift"], "Read NotchPresenter.swift"),
+        ("Edit", ["file_path": "/a/b/c.swift"], "Edit c.swift"),
+        ("MultiEdit", ["file_path": "/a/b/d.swift"], "MultiEdit d.swift"),
+        ("Write", ["file_path": "/a/README.md"], "Write README.md"),
+        ("NotebookEdit", ["notebook_path": "/a/n.ipynb"], "NotebookEdit n.ipynb"),
+        ("Bash", ["command": "xcodebuild -scheme Workdeck -destination 'platform=macOS' test"], "Bash xcodebuild -scheme Workd…"),
+        ("Bash", ["command": "git   status\nrm -rf build"], "Bash git status"),
+        ("WebFetch", ["url": "https://code.claude.com/docs/en/hooks?x=1"], "WebFetch code.claude.com"),
+        ("WebSearch", ["query": "swift testing"], "WebSearch swift testing"),
+        ("Grep", ["pattern": "NotchPresenter"], "Grep NotchPresenter"),
+        ("Glob", ["pattern": "**/*.swift"], "Glob **/*.swift"),
+        ("Agent", ["subagent_type": "Explore", "prompt": "secret"], "Agent Explore"),
+        ("mcp__github__search_repositories", ["query": "x"], "mcp:github"),
+        ("TodoWrite", ["todos": "x"], "TodoWrite"),
+        ("Read", [:], "Read"),
+    ] as [(String, [String: String], String)])
+    func actions(tool: String, input: [String: String], expected: String) {
+        #expect(HookPayloadFilter.action(toolName: tool, input: input) == expected)
+    }
+
+    @Test func preToolUseKeepsOnlyTheAction() throws {
+        let payload = try #require(parse([
+            "hook_event_name": "PreToolUse",
+            "session_id": sessionID,
+            "agent_id": "a1",
+            "tool_name": "Bash",
+            "tool_input": ["command": "curl -H 'Authorization: Bearer SECRET-TOKEN-VALUE' https://example.com"],
+        ]))
+        #expect(payload.event.action == "Bash curl -H 'Authorization: …")
+        #expect(payload.event.agentID == "a1")
+        let encoded = String(decoding: try JSONEncoder().encode(payload.event), as: UTF8.self)
+        #expect(!encoded.contains("SECRET"))
+    }
+
+    @Test func otherEventsHaveNoAction() throws {
+        let payload = try #require(parse(["hook_event_name": "PostToolUse", "session_id": sessionID, "tool_name": "Bash", "tool_input": ["command": "ls"]]))
+        #expect(payload.event.action == nil)
     }
 }

@@ -167,4 +167,63 @@ struct SessionReducerTests {
         let event = hookEvent(.userPromptSubmit, at: 10) { $0.cwd = "/p/Workdeck/sub"; $0.projectDir = "/p/Root" }
         #expect(SessionReducer.reduce([start, event])?.projectName == "Root")
     }
+
+    @Test func promptStartsATurn() throws {
+        let session = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10)]))
+        #expect(session.turnStartedAt == fixedNow.addingTimeInterval(10))
+    }
+
+    @Test func preToolUseSetsTheSessionAction() throws {
+        let tool = hookEvent(.preToolUse, at: 11) { $0.action = "Bash ls" }
+        let running = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10), tool]))
+        #expect(running.action == "Bash ls")
+        #expect(running.status == .working)
+        let done = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10), tool, hookEvent(.postToolUse, at: 12)]))
+        #expect(done.action == nil)
+    }
+
+    @Test func preToolUseOfAnAgentSetsItsAction() throws {
+        let agent = hookEvent(.subagentStart, at: 5) { $0.agentID = "a1"; $0.agentType = "Explore" }
+        let tool = hookEvent(.preToolUse, at: 6) { $0.agentID = "a1"; $0.action = "Read x.swift" }
+        let running = try #require(SessionReducer.reduce([start, agent, tool]))
+        #expect(running.agents.first?.action == "Read x.swift")
+        #expect(running.action == nil)
+        let done = try #require(SessionReducer.reduce([start, agent, tool, hookEvent(.postToolUse, at: 7) { $0.agentID = "a1" }]))
+        #expect(done.agents.first?.action == nil)
+    }
+
+    @Test func preToolUseDoesNotEndAWait() throws {
+        let prompt = hookEvent(.notification, at: 20) { $0.notificationType = "permission_prompt" }
+        let tool = hookEvent(.preToolUse, at: 21) { $0.action = "Bash ls" }
+        #expect(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10), prompt, tool])?.status == .waiting)
+    }
+
+    @Test func stopClearsTheActionAndRecordsWhen() throws {
+        let tool = hookEvent(.preToolUse, at: 11) { $0.action = "Bash ls" }
+        let session = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10), tool, hookEvent(.stop, at: 30)]))
+        #expect(session.action == nil)
+        #expect(session.lastStopAt == fixedNow.addingTimeInterval(30))
+        #expect(session.status == .idle)
+    }
+
+    @Test func compactionReturnsToWorking() throws {
+        let compacting = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10), hookEvent(.preCompact, at: 20)]))
+        #expect(compacting.status == .compacting)
+        #expect(compacting.since == fixedNow.addingTimeInterval(20))
+        let resumed = try #require(SessionReducer.reduce([
+            start, hookEvent(.userPromptSubmit, at: 10), hookEvent(.preCompact, at: 20),
+            hookEvent(.sessionStart, at: 25) { $0.source = "compact" },
+        ]))
+        #expect(resumed.status == .working)
+        #expect(resumed.since == fixedNow.addingTimeInterval(25))
+        #expect(resumed.lastStopAt == nil)
+    }
+
+    @Test func busyMeansWorkingCompactingOrRunningAgents() throws {
+        let agent = hookEvent(.subagentStart, at: 5) { $0.agentID = "a1"; $0.agentType = "Explore" }
+        #expect(SessionReducer.reduce([start])?.isBusy == false)
+        #expect(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 1)])?.isBusy == true)
+        #expect(SessionReducer.reduce([start, hookEvent(.preCompact, at: 1)])?.isBusy == true)
+        #expect(SessionReducer.reduce([start, agent, hookEvent(.stop, at: 9)])?.isBusy == true)
+    }
 }

@@ -52,6 +52,10 @@ struct SessionsPresentationTests {
         #expect(state.agentCount == 5)
         #expect(SessionsPresentation.viewState(sessions: [], now: fixedNow).agentCount == 0)
     }
+
+    @Test func compactingCountsAsWorking() {
+        #expect(SessionsPresentation.viewState(sessions: [session("a", .compacting), session("b", .idle)], now: fixedNow).level == .working)
+    }
 }
 
 struct SessionsTextTests {
@@ -59,6 +63,7 @@ struct SessionsTextTests {
         #expect(SessionsText.statusText(.working) == "working")
         #expect(SessionsText.statusText(.waiting) == "waiting for you")
         #expect(SessionsText.statusText(.idle) == "idle")
+        #expect(SessionsText.statusText(.compacting) == "compacting")
     }
 
     @Test(arguments: [(-5.0, "<1m"), (30.0, "<1m"), (720.0, "12m"), (3900.0, "1h 5m"), (10800.0, "3h")])

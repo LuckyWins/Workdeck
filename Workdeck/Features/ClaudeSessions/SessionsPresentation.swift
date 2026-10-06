@@ -77,7 +77,7 @@ nonisolated enum SessionsPresentation {
         if sessions.contains(where: { $0.status == .waiting }) {
             return .waiting
         }
-        if sessions.contains(where: { $0.status == .working }) {
+        if sessions.contains(where: { $0.status == .working || $0.status == .compacting }) {
             return .working
         }
         return sessions.isEmpty ? .none : .idle

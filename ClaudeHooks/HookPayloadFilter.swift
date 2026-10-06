@@ -10,6 +10,44 @@ nonisolated struct HookPayload: Equatable, Sendable {
 /// and tool input and output, is never read.
 nonisolated enum HookPayloadFilter {
     static let maxFieldLength = 100
+    static let maxActionLength = 30
+
+    /// The tool and a short target (spec §10.1); the rest of the tool input is never read.
+    static func action(toolName: String, input: [String: Any]?) -> String {
+        if toolName.hasPrefix("mcp__") {
+            let server = toolName.components(separatedBy: "__").dropFirst().first ?? ""
+            return truncated(server.isEmpty ? "mcp" : "mcp:\(server)")
+        }
+        let target: String? = switch toolName {
+        case "Read", "Edit", "MultiEdit", "Write": fileName(input?["file_path"])
+        case "NotebookEdit": fileName(input?["notebook_path"])
+        case "Bash": firstLine(input?["command"])
+        case "WebFetch": (input?["url"] as? String).flatMap { URL(string: $0)?.host() }
+        case "WebSearch": firstLine(input?["query"])
+        case "Grep", "Glob": firstLine(input?["pattern"])
+        case "Agent", "Task": firstLine(input?["subagent_type"])
+        default: nil
+        }
+        return truncated([toolName, target].compactMap { $0 }.joined(separator: " "))
+    }
+
+    private static func fileName(_ value: Any?) -> String? {
+        guard let path = value as? String else { return nil }
+        let name = URL(filePath: path).lastPathComponent
+        return name.isEmpty ? nil : name
+    }
+
+    /// The first line with runs of whitespace collapsed.
+    private static func firstLine(_ value: Any?) -> String? {
+        guard let string = value as? String else { return nil }
+        let line = string.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        let collapsed = line.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return collapsed.isEmpty ? nil : collapsed
+    }
+
+    private static func truncated(_ text: String) -> String {
+        text.count <= maxActionLength ? text : String(text.prefix(maxActionLength - 1)) + "…"
+    }
 
     static func parse(_ data: Data, environment: [String: String], now: Date) -> HookPayload? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -21,7 +59,7 @@ nonisolated enum HookPayloadFilter {
         if let agentID, !isSafeIdentifier(agentID) {
             return nil
         }
-        let event = HookEvent(
+        var event = HookEvent(
             time: now,
             name: name,
             sessionID: sessionID,
@@ -37,6 +75,9 @@ nonisolated enum HookPayloadFilter {
             agentID: agentID,
             agentType: short(root["agent_type"])
         )
+        if name == .preToolUse, let tool = root["tool_name"] as? String {
+            event.action = action(toolName: String(tool.prefix(maxFieldLength)), input: root["tool_input"] as? [String: Any])
+        }
         return HookPayload(event: event, transcriptPath: root["transcript_path"] as? String)
     }
 

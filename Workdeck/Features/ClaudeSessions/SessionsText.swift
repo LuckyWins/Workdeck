@@ -7,6 +7,7 @@ nonisolated enum SessionsText {
         case .working: "working"
         case .waiting: "waiting for you"
         case .idle: "idle"
+        case .compacting: "compacting"
         }
     }
 

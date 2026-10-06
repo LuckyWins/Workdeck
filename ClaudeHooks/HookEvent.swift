@@ -10,6 +10,8 @@ nonisolated enum HookEventName: String, Codable, Sendable, CaseIterable {
     case stop = "Stop"
     case subagentStart = "SubagentStart"
     case subagentStop = "SubagentStop"
+    case preToolUse = "PreToolUse"
+    case preCompact = "PreCompact"
 }
 
 /// One line of a session's event file. Holds only what Workdeck needs, never prompt, answer, or tool content.
@@ -34,4 +36,6 @@ nonisolated struct HookEvent: Codable, Equatable, Sendable {
     var agentID: String?
     var agentType: String?
     var agentDescription: String?
+    /// `PreToolUse` only: the tool and a short target, e.g. "Read NotchPresenter.swift".
+    var action: String?
 }

@@ -6,6 +6,7 @@ extension SessionStatus {
         case .waiting: .orange
         case .working: .green
         case .idle: .white.opacity(0.4)
+        case .compacting: .cyan
         }
     }
 }
@@ -150,7 +151,7 @@ struct SessionsList: View {
     /// Working sessions pulse, sessions waiting for you blink slowly, idle ones stay still.
     private func dotOpacity(_ status: SessionStatus, at date: Date) -> Double {
         switch status {
-        case .working: TerminalPulse.opacity(at: date, period: 1.2, minimum: 0.4)
+        case .working, .compacting: TerminalPulse.opacity(at: date, period: 1.2, minimum: 0.4)
         case .waiting: TerminalPulse.opacity(at: date, period: 2, minimum: 0.25)
         case .idle: 1
         }

@@ -4,6 +4,7 @@ nonisolated enum SessionStatus: Equatable, Sendable {
     case working
     case waiting
     case idle
+    case compacting
 }
 
 nonisolated struct RunningAgent: Equatable, Sendable, Identifiable {
@@ -11,6 +12,8 @@ nonisolated struct RunningAgent: Equatable, Sendable, Identifiable {
     var type: String
     var description: String?
     var startedAt: Date
+    /// What the agent is doing now, e.g. "Read NotchPresenter.swift".
+    var action: String?
 }
 
 /// A Claude Code session reconstructed from its hook events.
@@ -32,6 +35,17 @@ nonisolated struct ClaudeSession: Equatable, Sendable, Identifiable {
     var hasEnded = false
     /// The agent whose permission prompt made the session wait (`nil` for the main agent).
     var waitingAgentID: String?
+    /// What the main agent is doing now.
+    var action: String?
+    /// The last prompt, which starts a turn.
+    var turnStartedAt: Date?
+    /// The last `Stop`; an idle status that started then means the turn finished (not an interrupt).
+    var lastStopAt: Date?
+
+    /// Work in progress: keeps the Mac awake when that setting is on.
+    var isBusy: Bool {
+        status == .working || status == .compacting || !agents.isEmpty
+    }
 
     var projectName: String {
         guard let cwd, !cwd.isEmpty else { return "Claude Code" }

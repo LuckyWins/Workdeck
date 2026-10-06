@@ -49,17 +49,17 @@ struct SessionHooksConnectorTests {
             #expect(hooks[0]["async"] as? Bool == true)
             #expect(hooks[0]["timeout"] as? Int == 5)
         }
-        #expect(SessionHooksConnector.events.count == 8)
+        #expect(SessionHooksConnector.events.count == 10)
         #expect(connector(binary).status == .connected)
     }
 
     @Test func connectKeepsForeignHooksAndOtherKeysAndBacksUp() throws {
         let binary = try makeFakeBinary()
-        let original: [String: Any] = ["model": "opus", "hooks": ["Stop": [foreignStop], "PreToolUse": [foreignStop]]]
+        let original: [String: Any] = ["model": "opus", "hooks": ["Stop": [foreignStop], "PermissionRequest": [foreignStop]]]
         try writeSettings(original)
         try connector(binary).connect()
         #expect(try commands("Stop") == ["~/bin/notify.sh", "'\(binary)'"])
-        #expect(try commands("PreToolUse") == ["~/bin/notify.sh"])
+        #expect(try commands("PermissionRequest") == ["~/bin/notify.sh"])
         #expect(try readSettings()["model"] as? String == "opus")
         let backup = try JSONSerialization.jsonObject(with: Data(contentsOf: ClaudeSettingsFile(url: settingsURL).backupURL)) as? [String: Any]
         #expect(NSDictionary(dictionary: backup ?? [:]).isEqual(to: original))
