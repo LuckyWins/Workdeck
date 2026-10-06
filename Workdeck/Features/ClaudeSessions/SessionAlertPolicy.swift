@@ -21,12 +21,15 @@ nonisolated enum SessionAlertPolicy {
                current.filter({ $0.hostBundleID == host }).count == 1 {
                 continue
             }
+            // Finished: a Stop (not an interrupt) left the session with no running agents. An agent
+            // stopping alone is not the finish: Claude Code re-invokes the model, and a Stop follows.
             if notifyFinished,
                old.status == .working || old.status == .compacting,
                session.status == .idle,
+               session.agents.isEmpty,
                let stoppedAt = session.lastStopAt,
                session.since == stoppedAt {
-                let worked = stoppedAt.timeIntervalSince(session.turnStartedAt ?? old.since)
+                let worked = stoppedAt.timeIntervalSince(session.workStartedAt ?? old.since)
                 if worked >= finishedAfter {
                     alerts.append(.sessionFinished(project: session.projectName, worked: worked))
                 }

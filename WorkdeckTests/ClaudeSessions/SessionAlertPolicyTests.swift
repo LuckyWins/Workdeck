@@ -6,12 +6,22 @@ private func session(
     _ status: SessionStatus,
     id: String = "s1",
     since: TimeInterval,
-    turn: TimeInterval? = 0,
+    work: TimeInterval? = 0,
     stop: TimeInterval? = nil,
+    agents: Int = 0,
+    lastEvent: TimeInterval? = nil,
     host: String? = "com.microsoft.VSCode"
 ) -> ClaudeSession {
-    var session = ClaudeSession(id: id, cwd: "/p/\(id == "s1" ? "Workdeck" : id)", status: status, since: fixedNow.addingTimeInterval(since), hostBundleID: host, lastEventAt: fixedNow)
-    session.turnStartedAt = turn.map { fixedNow.addingTimeInterval($0) }
+    var session = ClaudeSession(
+        id: id,
+        cwd: "/p/\(id == "s1" ? "Workdeck" : id)",
+        status: status,
+        since: fixedNow.addingTimeInterval(since),
+        agents: (0..<agents).map { RunningAgent(id: "a\($0)", type: "Explore", startedAt: fixedNow) },
+        hostBundleID: host,
+        lastEventAt: fixedNow.addingTimeInterval(lastEvent ?? stop ?? since)
+    )
+    session.workStartedAt = work.map { fixedNow.addingTimeInterval($0) }
     session.lastStopAt = stop.map { fixedNow.addingTimeInterval($0) }
     return session
 }
@@ -46,13 +56,13 @@ struct SessionAlertPolicyTests {
         #expect(alerts([session(.compacting, since: 800)], [session(.working, since: 900)]).isEmpty)
     }
 
-    @Test func turnStartIsMeasuredFromThePrompt() {
-        let result = alerts([session(.compacting, since: 800, turn: 0)], [session(.idle, since: 900, turn: 0, stop: 900)])
+    @Test func workIsMeasuredFromWhenItStarted() {
+        let result = alerts([session(.compacting, since: 800, work: 0)], [session(.idle, since: 900, work: 0, stop: 900)])
         #expect(result == [.sessionFinished(project: "Workdeck", worked: 900)])
     }
 
-    @Test func withoutATurnStartThePreviousStatusTimeCounts() {
-        let result = alerts([session(.working, since: 100, turn: nil)], [session(.idle, since: 900, turn: nil, stop: 900)])
+    @Test func withoutAWorkStartThePreviousStatusTimeCounts() {
+        let result = alerts([session(.working, since: 100, work: nil)], [session(.idle, since: 900, work: nil, stop: 900)])
         #expect(result == [.sessionFinished(project: "Workdeck", worked: 800)])
     }
 
@@ -79,5 +89,22 @@ struct SessionAlertPolicyTests {
         let previous = [session(.working, since: 0), session(.idle, id: "vitastir", since: 0)]
         let current = [session(.waiting, since: 10), session(.idle, id: "vitastir", since: 0)]
         #expect(alerts(previous, current, frontmost: "com.microsoft.VSCode") == [.sessionNeedsYou(project: "Workdeck")])
+    }
+
+    @Test func runningAgentsDelayTheFinish() {
+        #expect(alerts([session(.working, since: 0)], [session(.idle, since: 900, stop: 900, agents: 2)]).isEmpty)
+    }
+
+    @Test func anAgentStoppingIsNotAFinish() {
+        // Claude Code re-invokes the model after a background agent; the Stop that follows is the finish.
+        let previous = [session(.idle, since: 900, stop: 900, agents: 1)]
+        let current = [session(.idle, since: 900, stop: 900, lastEvent: 1500)]
+        #expect(alerts(previous, current).isEmpty)
+    }
+
+    @Test func theFinishAfterBackgroundAgentsCountsAllTheWork() {
+        let previous = [session(.working, since: 1501, work: 0)]
+        let current = [session(.idle, since: 1520, work: 0, stop: 1520)]
+        #expect(alerts(previous, current) == [.sessionFinished(project: "Workdeck", worked: 1520)])
     }
 }

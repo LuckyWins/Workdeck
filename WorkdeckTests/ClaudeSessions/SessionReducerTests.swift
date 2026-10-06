@@ -168,9 +168,9 @@ struct SessionReducerTests {
         #expect(SessionReducer.reduce([start, event])?.projectName == "Root")
     }
 
-    @Test func promptStartsATurn() throws {
+    @Test func promptStartsWork() throws {
         let session = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10)]))
-        #expect(session.turnStartedAt == fixedNow.addingTimeInterval(10))
+        #expect(session.workStartedAt == fixedNow.addingTimeInterval(10))
     }
 
     @Test func preToolUseSetsTheSessionAction() throws {
@@ -233,7 +233,7 @@ struct SessionReducerTests {
             start, hookEvent(.userPromptSubmit, at: 1), hookEvent(.stop, at: 60),
             hookEvent(.preToolUse, at: 7200) { $0.action = "Bash ls" }, hookEvent(.stop, at: 7230),
         ]))
-        #expect(session.turnStartedAt == fixedNow.addingTimeInterval(7200))
+        #expect(session.workStartedAt == fixedNow.addingTimeInterval(7200))
     }
 
     @Test func manualCompactOnAnIdleSessionReturnsToIdle() throws {
@@ -253,5 +253,19 @@ struct SessionReducerTests {
         let unknownAgentTool = hookEvent(.preToolUse, at: 22) { $0.agentID = "a9"; $0.action = "Read z.swift" }
         let session = try #require(SessionReducer.reduce([start, main, agentStart, agentStop, lateAgentTool, unknownAgentTool]))
         #expect(session.action == "Agent Explore")
+    }
+
+    @Test func workSpansBackgroundAgentsUntilTheSessionIsQuiet() throws {
+        // A background agent keeps the work going after Stop; its completion re-invokes the model.
+        let agentStart = hookEvent(.subagentStart, at: 20) { $0.agentID = "a1"; $0.agentType = "Explore" }
+        let agentStop = hookEvent(.subagentStop, at: 600) { $0.agentID = "a1" }
+        let events = [
+            start, hookEvent(.userPromptSubmit, at: 10), agentStart, hookEvent(.stop, at: 30),
+            agentStop, hookEvent(.userPromptSubmit, at: 601), hookEvent(.stop, at: 620),
+        ]
+        let session = try #require(SessionReducer.reduce(events))
+        #expect(session.workStartedAt == fixedNow.addingTimeInterval(10))
+        let next = try #require(SessionReducer.reduce(events + [hookEvent(.userPromptSubmit, at: 900)]))
+        #expect(next.workStartedAt == fixedNow.addingTimeInterval(900))
     }
 }

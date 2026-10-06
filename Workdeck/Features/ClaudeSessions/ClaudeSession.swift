@@ -37,8 +37,11 @@ nonisolated struct ClaudeSession: Equatable, Sendable, Identifiable {
     var waitingAgentID: String?
     /// What the main agent is doing now.
     var action: String?
-    /// The last prompt, which starts a turn.
-    var turnStartedAt: Date?
+    /// When the session last went from quiet to busy: the start of work that background agents may extend.
+    var workStartedAt: Date?
+    /// When the session last went quiet; work that resumes soon after (a background agent re-invoking
+    /// the model) continues the same work.
+    var quietSince: Date?
     /// The last `Stop`; an idle status that started then means the turn finished (not an interrupt).
     var lastStopAt: Date?
     /// What compaction interrupted, restored when it ends: a manual `/compact` on an idle session stays idle.

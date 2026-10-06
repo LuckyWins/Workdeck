@@ -239,7 +239,7 @@ After trying the first version, the user chose a terminal-style notch (htop-like
 
 | Event | Effect |
 |---|---|
-| `UserPromptSubmit` | As before; also starts the turn (`turnStartedAt`). Any change from idle to working or compacting (a background task or wake-up without a prompt) also starts a turn. |
+| `UserPromptSubmit` | As before. Work (`workStartedAt`) starts whenever a quiet session gets busy (see §10.5). |
 | `PreToolUse` | Sets the action of the agent with that `agent_id` when it is running; an `agent_id` of an agent not running (stopped, or not read yet) changes nothing; no `agent_id` sets the session's action. Status working unless the session is waiting. |
 | `PostToolUse` | As before; also clears the action it belongs to. |
 | `Stop` | As before; clears the session action and records `lastStopAt`. |
@@ -264,7 +264,8 @@ Compacting counts as working for the counter color, ordering and keep-awake.
 
 - New `LimitsAlert` cases: `sessionFinished(project:worked:)` → "✓ Workdeck finished" / "worked 14m" (green); `sessionNeedsYou(project:)` → "! vitastir needs you" / "permission prompt" (orange). They use the existing notch alert (6 seconds, one at a time) and require the indicator to be on.
 - `SessionAlertPolicy` (pure) compares the previous and current session lists:
-  - finished: a session that was working or compacting is now idle because of `Stop` (`since == lastStopAt`), and `lastStopAt − turnStartedAt` (or the previous `since` without a turn start) is at least the threshold;
+  - finished: a session that was working or compacting is now idle because of `Stop` (`since == lastStopAt`) **with no running agents**, and `lastStopAt − workStartedAt` (or the previous `since` without a work start) is at least the threshold. An agent stopping alone never announces: Claude Code re-invokes the model after a background agent, and the `Stop` that follows is the finish;
+  - `workStartedAt` is set when a quiet session (idle, no agents) gets busy, unless it went quiet less than 60 seconds earlier — the re-invocation after a background agent — so "worked" covers the whole job, agents included;
   - needs you: a session that was not waiting is now waiting;
   - none for sessions seen for the first time (launch, connect), or when the session's host app is frontmost and hosts no other live session (with several sessions in one app, such as VS Code windows, the window in front is unknown, so the alert shows).
 - Alerts that arrive together are shown together: a header ("2 sessions finished", "2 sessions need you", "3 alerts") and one line per alert (at most three, then "+N more"). An alert arriving while others are on screen joins them and restarts the 6-second display.

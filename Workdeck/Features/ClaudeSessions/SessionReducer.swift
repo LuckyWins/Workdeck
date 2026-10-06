@@ -2,6 +2,9 @@ import Foundation
 
 /// Folds a session's hook events into its current state (spec §5.2).
 nonisolated enum SessionReducer {
+    /// How soon after going quiet new activity still counts as the same work.
+    static let workResumeWindow: TimeInterval = 60
+
     /// Events are applied oldest first: async hooks may have written them out of order.
     static func reduce(_ events: [HookEvent]) -> ClaudeSession? {
         events
@@ -10,6 +13,23 @@ nonisolated enum SessionReducer {
     }
 
     static func apply(_ event: HookEvent, to current: ClaudeSession?) -> ClaudeSession {
+        let wasBusy = current?.isBusy ?? false
+        var session = applyEvent(event, to: current)
+        // Work starts when a quiet session gets busy and lasts until it is quiet again, agents included.
+        // A background agent's completion re-invokes the model a moment after the session went quiet.
+        if wasBusy, !session.isBusy {
+            session.quietSince = event.time
+        } else if !wasBusy, session.isBusy {
+            let resumesWork = session.quietSince.map { event.time.timeIntervalSince($0) <= workResumeWindow } ?? false
+            if !resumesWork || session.workStartedAt == nil {
+                session.workStartedAt = event.time
+            }
+            session.quietSince = nil
+        }
+        return session
+    }
+
+    private static func applyEvent(_ event: HookEvent, to current: ClaudeSession?) -> ClaudeSession {
         var session = current ?? ClaudeSession(id: event.sessionID, status: .idle, since: event.time, lastEventAt: event.time)
         // Compaction keeps the session running; startup, resume and clear begin afresh.
         if event.name == .sessionStart, event.source != "compact" {
@@ -48,7 +68,6 @@ nonisolated enum SessionReducer {
                 setStatus(session.statusBeforeCompact == .idle ? .idle : .working, at: event.time, on: &session)
             }
         case .userPromptSubmit:
-            session.turnStartedAt = event.time
             setStatus(.working, at: event.time, on: &session)
         case .preToolUse:
             setAction(event.action, for: event.agentID, on: &session)
@@ -112,10 +131,6 @@ nonisolated enum SessionReducer {
 
     private static func setStatus(_ status: SessionStatus, at time: Date, on session: inout ClaudeSession) {
         guard session.status != status else { return }
-        // Background tasks and wake-ups resume work without a prompt; their turn starts here.
-        if session.status == .idle, status == .working || status == .compacting {
-            session.turnStartedAt = time
-        }
         session.status = status
         session.since = time
     }
