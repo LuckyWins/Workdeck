@@ -199,7 +199,7 @@ final class ClaudeLimitsController {
 
     /// Recomputes alerts and the display from the latest snapshot and settings.
     func refresh() {
-        sleepPreventer.setPreventing(isHooksConnected && settings.keepAwakeWhileWorking && sessions.sessions.contains(where: \.isBusy))
+        sleepPreventer.setPreventing(isHooksConnected && settings.keepAwakeWhileWorking && hasRecentlyBusySession)
         let current = store.currentWindows
         defer { previousWindows = current }
 
@@ -314,6 +314,16 @@ final class ClaudeLimitsController {
     func activateSession(id: String) {
         guard let session = sessions.sessions.first(where: { $0.id == id }) else { return }
         activator.activate(session)
+    }
+
+    /// A session that missed its last event (an agent's SubagentStop, an idle prompt) must not keep
+    /// the Mac awake for days, so only work with events in the last hour counts.
+    static let keepAwakeActivityWindow: TimeInterval = 60 * 60
+
+    private var hasRecentlyBusySession: Bool {
+        sessions.sessions.contains { session in
+            session.isBusy && sessions.now.timeIntervalSince(session.lastEventAt) < Self.keepAwakeActivityWindow
+        }
     }
 
     /// New session data: announce transitions, then redraw.

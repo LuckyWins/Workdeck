@@ -41,6 +41,8 @@ nonisolated struct ClaudeSession: Equatable, Sendable, Identifiable {
     var turnStartedAt: Date?
     /// The last `Stop`; an idle status that started then means the turn finished (not an interrupt).
     var lastStopAt: Date?
+    /// What compaction interrupted, restored when it ends: a manual `/compact` on an idle session stays idle.
+    var statusBeforeCompact: SessionStatus?
 
     /// Work in progress: keeps the Mac awake when that setting is on.
     var isBusy: Bool {

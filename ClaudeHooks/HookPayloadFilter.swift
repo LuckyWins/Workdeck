@@ -21,7 +21,7 @@ nonisolated enum HookPayloadFilter {
         let target: String? = switch toolName {
         case "Read", "Edit", "MultiEdit", "Write": fileName(input?["file_path"])
         case "NotebookEdit": fileName(input?["notebook_path"])
-        case "Bash": firstLine(input?["command"])
+        case "Bash": firstLine(input?["command"]).map(maskingSecrets)
         case "WebFetch": (input?["url"] as? String).flatMap { URL(string: $0)?.host() }
         case "WebSearch": firstLine(input?["query"])
         case "Grep", "Glob": firstLine(input?["pattern"])
@@ -43,6 +43,21 @@ nonisolated enum HookPayloadFilter {
         let line = string.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
         let collapsed = line.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         return collapsed.isEmpty ? nil : collapsed
+    }
+
+    /// Hides values that look like secrets in a shell command: `NAME=value`, `-pPASSWORD`, `Bearer TOKEN`.
+    static func maskingSecrets(_ command: String) -> String {
+        let rules: [(pattern: String, template: String)] = [
+            (#"\b([A-Za-z_][A-Za-z0-9_]*)=("[^"]*"|'[^']*'|[^\s'"]+)"#, "$1=…"),
+            (#"(^|\s)-p[^\s'"]+"#, "$1-p…"),
+            (#"(?i)\b(bearer|basic|token)\s+[^\s'"]+"#, "$1 …"),
+        ]
+        var result = command
+        for rule in rules {
+            guard let regex = try? NSRegularExpression(pattern: rule.pattern) else { continue }
+            result = regex.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: rule.template)
+        }
+        return result
     }
 
     private static func truncated(_ text: String) -> String {

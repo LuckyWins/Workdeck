@@ -49,6 +49,6 @@ struct ClaudeSessionsSettingsSection: View {
         if !controller.canConnectHooks {
             return "The session hook command is missing from the app bundle."
         }
-        return "Adds hooks to ~/.claude/settings.json that tell Workdeck when sessions and agents start, stop and which tool they run. Prompts and answers are never stored; for tool calls only the tool name and a short target (file name, start of a command, domain) are kept."
+        return "Adds hooks to ~/.claude/settings.json that tell Workdeck when sessions and agents start, stop and which tool they run. Prompts and answers are never stored; for tool calls only the tool name and a short target (file name, start of a command with secret-looking values masked, domain, search text) are kept."
     }
 }

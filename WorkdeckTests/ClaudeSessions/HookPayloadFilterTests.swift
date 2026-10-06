@@ -144,4 +144,15 @@ struct HookPayloadFilterTests {
         let payload = try #require(parse(["hook_event_name": "PostToolUse", "session_id": sessionID, "tool_name": "Bash", "tool_input": ["command": "ls"]]))
         #expect(payload.event.action == nil)
     }
+
+    @Test(arguments: [
+        ("mysql -uroot -pS3cretPass db", "Bash mysql -uroot -p… db"),
+        ("export GITHUB_TOKEN=ghp_abc123", "Bash export GITHUB_TOKEN=…"),
+        ("ANTHROPIC_API_KEY=sk-ant-x make", "Bash ANTHROPIC_API_KEY=… make"),
+        ("psql --password=hunter2 app", "Bash psql --password=… app"),
+        ("curl -H 'X: Bearer abc' u", "Bash curl -H 'X: Bearer …' u"),
+    ] as [(String, String)])
+    func bashSecretsAreMasked(command: String, expected: String) {
+        #expect(HookPayloadFilter.action(toolName: "Bash", input: ["command": command]) == expected)
+    }
 }

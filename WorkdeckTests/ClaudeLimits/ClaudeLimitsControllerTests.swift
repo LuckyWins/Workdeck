@@ -542,4 +542,17 @@ struct ClaudeLimitsControllerTests {
         controller.sessions.reload()
         #expect(presenter.alerts.isEmpty)
     }
+
+    @Test func keepAwakeIsReleasedWhenABusySessionGoesQuiet() {
+        // An agent whose SubagentStop never arrived must not hold the Mac awake for days.
+        hooksConnector.status = .connected
+        settings.keepAwakeWhileWorking = true
+        writeSessionEvent(hookEvent(.sessionStart, at: -7200, session: "s1") { $0.pid = 42 }, to: sessionsDirectory)
+        writeSessionEvent(hookEvent(.subagentStart, at: -7190, session: "s1") { $0.agentID = "a1"; $0.agentType = "Explore" }, to: sessionsDirectory)
+        liveness.startTimes[42] = fixedNow.addingTimeInterval(-9000)
+        let (controller, _) = makeController()
+        controller.start()
+        #expect(controller.sessions.sessions.first?.isBusy == true)
+        #expect(!sleepPreventer.isPreventing)
+    }
 }

@@ -228,7 +228,7 @@ After trying the first version, the user chose a terminal-style notch (htop-like
 - Two more hook events: `PreToolUse` (the current action) and `PreCompact` (context compaction starts), ten in total. On launch, if any Workdeck hook entry exists but some events are missing, the connector adds them (no new Connect needed).
 - `HookEvent.action`: for `PreToolUse` only, the tool name and a short target, at most 30 characters (longer → 29 + "…"):
   - `Read`, `Edit`, `MultiEdit`, `Write` → file name of `file_path` (no directories); `NotebookEdit` → file name of `notebook_path`;
-  - `Bash` → the first line of `command`, whitespace collapsed;
+  - `Bash` → the first line of `command`, whitespace collapsed, with secret-looking values masked before truncation (`NAME=value` → `NAME=…`, `-pPASSWORD` → `-p…`, `Bearer|Basic|token VALUE` → `Bearer …`);
   - `WebFetch` → host of `url`; `WebSearch` → `query`; `Grep`, `Glob` → `pattern`;
   - `Agent`, `Task` → `subagent_type`;
   - `mcp__<server>__<tool>` → `mcp:<server>`;
@@ -239,12 +239,12 @@ After trying the first version, the user chose a terminal-style notch (htop-like
 
 | Event | Effect |
 |---|---|
-| `UserPromptSubmit` | As before; also starts the turn (`turnStartedAt`). |
+| `UserPromptSubmit` | As before; also starts the turn (`turnStartedAt`). Any change from idle to working or compacting (a background task or wake-up without a prompt) also starts a turn. |
 | `PreToolUse` | Sets the action of the agent with that `agent_id` when it is running, otherwise of the session. Status working unless the session is waiting. |
 | `PostToolUse` | As before; also clears the action it belongs to. |
 | `Stop` | As before; clears the session action and records `lastStopAt`. |
-| `PreCompact` | Status compacting. |
-| `SessionStart` with `source == "compact"` | A compacting session returns to working (compaction ends; idle follows on `Stop` or `idle_prompt`). |
+| `PreCompact` | Status compacting; remembers the status it interrupted. |
+| `SessionStart` with `source == "compact"` | A compacting session returns to idle if compaction interrupted an idle session (manual `/compact`), otherwise to working (idle follows on `Stop` or `idle_prompt`). |
 
 Compacting counts as working for the counter color, ordering and keep-awake.
 
@@ -269,11 +269,11 @@ Compacting counts as working for the counter color, ordering and keep-awake.
 
 ### 10.6 Keep Awake
 
-- While the setting is on and hooks are connected, a `PreventUserIdleSystemSleep` power assertion named "Workdeck: Claude Code is working" is held whenever any session is working or compacting or has running agents; it is released otherwise. The display may still sleep; a closed lid still sleeps unless Closed-Lid Mode is on. The assertion is behind a protocol (`SleepPreventing`) for tests.
+- While the setting is on and hooks are connected, a `PreventUserIdleSystemSleep` power assertion named "Workdeck: Claude Code is working" is held whenever any session is working or compacting or has running agents and had an event in the last hour (a missed `SubagentStop` or idle prompt must not keep the Mac awake for days); it is released otherwise. The display may still sleep; a closed lid still sleeps unless Closed-Lid Mode is on. The assertion is behind a protocol (`SleepPreventing`) for tests.
 
 ### 10.7 Privacy Wording
 
-The Sessions footer and README change from "tool input is never stored" to "Prompts and answers are never stored; for tool calls only the tool name and a short target (file name, start of a command, domain) are kept."
+The Sessions footer and README change from "tool input is never stored" to "Prompts and answers are never stored; for tool calls only the tool name and a short target (file name, start of a command with secret-looking values masked, domain, search text) are kept."
 
 ### 10.8 Testing
 

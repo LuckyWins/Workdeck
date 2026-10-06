@@ -45,7 +45,7 @@ nonisolated enum SessionReducer {
         case .sessionStart:
             // Compaction finished; the turn goes on (idle follows on Stop or the idle prompt).
             if event.source == "compact", session.status == .compacting {
-                setStatus(.working, at: event.time, on: &session)
+                setStatus(session.statusBeforeCompact == .idle ? .idle : .working, at: event.time, on: &session)
             }
         case .userPromptSubmit:
             session.turnStartedAt = event.time
@@ -62,6 +62,9 @@ nonisolated enum SessionReducer {
                 setStatus(.working, at: event.time, on: &session)
             }
         case .preCompact:
+            if session.status != .compacting {
+                session.statusBeforeCompact = session.status
+            }
             setStatus(.compacting, at: event.time, on: &session)
         case .notification:
             switch event.notificationType {
@@ -106,6 +109,10 @@ nonisolated enum SessionReducer {
 
     private static func setStatus(_ status: SessionStatus, at time: Date, on session: inout ClaudeSession) {
         guard session.status != status else { return }
+        // Background tasks and wake-ups resume work without a prompt; their turn starts here.
+        if session.status == .idle, status == .working || status == .compacting {
+            session.turnStartedAt = time
+        }
         session.status = status
         session.since = time
     }

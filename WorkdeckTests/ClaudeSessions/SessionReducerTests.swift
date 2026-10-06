@@ -226,4 +226,21 @@ struct SessionReducerTests {
         #expect(SessionReducer.reduce([start, hookEvent(.preCompact, at: 1)])?.isBusy == true)
         #expect(SessionReducer.reduce([start, agent, hookEvent(.stop, at: 9)])?.isBusy == true)
     }
+
+    @Test func aTurnWithoutAPromptStartsWhenWorkResumes() throws {
+        // A background task or wake-up re-invokes the model without UserPromptSubmit.
+        let session = try #require(SessionReducer.reduce([
+            start, hookEvent(.userPromptSubmit, at: 1), hookEvent(.stop, at: 60),
+            hookEvent(.preToolUse, at: 7200) { $0.action = "Bash ls" }, hookEvent(.stop, at: 7230),
+        ]))
+        #expect(session.turnStartedAt == fixedNow.addingTimeInterval(7200))
+    }
+
+    @Test func manualCompactOnAnIdleSessionReturnsToIdle() throws {
+        let session = try #require(SessionReducer.reduce([
+            start, hookEvent(.preCompact, at: 5), hookEvent(.sessionStart, at: 6) { $0.source = "compact" },
+        ]))
+        #expect(session.status == .idle)
+        #expect(!session.isBusy)
+    }
 }
