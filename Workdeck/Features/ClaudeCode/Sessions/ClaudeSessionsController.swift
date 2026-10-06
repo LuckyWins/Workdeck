@@ -100,6 +100,12 @@ final class ClaudeSessionsController {
         activator.activate(session)
     }
 
+    /// Session alerts know only the project; sessions in one project share its window.
+    func activateProject(named name: String) {
+        guard let session = store.sessions.first(where: { $0.projectName == name }) else { return }
+        activator.activate(session)
+    }
+
     /// Holds the power assertion while a connected session works, if the setting is on.
     func updateKeepAwake() {
         sleepPreventer.setPreventing(isHooksConnected && settings.keepAwakeWhileWorking && hasRecentlyBusySession)

@@ -24,6 +24,22 @@ nonisolated struct AgentRow: Equatable, Sendable, Identifiable {
     var title: String {
         [type, description].compactMap { $0 }.joined(separator: " · ")
     }
+
+    /// The first line: what the agent works on, or its type when it has no description.
+    var name: String {
+        description ?? type
+    }
+
+    /// A user-defined agent type, shown next to the name; built-in types only appear in the help text.
+    var customType: String? {
+        guard description != nil, !SessionsPresentation.builtInAgentTypes.contains(type) else { return nil }
+        return type
+    }
+
+    /// The second line: what the agent is doing now.
+    var detail: String {
+        action ?? "starting…"
+    }
 }
 
 nonisolated struct SessionRow: Equatable, Sendable, Identifiable {
@@ -56,6 +72,8 @@ nonisolated struct SessionsViewState: Equatable, Sendable {
 nonisolated enum SessionsPresentation {
     static let maxSessions = 3
     static let maxAgentsPerSession = 2
+    /// Claude Code's own agent types say little about the task, so the description stands in for them.
+    static let builtInAgentTypes: Set<String> = ["general-purpose", "Explore", "Plan"]
 
     /// `sessions` arrive in display order from `ClaudeSessionStore`.
     static func viewState(sessions: [ClaudeSession], now: Date) -> SessionsViewState {

@@ -93,4 +93,10 @@ struct LimitsTextTests {
         #expect(LimitsText.batchLine(waiting, now: fixedNow) == "pokemon  needs you")
         #expect(LimitsText.batchLine(.reset(.sevenDay), now: fixedNow) == "Weekly limit reset")
     }
+
+    @Test func onlySessionAlertsOpenAProject() {
+        #expect(LimitsText.alertProject(.sessionFinished(project: "vitastir", worked: 60)) == "vitastir")
+        #expect(LimitsText.alertProject(.sessionNeedsYou(project: "Workdeck")) == "Workdeck")
+        #expect(LimitsText.alertProject(.reset(.fiveHour)) == nil)
+    }
 }

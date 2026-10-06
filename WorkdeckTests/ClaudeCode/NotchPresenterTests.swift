@@ -175,4 +175,12 @@ struct NotchPresenterTests {
         #expect(surface.calls.filter { $0 == "expand" }.count == 1)
         #expect(presenter.model.alerts.isEmpty)
     }
+
+    @Test func projectActionReachesTheNotchViews() {
+        let (presenter, _) = makePresenter()
+        var opened: [String] = []
+        presenter.setProjectAction { opened.append($0) }
+        presenter.model.onActivateProject?("vitastir")
+        #expect(opened == ["vitastir"])
+    }
 }

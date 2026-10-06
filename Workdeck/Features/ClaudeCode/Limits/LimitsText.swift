@@ -101,6 +101,14 @@ nonisolated enum LimitsText {
         }
     }
 
+    /// The project a session alert is about; clicking the alert opens it.
+    static func alertProject(_ alert: LimitsAlert) -> String? {
+        switch alert {
+        case let .sessionFinished(project, _), let .sessionNeedsYou(project): project
+        case .threshold, .reset: nil
+        }
+    }
+
     /// "!" for something to act on, "✓" for good news.
     static func alertSymbol(_ alert: LimitsAlert) -> String {
         switch alert {

@@ -137,7 +137,8 @@ struct SessionsList: View {
         .animation(.easeOut(duration: 0.12), value: isHovered)
     }
 
-    /// Two lines per agent: what it is (type, model, background) and what it does (action, steps).
+    /// Two lines per agent: what it works on (description or type, model, custom type, background) and what it
+    /// does now (action, steps).
     private func agentView(_ agent: AgentRow, isLast: Bool, at date: Date) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
@@ -146,10 +147,14 @@ struct SessionsList: View {
                 Text(TerminalSpinner.frame(at: date))
                     .foregroundStyle(.cyan)
                 HStack(spacing: 0) {
-                    Text(agent.type)
+                    Text(agent.name)
                         .foregroundStyle(Terminal.text)
                     if let model = agent.model {
                         Text(" · \(model)")
+                            .foregroundStyle(Terminal.dim)
+                    }
+                    if let customType = agent.customType {
+                        Text(" · \(customType)")
                             .foregroundStyle(Terminal.dim)
                     }
                 }
@@ -168,7 +173,7 @@ struct SessionsList: View {
                 Text(isLast ? " " : "│")
                     .foregroundStyle(Terminal.faint)
                 Text(" ")
-                Text(agent.action ?? agent.description ?? "")
+                Text(agent.detail)
                     .foregroundStyle(Terminal.dim)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -180,7 +185,7 @@ struct SessionsList: View {
             }
         }
         .font(Terminal.font(10))
-        .help([agent.description, agent.model, agent.isBackground ? "background" : "foreground"].compactMap { $0 }.joined(separator: " · "))
+        .help([agent.type, agent.description, agent.model, agent.isBackground ? "background" : "foreground"].compactMap { $0 }.joined(separator: " · "))
     }
 
     /// Working sessions pulse, sessions waiting for you blink slowly, idle ones stay still.

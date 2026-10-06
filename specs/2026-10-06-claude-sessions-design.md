@@ -322,3 +322,8 @@ Unit: action extraction for every tool kind, truncation, other input never store
 ### 12.4 Testing
 
 Unit: the split keeps every existing test's assertions (only constructors and the object a call goes through change); background agent IDs parsed only from main `Stop` and only `subagent` entries; reducer removal on `Stop`; alert decision reasons; the diagnostics snapshot text. Manual: `docs/testing.md` S15 (stopping a background agent with TaskStop removes it at the next Stop) and S16 (Copy Diagnostics).
+
+## 13. Amendment: Agent Names and Clickable Alerts (2026-10-06)
+
+- An agent's first line shows its task description instead of its type; a user-defined type follows the model as a dim tag (`Review auth module · Sonnet 5.5 · code-reviewer`). Claude Code's own types (`general-purpose`, `Explore`, `Plan`) appear only in the help text. Without a description, the type is the name. The second line shows the current command, or "starting…" before the first one.
+- Session alerts (`finished`, `needs you`) are clickable: hovering shows the pointing hand, a highlight and "↗ open"; a click opens the project's window, found by project name (sessions in one project share a window). In a batch, each line opens its own project. Limit alerts are not clickable.

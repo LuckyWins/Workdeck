@@ -58,6 +58,7 @@ final class ClaudeCodeController {
             }
         }
         presenter.setSessionAction { [weak self] id in self?.sessions.activateSession(id: id) }
+        presenter.setProjectAction { [weak self] name in self?.sessions.activateProject(named: name) }
         presenter.setRefreshAction { [weak self] in self?.limits.refreshNow() }
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,

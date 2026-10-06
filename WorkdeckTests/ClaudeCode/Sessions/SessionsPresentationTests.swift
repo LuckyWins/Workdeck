@@ -89,6 +89,28 @@ struct SessionsPresentationTests {
         #expect(row.agents.map(\.isBackground) == [true, false])
         #expect(row.agents.map(\.steps) == [87, 0])
     }
+
+    @Test func agentLinesNameTheTaskAndHideBuiltInTypes() throws {
+        let research = RunningAgent(id: "a", type: "general-purpose", description: "Authorize.Net refund research", startedAt: fixedNow, action: "Bash cd /x")
+        let review = RunningAgent(id: "b", type: "code-reviewer", description: "Review auth module", startedAt: fixedNow.addingTimeInterval(1))
+        let unnamed = RunningAgent(id: "c", type: "code-reviewer", startedAt: fixedNow.addingTimeInterval(2))
+        let rows = SessionsPresentation.viewState(sessions: [session("s", .working, agents: [research, review, unnamed])], now: fixedNow).rows
+        let agents = try #require(rows.first?.agents)
+        #expect(agents[0].name == "Authorize.Net refund research")
+        #expect(agents[0].customType == nil)
+        #expect(agents[0].detail == "Bash cd /x")
+        #expect(agents[1].name == "Review auth module")
+        #expect(agents[1].customType == "code-reviewer")
+        #expect(agents[1].detail == "starting…")
+        #expect(SessionsPresentation.builtInAgentTypes == ["general-purpose", "Explore", "Plan"])
+    }
+
+    @Test func anAgentWithoutADescriptionIsNamedByItsType() throws {
+        let unnamed = RunningAgent(id: "c", type: "code-reviewer", startedAt: fixedNow)
+        let agent = try #require(SessionsPresentation.viewState(sessions: [session("s", .working, agents: [unnamed])], now: fixedNow).rows.first?.agents.first)
+        #expect(agent.name == "code-reviewer")
+        #expect(agent.customType == nil)
+    }
 }
 
 struct SessionsTextTests {

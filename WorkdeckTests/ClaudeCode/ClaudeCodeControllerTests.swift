@@ -46,6 +46,11 @@ final class FakePresenter: LimitsPresenting {
     func setSessionAction(_ action: @escaping (String) -> Void) {
         sessionAction = action
     }
+
+    private(set) var projectAction: ((String) -> Void)?
+    func setProjectAction(_ action: @escaping (String) -> Void) {
+        projectAction = action
+    }
 }
 
 @MainActor
@@ -589,5 +594,15 @@ struct ClaudeCodeControllerTests {
         controller.sessions.store.reload()
         controller.sessions.settingsChanged()
         #expect(sleepPreventer.isPreventing)
+    }
+
+    @Test func clickingASessionAlertOpensItsProject() {
+        hooksConnector.status = .connected
+        addLiveSession()
+        let (controller, _) = makeController()
+        controller.start()
+        presenter.projectAction?("Workdeck")
+        presenter.projectAction?("unknown")
+        #expect(activator.activated == ["s1"])
     }
 }

@@ -11,6 +11,7 @@ final class LimitsNotchModel {
     }
     @ObservationIgnored var onRefresh: (() -> Void)?
     @ObservationIgnored var onActivateSession: ((String) -> Void)?
+    @ObservationIgnored var onActivateProject: ((String) -> Void)?
 }
 
 extension LimitsLevel {
@@ -95,6 +96,8 @@ struct LimitsExpandedView: View {
     let model: LimitsNotchModel
 
     @State private var isRefreshHovered = false
+    /// Which alert line the pointer is over, for the clickable session alerts.
+    @State private var hoveredAlert: String?
 
     /// Cells in a usage bar; with the percent and reset time a row stays within about 40 characters.
     static let barWidth = 16
@@ -117,18 +120,57 @@ struct LimitsExpandedView: View {
     }
 
     private func alertView(_ alert: LimitsAlert) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 6) {
-                Text(LimitsText.alertSymbol(alert))
-                    .fontWeight(.bold)
-                    .foregroundStyle(alertColor(alert))
-                Text(LimitsText.alertTitle(alert))
-                    .fontWeight(.semibold)
+        openable(alert, id: "single") {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(LimitsText.alertSymbol(alert))
+                        .fontWeight(.bold)
+                        .foregroundStyle(alertColor(alert))
+                    Text(LimitsText.alertTitle(alert))
+                        .fontWeight(.semibold)
+                    Spacer(minLength: 6)
+                    if hoveredAlert == "single", LimitsText.alertProject(alert) != nil {
+                        Text("↗ open")
+                    }
+                }
+                if let subtitle = LimitsText.alertSubtitle(alert, now: model.state.now) {
+                    Text("  \(subtitle)")
+                        .foregroundStyle(Terminal.dim)
+                }
             }
-            if let subtitle = LimitsText.alertSubtitle(alert, now: model.state.now) {
-                Text("  \(subtitle)")
-                    .foregroundStyle(Terminal.dim)
+        }
+    }
+
+    /// Session alerts open their project on click, with the same hover cues as session rows.
+    @ViewBuilder
+    private func openable(_ alert: LimitsAlert, id: String, @ViewBuilder content: () -> some View) -> some View {
+        if let project = LimitsText.alertProject(alert) {
+            Button {
+                model.onActivateProject?(project)
+            } label: {
+                content()
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(.white.opacity(hoveredAlert == id ? 0.1 : 0))
+                    )
+                    .padding(.horizontal, -4)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .pointerStyle(.link)
+            .onHover { hovering in
+                if hovering {
+                    hoveredAlert = id
+                } else if hoveredAlert == id {
+                    hoveredAlert = nil
+                }
+            }
+            .animation(.easeOut(duration: 0.12), value: hoveredAlert)
+            .help("Open \(project)")
+        } else {
+            content()
         }
     }
 
@@ -143,13 +185,19 @@ struct LimitsExpandedView: View {
                 Text(LimitsText.batchTitle(alerts))
                     .fontWeight(.semibold)
             }
-            ForEach(Array(alerts.prefix(Self.maxBatchLines).enumerated()), id: \.offset) { _, alert in
-                HStack(spacing: 6) {
-                    Text(LimitsText.alertSymbol(alert))
-                        .foregroundStyle(alertColor(alert))
-                    Text(LimitsText.batchLine(alert, now: model.state.now))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+            ForEach(Array(alerts.prefix(Self.maxBatchLines).enumerated()), id: \.offset) { index, alert in
+                openable(alert, id: "line\(index)") {
+                    HStack(spacing: 6) {
+                        Text(LimitsText.alertSymbol(alert))
+                            .foregroundStyle(alertColor(alert))
+                        Text(LimitsText.batchLine(alert, now: model.state.now))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Spacer(minLength: 6)
+                        if hoveredAlert == "line\(index)" {
+                            Text("↗ open")
+                        }
+                    }
                 }
                 .padding(.leading, 12)
             }
