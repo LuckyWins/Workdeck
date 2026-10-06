@@ -96,8 +96,10 @@ struct SessionsList: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer(minLength: 6)
-                Text(SessionsText.statusText(row.status))
+                Text(row.status == .working ? (row.action ?? SessionsText.statusText(row.status)) : SessionsText.statusText(row.status))
                     .foregroundStyle(row.status == .idle ? Terminal.dim : row.status.notchColor)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 Text(isHovered ? "↗ open" : (row.status == .waiting ? "" : SessionsText.duration(from: row.since, to: state.now)))
                     .foregroundStyle(isHovered ? Terminal.text : Terminal.dim)
                     .frame(minWidth: 44, alignment: .trailing)
@@ -135,8 +137,8 @@ struct SessionsList: View {
                 .foregroundStyle(.cyan)
             Text(agent.type)
                 .foregroundStyle(Terminal.text)
-            if let description = agent.description {
-                Text(description)
+            if let detail = agent.action ?? agent.description {
+                Text(detail)
                     .foregroundStyle(Terminal.dim)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -146,6 +148,7 @@ struct SessionsList: View {
                 .foregroundStyle(Terminal.dim)
         }
         .font(Terminal.font(10))
+        .help(agent.description ?? agent.type)
     }
 
     /// Working sessions pulse, sessions waiting for you blink slowly, idle ones stay still.

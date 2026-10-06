@@ -12,6 +12,8 @@ nonisolated struct AgentRow: Equatable, Sendable, Identifiable {
     var id: String
     var type: String
     var description: String?
+    /// What the agent is doing now, shown instead of the description when known.
+    var action: String?
     var startedAt: Date
 
     /// "Explore · Find NotchPresenter usages", or the type alone.
@@ -25,6 +27,8 @@ nonisolated struct SessionRow: Equatable, Sendable, Identifiable {
     var projectName: String
     var status: SessionStatus
     var since: Date
+    /// What the main agent is doing now.
+    var action: String?
     var agents: [AgentRow]
     var hiddenAgentCount: Int
 }
@@ -56,8 +60,9 @@ nonisolated enum SessionsPresentation {
                 projectName: session.projectName,
                 status: session.status,
                 since: session.since,
+                action: session.action,
                 agents: agents.prefix(maxAgentsPerSession).map { agent in
-                    AgentRow(id: agent.id, type: agent.type, description: agent.description, startedAt: agent.startedAt)
+                    AgentRow(id: agent.id, type: agent.type, description: agent.description, action: agent.action, startedAt: agent.startedAt)
                 },
                 hiddenAgentCount: max(0, agents.count - maxAgentsPerSession)
             )

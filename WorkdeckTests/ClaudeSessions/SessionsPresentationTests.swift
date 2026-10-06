@@ -56,6 +56,15 @@ struct SessionsPresentationTests {
     @Test func compactingCountsAsWorking() {
         #expect(SessionsPresentation.viewState(sessions: [session("a", .compacting), session("b", .idle)], now: fixedNow).level == .working)
     }
+
+    @Test func rowsCarryActions() throws {
+        var main = session("a", .working, agents: [RunningAgent(id: "x", type: "Explore", description: "Find", startedAt: fixedNow, action: "Read y.swift")])
+        main.action = "Bash ls"
+        let row = try #require(SessionsPresentation.viewState(sessions: [main], now: fixedNow).rows.first)
+        #expect(row.action == "Bash ls")
+        #expect(row.agents.first?.action == "Read y.swift")
+        #expect(row.agents.first?.description == "Find")
+    }
 }
 
 struct SessionsTextTests {
