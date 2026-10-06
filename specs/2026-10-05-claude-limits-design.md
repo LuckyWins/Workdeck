@@ -260,3 +260,63 @@ The first enable while not connected runs the Connect confirmation. Turning the 
 
 Unit: token extraction; response parsing (both windows, `null`, fractional-second dates, out-of-range values, extra keys); client with a fake transport (URL and headers, each status code, `Retry-After`, token never in error text); poller with a fake client, temporary directory and injected clock (merge into the snapshot, 5-minute interval, 1-minute popover throttle, 429 pause, statuses, stop on disable); controller (shows without the status line when the API is on, no connect prompt, poller problems in the subtitle). Manual (`docs/testing.md` L14–L16): Keychain prompt and Always Allow, data while working only in the VS Code panel, expired-token behavior.
 
+
+## 11. Amendment: Keychain Access, Polling Pause, Manual Refresh, Settings Layout, Forecast
+
+**Why:** Claude Code recreates its Keychain item when it refreshes the OAuth token (about every 8 hours). The new item's partition list no longer includes Workdeck's team, so the next background poll shows a Keychain prompt that asks for the login password, even overnight with the lid closed. `/usr/bin/security` is in the item's partition list (confirmed: `security find-generic-password -s "Claude Code-credentials" -w` succeeds without a prompt), so reading through it avoids the prompt entirely. The other changes came out of the same review.
+
+### 11.1 Reading the Token
+
+- `SecurityCLICredentialsReader` replaces `KeychainCredentialsReader` (the `SecItemCopyMatching` code is removed).
+- It runs `/usr/bin/security find-generic-password -s "Claude Code-credentials" -w` with fixed arguments, reads stdout through a pipe, discards stderr, and terminates the process after 10 seconds.
+- Exit 0 → trim the trailing newline and extract the token with `ClaudeCredentials.accessToken(fromCredentialsJSON:)`; exit 44 → `notFound`; timeout or any other exit → `accessDenied`.
+- Running the process sits behind a protocol, so tests never run the real `security` or touch the Keychain.
+- The token never appears in process arguments, logs, or error text (§10.3 still applies).
+
+### 11.2 Pausing While the Screen Is Locked or Asleep
+
+- `SessionActivityMonitor` (behind a protocol) reports whether the user session is active. It observes the distributed notifications `com.apple.screenIsLocked` / `com.apple.screenIsUnlocked` and `NSWorkspace.screensDidSleepNotification` / `screensDidWakeNotification`. Closed-Lid Mode with the lid closed puts the displays to sleep; a closed lid with an external display in use keeps polling.
+- While inactive, `UsagePoller` skips its timer ticks and `pollIfStale()`. When the session becomes active again, the controller calls `pollIfStale()`.
+- The status line is unaffected.
+
+### 11.3 Manual Refresh
+
+- Popover row: a small borderless `arrow.clockwise` button in the secondary color, left of the toggle, help text "Refresh usage". Shown only when `fetchFromAPI` is on; a small progress indicator replaces it while a fetch is in flight; disabled while a 429 pause is active.
+- It calls `UsagePoller.refreshNow()`: polls immediately regardless of the 1-minute throttle and clears the Keychain denial block. It still respects the 429 pause and never starts a second fetch while one is in flight.
+- The `keychainDenied` status text becomes "Keychain access denied — click Refresh to try again".
+
+### 11.4 Settings Layout
+
+The section lists data sources first; the rest appears only when at least one source is on (`hasDataSource`):
+
+```
+Claude Code Limits
+  Status line                     [Connect…] / [Disconnect]
+  Fetch usage from Anthropic (unofficial)   [toggle]
+    <poller status>
+  — only with a data source —
+  Show                            Always ▾
+  First alert at                     80% ▾
+  Second alert at                    95% ▾
+  Notify when a limit resets      [toggle]
+  Forecast when limits run out    [toggle]
+```
+
+The footers stay; the API footnote drops "macOS will ask for Keychain access — choose Always Allow."
+
+### 11.5 Forecast
+
+- `ClaudeLimitsSettings.showForecast`, default on.
+- `UsageWindowKind.duration`: 5 hours or 7 days.
+- `UsageForecast.exhaustion(window:samples:now:) -> Date?` (pure, `nonisolated`):
+  - **Recent rate (5-hour window only):** the oldest sample from the last 60 minutes in the same period; rate = (current percent − sample percent) / (now − sample time). Time runs to `now`, so idle time after the last message lowers the rate. Requires at least 10 minutes between the sample and `now`; otherwise falls back to the average rate.
+  - **Average rate (weekly window, and the 5-hour fallback):** rate = percent / (now − window start), where window start = `resetsAt − duration`. Requires at least 15 minutes (5-hour) or 6 hours (weekly) since the window start.
+  - Exhaustion = now + (100 − percent) / rate. Returned only when it is before `resetsAt`.
+  - `nil` when the rate is not positive, the window is at 100% or more, or the requirements above are not met.
+- `UsageHistory` (in memory, owned by the controller): on every snapshot change, appends `(capturedAt, percent)` for the current 5-hour window; drops samples older than 60 minutes and samples from another period (reset time differs by more than `UsageSnapshot.samePeriodTolerance`). Starts empty after a relaunch, so the average rate applies until samples accumulate.
+- `refresh()` computes forecasts only when `showForecast` is on and passes them in `LimitsViewState` (per window kind).
+- Expanded notch only: a window with a forecast shows "runs out ~16:40 · resets 18:00" in place of the reset text, with "runs out ~16:40" in orange. Times use the reset text's format: `HH:mm` within a day, otherwise `EEE HH:mm`. Nothing changes when the limit lasts until the reset.
+
+### 11.6 Testing
+
+Unit: credentials reader with a fake process runner (exit codes 0, 44, other; timeout; malformed output; the token is never in error text); poller pause and resume, `refreshNow()` (bypasses the throttle, clears the denial block, respects 429, no concurrent fetch); forecast (recent rate, average rate, fallback when history is short, idle time, all `nil` cases, exhaustion after the reset); history trimming and period change; `showForecast` default; forecast text; controller passes forecasts only when the setting is on and calls `pollIfStale()` when the session becomes active. Manual (`docs/testing.md`): no Keychain prompt after Claude Code refreshes its token; polling stops while the screen is locked and resumes after unlocking; the refresh button; the settings layout with and without a data source.
