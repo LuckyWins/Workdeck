@@ -4,6 +4,8 @@ struct ClaudeSessionsSettingsSection: View {
     @Bindable var controller: ClaudeLimitsController
 
     var body: some View {
+        @Bindable var settings = controller.settings
+
         Section {
             LabeledContent("Session hooks") {
                 if controller.isHooksConnected {
@@ -12,6 +14,18 @@ struct ClaudeSessionsSettingsSection: View {
                     Button("Connect…") { controller.isConfirmingHooksConnect = true }
                         .disabled(!controller.canConnectHooks)
                 }
+            }
+            if controller.isHooksConnected {
+                Toggle("Keep Mac awake while Claude works", isOn: $settings.keepAwakeWhileWorking)
+                Toggle("Notify when a session finishes", isOn: $settings.notifyWhenFinished)
+                if settings.notifyWhenFinished {
+                    Picker("After working for", selection: $settings.finishedAfterMinutes) {
+                        ForEach(ClaudeLimitsSettings.finishedAfterOptions, id: \.self) { minutes in
+                            Text("\(minutes) min").tag(minutes)
+                        }
+                    }
+                }
+                Toggle("Notify when a session needs you", isOn: $settings.notifyWhenNeedsYou)
             }
         } header: {
             Text("Claude Code · Sessions")
@@ -23,8 +37,9 @@ struct ClaudeSessionsSettingsSection: View {
             Button("Connect") { controller.connectHooks() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Workdeck will add hooks to ~/.claude/settings.json that record when Claude Code sessions and agents start and stop. A backup will be saved next to it.")
+            Text("Workdeck will add hooks to ~/.claude/settings.json that record when Claude Code sessions and agents start, stop and which tool they run. A backup will be saved next to it.")
         }
+        .onChange(of: settings.keepAwakeWhileWorking) { controller.refresh() }
     }
 
     private var footer: String {
@@ -34,6 +49,6 @@ struct ClaudeSessionsSettingsSection: View {
         if !controller.canConnectHooks {
             return "The session hook command is missing from the app bundle."
         }
-        return "Adds hooks to ~/.claude/settings.json that tell Workdeck when sessions and agents start and stop. Prompts, answers and tool input are never stored."
+        return "Adds hooks to ~/.claude/settings.json that tell Workdeck when sessions and agents start, stop and which tool they run. Prompts and answers are never stored; for tool calls only the tool name and a short target (file name, start of a command, domain) are kept."
     }
 }
