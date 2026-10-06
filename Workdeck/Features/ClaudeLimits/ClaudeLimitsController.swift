@@ -19,7 +19,6 @@ final class ClaudeLimitsController {
     @ObservationIgnored private let activity: any SessionActivityMonitoring
     @ObservationIgnored private let hasNotchScreen: @MainActor () -> Bool
     @ObservationIgnored private var previousWindows: [UsageWindow] = []
-    @ObservationIgnored private var history = UsageHistory()
     @ObservationIgnored private var screenObserver: (any NSObjectProtocol)?
 
     init(
@@ -155,13 +154,10 @@ final class ClaudeLimitsController {
         let current = store.currentWindows
         defer { previousWindows = current }
 
-        if let snapshot = store.snapshot {
-            history.record(current.first { $0.kind == .fiveHour }, at: snapshot.capturedAt)
-        }
         var forecasts: [UsageWindowKind: Date] = [:]
         if settings.showForecast {
             for window in current {
-                forecasts[window.kind] = UsageForecast.exhaustion(window: window, samples: history.samples, now: store.now)
+                forecasts[window.kind] = UsageForecast.exhaustion(window: window, now: store.now)
             }
         }
 
