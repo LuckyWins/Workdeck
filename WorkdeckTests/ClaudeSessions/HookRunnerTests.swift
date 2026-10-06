@@ -64,4 +64,27 @@ struct HookRunnerTests {
         try Data().write(to: file)
         HookRunner(directory: file).run(stdin: input(["hook_event_name": "Stop", "session_id": sessionID]), environment: [:], now: fixedNow)
     }
+
+    @Test(.timeLimit(.minutes(1)))
+    func boundedInputDrainsOversizedInput() async throws {
+        let pipe = Pipe()
+        let writer = pipe.fileHandleForWriting
+        let limit = 1 << 20
+        let size = 3 << 20
+        let written = Task.detached {
+            writer.write(Data(repeating: 0x41, count: size))
+            try? writer.close()
+            return true
+        }
+        let data = BoundedInput.read(from: pipe.fileHandleForReading, limit: limit)
+        #expect(data.count == limit + 1)
+        #expect(await written.value)
+    }
+
+    @Test func boundedInputReturnsSmallInputWhole() throws {
+        let pipe = Pipe()
+        pipe.fileHandleForWriting.write(Data("{\"a\":1}".utf8))
+        try pipe.fileHandleForWriting.close()
+        #expect(BoundedInput.read(from: pipe.fileHandleForReading, limit: 100) == Data("{\"a\":1}".utf8))
+    }
 }

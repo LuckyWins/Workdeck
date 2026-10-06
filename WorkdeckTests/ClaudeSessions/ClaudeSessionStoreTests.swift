@@ -142,6 +142,75 @@ struct ClaudeSessionStoreTests {
         }
         #expect(store.sessions.first?.status == .working)
     }
+
+    @Test func recreatedLongerFileIsReadFromStart() throws {
+        start("s1")
+        let store = makeStore()
+        store.reload()
+        // Replaced by a longer file between two reads: the remembered offset lands mid-line.
+        try FileManager.default.removeItem(at: HookEventFile.url(for: "s1", in: directory))
+        writeSessionEvent(hookEvent(.sessionStart, at: 10, session: "s1") { $0.pid = 42; $0.cwd = "/p/a-much-longer-project-name" }, to: directory)
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 11, session: "s1"), to: directory)
+        store.reload()
+        #expect(store.sessions.first?.projectName == "a-much-longer-project-name")
+        #expect(store.sessions.first?.status == .working)
+    }
+
+    @Test func keepsOnlyRecentEventsInMemory() {
+        start("s1")
+        writeSessionEvent(hookEvent(.subagentStart, at: 1) { $0.agentID = "a1"; $0.agentType = "Explore" }, to: directory)
+        for second in stride(from: 2.0, through: 1000, by: 2) {
+            writeSessionEvent(hookEvent(.postToolUse, at: second), to: directory)
+        }
+        writeSessionEvent(hookEvent(.stop, at: 1001), to: directory)
+        let store = makeStore()
+        store.reload()
+        #expect(store.retainedEventCount <= 32)
+        #expect(store.sessions.first?.status == .idle)
+        #expect(store.sessions.first?.agents.map(\.id) == ["a1"])
+        #expect(store.sessions.first?.projectName == "s1")
+        writeSessionEvent(hookEvent(.subagentStop, at: 1002) { $0.agentID = "a1" }, to: directory)
+        store.reload()
+        #expect(store.sessions.first?.agents.isEmpty == true)
+    }
+
+    @Test func lateEventsWithinAMinuteAreStillOrdered() {
+        start("s1")
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 10), to: directory)
+        writeSessionEvent(hookEvent(.stop, at: 30), to: directory)
+        let store = makeStore()
+        store.reload()
+        writeSessionEvent(hookEvent(.postToolUse, at: 20), to: directory)
+        store.reload()
+        #expect(store.sessions.first?.status == .idle)
+    }
+
+    @Test func samePIDKeepsOnlyTheNewestSession() {
+        // /resume inside a running process may not end the previous session.
+        start("old", pid: 42, at: 0)
+        start("new", pid: 42, at: 10)
+        let store = makeStore()
+        store.reload()
+        #expect(store.sessions.map(\.id) == ["new"])
+        #expect(!fileExists("old"))
+    }
+
+    @Test func notifiesOnlyOnChangesOrANewMinute() {
+        start("s1")
+        var now = fixedNow
+        let store = makeStore { now }
+        var calls = 0
+        store.onChange = { calls += 1 }
+        store.reload()
+        store.reload()
+        #expect(calls == 1)
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 5), to: directory)
+        store.reload()
+        #expect(calls == 2)
+        now = fixedNow.addingTimeInterval(61)
+        store.reload()
+        #expect(calls == 3)
+    }
 }
 
 struct SystemProcessLivenessTests {

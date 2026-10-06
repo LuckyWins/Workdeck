@@ -468,4 +468,13 @@ struct ClaudeLimitsControllerTests {
         #expect(!controller.isHooksConnected)
         #expect(presenter.shown.last?.sessions == SessionsViewState.none)
     }
+
+    @Test func sessionUpdatesAreIgnoredWithoutHooks() {
+        let (controller, _) = makeController()
+        controller.start()
+        let shown = presenter.shown.count
+        addLiveSession()
+        controller.sessions.reload()
+        #expect(presenter.shown.count == shown)
+    }
 }

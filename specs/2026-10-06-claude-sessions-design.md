@@ -117,7 +117,7 @@ All file-system, clock, process, and workspace access is injected so units are t
 ### 5.1 Hook Command (`workdeck-hook`)
 
 - Configured for `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PostToolUse`, `Notification`, `Stop`, `SubagentStart`, `SubagentStop`, each as `{"type": "command", "command": "'<app>/Contents/Helpers/workdeck-hook'", "async": true, "timeout": 5}` with no matcher.
-- Reads stdin (at most 4 MiB: `PostToolUse` payloads carry the tool output, which Workdeck never reads), filters (§4.2), appends one line, exits 0 with no output. Larger input or any error → exit 0 silently.
+- Reads stdin in chunks, keeping at most 4 MiB and draining the rest so Claude Code never sees a broken pipe (at most 4 MiB: `PostToolUse` payloads carry the tool output, which Workdeck never reads), filters (§4.2), appends one line, exits 0 with no output. Larger input or any error → exit 0 silently.
 - Environment fields: `CLAUDE_PROJECT_DIR` → `projectDir`, `CLAUDE_PID` → `pid`, `CLAUDE_CODE_ENTRYPOINT` → `entrypoint`, `__CFBundleIdentifier` → `hostBundleID`, `TERM_PROGRAM` → `termProgram`.
 - `transcript_path` is used only to locate the agent's `meta.json` and is not stored.
 
@@ -157,6 +157,10 @@ All file-system, clock, process, and workspace access is injected so units are t
   - it has a `pid` and that process is gone, or it started after the event that reported the PID (the PID was reused), or
   - it has no `pid` and no event for 24 hours.
 - On launch, files of sessions found dead are deleted; the rest are read from the start.
+- Memory stays bounded: events older than 60 seconds before a session's newest event are folded into a settled state and dropped; only the last minute of events is kept for reordering late async hooks. Event files themselves grow for the life of a session (about 350 bytes per tool call) and are deleted with it.
+- A file deleted and recreated between reads (new file number) is read from the start.
+- One process runs one session: when two live sessions report the same PID (an in-process `/resume` that sent no `SessionEnd`), only the one with the newest event stays; the other is removed with its file.
+- The store notifies the controller only when the sessions change or a new minute starts (durations are shown in minutes); the controller ignores sessions updates while the hooks are not connected.
 - Activation on click:
   - `hostBundleID` of a known editor (VS Code `com.microsoft.VSCode`, VS Code Insiders, Cursor, Windsurf) → open the session's `cwd` with that application through `NSWorkspace`, which focuses the window holding that folder.
   - Any other `hostBundleID` (for example `com.apple.Terminal`, `com.googlecode.iterm2`, `com.mitchellh.ghostty`) → activate that application.

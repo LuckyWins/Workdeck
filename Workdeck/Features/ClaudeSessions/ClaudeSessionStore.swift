@@ -8,17 +8,28 @@ final class ClaudeSessionStore {
     static let expiryWithoutPID: TimeInterval = 24 * 60 * 60
     /// Process start times have microsecond precision but hook events are stamped a moment later.
     static let startTimeTolerance: TimeInterval = 1
+    /// Async hooks finish out of order by seconds; events older than this are folded and dropped from memory.
+    static let reorderWindow: TimeInterval = 60
 
     /// Live sessions: waiting first, then working, then idle; the newest state change first within a group.
     private(set) var sessions: [ClaudeSession] = []
     private(set) var now: Date
 
     @ObservationIgnored var onChange: (() -> Void)?
+    /// Events still held in memory, across sessions.
+    var retainedEventCount: Int {
+        events.values.reduce(0) { $0 + $1.count }
+    }
     @ObservationIgnored let directory: URL
     @ObservationIgnored private let liveness: any ProcessLiveness
     @ObservationIgnored private let clock: () -> Date
+    /// Each session's state from events older than the reorder window, and the recent events on top of it.
+    @ObservationIgnored private var settled: [String: ClaudeSession] = [:]
     @ObservationIgnored private var events: [String: [HookEvent]] = [:]
     @ObservationIgnored private var offsets: [String: UInt64] = [:]
+    /// A file deleted and recreated between reads gets a new file number, so it is read from the start.
+    @ObservationIgnored private var fileNumbers: [String: Int] = [:]
+    @ObservationIgnored private var lastNotifiedMinute: Int?
     @ObservationIgnored private var source: (any DispatchSourceFileSystemObject)?
     /// One source per event file: appending to a file does not change its directory.
     @ObservationIgnored private var fileSources: [String: any DispatchSourceFileSystemObject] = [:]
@@ -60,10 +71,16 @@ final class ClaudeSessionStore {
             let id = file.deletingPathExtension().lastPathComponent
             guard HookPayloadFilter.isSafeIdentifier(id) else { continue }
             present.insert(id)
+            let fileNumber = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.systemFileNumber] as? Int
+            if let fileNumber, let known = fileNumbers[id], known != fileNumber {
+                forget(id)
+            }
+            fileNumbers[id] = fileNumber
             let previous = offsets[id] ?? 0
             guard let result = try? HookEventFile.read(from: file, offset: previous) else { continue }
             if result.offset < previous {
                 events[id] = []
+                settled[id] = nil
             }
             events[id, default: []] += result.events
             offsets[id] = result.offset
@@ -74,20 +91,52 @@ final class ClaudeSessionStore {
         }
 
         var live: [ClaudeSession] = []
-        for (id, list) in events {
-            guard let session = SessionReducer.reduce(list) else { continue }
+        for id in Array(events.keys) {
+            guard let session = currentSession(id) else { continue }
             if isAlive(session) {
                 live.append(session)
             } else {
-                try? FileManager.default.removeItem(at: HookEventFile.url(for: id, in: directory))
-                forget(id)
+                remove(id)
             }
         }
+        // One process runs one session; an in-process /resume may not end the previous one.
+        let byPID = Dictionary(grouping: live.filter { $0.pid != nil }, by: \.pid)
+        for group in byPID.values where group.count > 1 {
+            let newest = group.max { $0.lastEventAt < $1.lastEventAt }
+            for session in group where session.id != newest?.id {
+                remove(session.id)
+                live.removeAll { $0.id == session.id }
+            }
+        }
+
         let sorted = live.sorted(by: Self.displayOrder)
+        // Durations are shown in minutes, so a new minute is worth a redraw even without new events.
+        let minute = Int(now.timeIntervalSince1970 / 60)
+        guard sorted != sessions || minute != lastNotifiedMinute else { return }
         if sorted != sessions {
             sessions = sorted
         }
+        lastNotifiedMinute = minute
         onChange?()
+    }
+
+    /// Folds events older than the reorder window into the settled state and keeps the rest.
+    private func currentSession(_ id: String) -> ClaudeSession? {
+        var recent = (events[id] ?? []).sorted { $0.time < $1.time }
+        guard let newest = recent.last?.time else { return settled[id] }
+        let cutoff = newest.addingTimeInterval(-Self.reorderWindow)
+        let old = recent.prefix { $0.time < cutoff }
+        if !old.isEmpty {
+            settled[id] = old.reduce(settled[id]) { SessionReducer.apply($1, to: $0) }
+            recent.removeFirst(old.count)
+        }
+        events[id] = recent
+        return recent.reduce(settled[id]) { SessionReducer.apply($1, to: $0) }
+    }
+
+    private func remove(_ id: String) {
+        try? FileManager.default.removeItem(at: HookEventFile.url(for: id, in: directory))
+        forget(id)
     }
 
     static func displayOrder(_ lhs: ClaudeSession, _ rhs: ClaudeSession) -> Bool {
@@ -121,7 +170,9 @@ final class ClaudeSessionStore {
 
     private func forget(_ id: String) {
         events[id] = nil
+        settled[id] = nil
         offsets[id] = nil
+        fileNumbers[id] = nil
         fileSources.removeValue(forKey: id)?.cancel()
     }
 

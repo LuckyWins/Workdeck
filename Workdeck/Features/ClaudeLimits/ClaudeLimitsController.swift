@@ -138,7 +138,10 @@ final class ClaudeLimitsController {
         connectionStatus = connector.status
         hooksConnector.repairPathIfNeeded()
         hooksStatus = hooksConnector.status
-        sessions.onChange = { [weak self] in self?.refresh() }
+        sessions.onChange = { [weak self] in
+            guard let self, self.isHooksConnected else { return }
+            self.refresh()
+        }
         presenter.setSessionAction { [weak self] id in self?.activateSession(id: id) }
         store.onChange = { [weak self] in self?.refresh() }
         poller.onChange = { [weak self] in self?.refresh() }
