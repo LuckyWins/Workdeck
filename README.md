@@ -21,13 +21,14 @@ Shows how much of your Claude Code plan limits you have used — the 5-hour wind
 - The compact view shows the window closest to its limit, e.g. `5h 42%`; hover to see both windows and when they reset.
 - Two modes: always visible, or only near limits.
 - Alerts at two configurable thresholds (80 % and 95 % by default) and, optionally, when a limit resets.
+- A forecast in the expanded view, e.g. `runs out ~16:40 · resets 18:00`, when a limit will run out before it resets at your current pace (can be turned off in Settings).
 - On a screen without a notch (an external display, or with the lid closed) the usage appears as text next to the Workdeck icon in the menu bar.
 
 **Connecting to Claude Code.** Turn on Claude Code Limits in the popover (or click **Connect…** in Settings). Workdeck adds its status line command to `~/.claude/settings.json` and saves a backup as `~/.claude/settings.json.workdeck-backup`. Only the `statusLine` key changes, but the file is re-written, so key order and formatting may change. If you already had a status line, Workdeck keeps running it and shows its output after the usage, e.g. `5h 42% · main`. **Disconnect** in Settings restores your previous status line.
 
 **Limitations.** Claude Code reports plan usage through the status line only for Claude Pro and Max subscriptions, and only while a Claude Code session runs in a terminal (after the first response). The graphical panel of the Claude Code VS Code extension does not run the status line. Between sessions Workdeck shows the last known values and how old they are.
 
-**Working only in the VS Code extension.** Turn on **Fetch usage from Anthropic (unofficial)** in Settings. Workdeck then reads the login token Claude Code stores in your Keychain and calls an undocumented Anthropic endpoint every 5 minutes (and when you open the popover, at most once a minute). macOS asks for Keychain access the first time — choose **Always Allow**. Workdeck never refreshes or stores the token. Anthropic's terms do not allow third-party use of Claude Code credentials, and the endpoint may change or stop working at any time; use this at your own discretion. If the login expires, open Claude Code to refresh it.
+**Working only in the VS Code extension.** Turn on **Fetch usage from Anthropic (unofficial)** in Settings. Workdeck then reads the login token Claude Code stores in your Keychain (through the system `security` tool, so macOS does not ask for your password) and calls an undocumented Anthropic endpoint every 5 minutes, when you open the popover (at most once a minute), and when you click the refresh button in the popover. Polling pauses while the screen is locked or asleep and catches up when you unlock. Workdeck never refreshes or stores the token. Anthropic's terms do not allow third-party use of Claude Code credentials, and the endpoint may change or stop working at any time; use this at your own discretion. If the login expires, open Claude Code to refresh it.
 
 ## Requirements
 
