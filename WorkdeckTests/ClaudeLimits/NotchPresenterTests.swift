@@ -140,4 +140,12 @@ struct NotchPresenterTests {
         presenter.model.onRefresh?()
         #expect(refreshed == 1)
     }
+
+    @Test func sessionActionReachesTheNotchViews() {
+        let (presenter, _) = makePresenter()
+        var activated: [String] = []
+        presenter.setSessionAction { activated.append($0) }
+        presenter.model.onActivateSession?("s1")
+        #expect(activated == ["s1"])
+    }
 }

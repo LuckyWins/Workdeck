@@ -65,5 +65,34 @@ struct LimitsPresentationTests {
         let pressing = percent.map { window(.fiveHour, $0) }
         #expect(LimitsPresentation.compactText(pressing: pressing, hasData: hasData) == expected)
     }
-}
 
+    @Test func sessionsKeepTheNotchWithoutLimits() {
+        let onlySessions = LimitsPresentation.display(
+            isEnabled: true, isConnected: false, mode: .always, hasNotchScreen: true,
+            pressing: nil, hasData: false, thresholds: [80, 95], hasSessions: true
+        )
+        #expect(onlySessions == .notch(.noData))
+        let nearLimits = LimitsPresentation.display(
+            isEnabled: true, isConnected: true, mode: .nearLimits, hasNotchScreen: true,
+            pressing: window(.fiveHour, 10), hasData: true, thresholds: [80, 95], hasSessions: true
+        )
+        #expect(nearLimits == .notch(.normal))
+        let disabled = LimitsPresentation.display(
+            isEnabled: false, isConnected: true, mode: .always, hasNotchScreen: true,
+            pressing: nil, hasData: false, thresholds: [80, 95], hasSessions: true
+        )
+        #expect(disabled == .hidden)
+        let menuBar = LimitsPresentation.display(
+            isEnabled: true, isConnected: false, mode: .always, hasNotchScreen: false,
+            pressing: nil, hasData: false, thresholds: [80, 95], hasSessions: true
+        )
+        #expect(menuBar == .hidden)
+    }
+
+    @Test func limitsShowOnlyWithASourceAndOutsideQuietNearLimitsMode() {
+        #expect(!LimitsPresentation.showsLimits(isConnected: false, mode: .always, level: .warning))
+        #expect(LimitsPresentation.showsLimits(isConnected: true, mode: .always, level: .normal))
+        #expect(!LimitsPresentation.showsLimits(isConnected: true, mode: .nearLimits, level: .normal))
+        #expect(LimitsPresentation.showsLimits(isConnected: true, mode: .nearLimits, level: .warning))
+    }
+}

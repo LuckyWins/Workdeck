@@ -47,6 +47,9 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
     /// When each window runs out at the current pace; only windows that run out before their reset.
     var forecasts: [UsageWindowKind: Date] = [:]
     var refresh = LimitsRefreshState.hidden
+    /// False when the notch is shown only for sessions (no limits source, or "Only near limits" below the threshold).
+    var showsLimits = true
+    var sessions = SessionsViewState.none
 
     static let hidden = LimitsViewState(display: .hidden, windows: [], now: .distantPast, age: nil, thresholds: [80, 95])
 
@@ -84,21 +87,32 @@ nonisolated enum LimitsPresentation {
         hasNotchScreen: Bool,
         pressing: UsageWindow?,
         hasData: Bool,
-        thresholds: [Int]
+        thresholds: [Int],
+        hasSessions: Bool = false
     ) -> LimitsDisplay {
-        guard isEnabled, isConnected else { return .hidden }
-        var level = level(of: pressing, thresholds: thresholds)
-        if level == .noData, hasData {
-            // No running window, but data exists: the next window starts at 0%.
-            level = .normal
-        }
-        if mode == .nearLimits, level == .noData || level == .normal {
-            return .hidden
-        }
+        guard isEnabled else { return .hidden }
+        let level = displayLevel(pressing: pressing, hasData: hasData, thresholds: thresholds)
+        let limitsVisible = showsLimits(isConnected: isConnected, mode: mode, level: level)
         if hasNotchScreen {
-            return .notch(level)
+            if limitsVisible {
+                return .notch(level)
+            }
+            return hasSessions ? .notch(level) : .hidden
         }
+        guard limitsVisible else { return .hidden }
         return .menuBar(text: compactText(pressing: pressing, hasData: hasData), level: level)
+    }
+
+    /// The indicator level; with data but no running window the next window starts at 0%.
+    static func displayLevel(pressing: UsageWindow?, hasData: Bool, thresholds: [Int]) -> LimitsLevel {
+        let level = level(of: pressing, thresholds: thresholds)
+        return level == .noData && hasData ? .normal : level
+    }
+
+    /// Whether the limits part is visible: a source is on and "Only near limits" is not keeping it quiet.
+    static func showsLimits(isConnected: Bool, mode: LimitsDisplayMode, level: LimitsLevel) -> Bool {
+        guard isConnected else { return false }
+        return !(mode == .nearLimits && (level == .noData || level == .normal))
     }
 
     /// "5h 42%"; "5h 0%" when no window is running (after a reset or before the first message);

@@ -20,7 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             client: UsageAPIClient(transport: URLSessionTransport()),
             snapshotURL: WorkdeckPaths.standard().snapshotURL
         ),
-        activity: SessionActivityMonitor()
+        activity: SessionActivityMonitor(),
+        sessions: ClaudeSessionStore(directory: SessionsDirectory.standard(), liveness: SystemProcessLiveness()),
+        hooksConnector: SessionHooksConnector.standard(),
+        activator: WindowActivator(workspace: SystemWorkspace())
     )
 
     func applicationDidFinishLaunching(_ notification: Notification) {

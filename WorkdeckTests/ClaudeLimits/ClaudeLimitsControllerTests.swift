@@ -41,6 +41,11 @@ final class FakePresenter: LimitsPresenting {
     func setRefreshAction(_ action: @escaping () -> Void) {
         refreshAction = action
     }
+
+    private(set) var sessionAction: ((String) -> Void)?
+    func setSessionAction(_ action: @escaping (String) -> Void) {
+        sessionAction = action
+    }
 }
 
 @MainActor
@@ -78,12 +83,46 @@ final class FakeActivity: SessionActivityMonitoring {
 }
 
 @MainActor
+final class FakeHooksConnector: SessionHooksConnecting {
+    var status: ClaudeConnectionStatus = .notConnected
+    var canConnect = true
+    var connectError: (any Error)?
+    private(set) var repairCount = 0
+
+    func connect() throws {
+        if let connectError { throw connectError }
+        status = .connected
+    }
+
+    func disconnect() throws {
+        status = .notConnected
+    }
+
+    func repairPathIfNeeded() {
+        repairCount += 1
+    }
+}
+
+@MainActor
+final class FakeActivator: WindowActivating {
+    private(set) var activated: [String] = []
+
+    func activate(_ session: ClaudeSession) {
+        activated.append(session.id)
+    }
+}
+
+@MainActor
 struct ClaudeLimitsControllerTests {
     let fileURL = makeTemporaryDirectory().appending(path: "Workdeck/claude-usage.json")
     let connector = FakeConnector()
     let presenter = FakePresenter()
     let poller = FakePoller()
     let activity = FakeActivity()
+    let sessionsDirectory = makeTemporaryDirectory().appending(path: "sessions")
+    let liveness = FakeLiveness()
+    let hooksConnector = FakeHooksConnector()
+    let activator = FakeActivator()
     let settings = ClaudeLimitsSettings(defaults: UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!)
 
     private func makeController(notch: Bool = true) -> (ClaudeLimitsController, ClaudeUsageStore) {
@@ -95,6 +134,9 @@ struct ClaudeLimitsControllerTests {
             presenter: presenter,
             poller: poller,
             activity: activity,
+            sessions: ClaudeSessionStore(directory: sessionsDirectory, liveness: liveness) { fixedNow },
+            hooksConnector: hooksConnector,
+            activator: activator,
             hasNotchScreen: { notch }
         )
         return (controller, store)
@@ -334,5 +376,96 @@ struct ClaudeLimitsControllerTests {
         controller.start()
         store.reload()
         #expect(presenter.shown.last?.forecasts.isEmpty == true)
+    }
+
+    private func addLiveSession(_ id: String = "s1", waiting: Bool = false) {
+        writeSessionEvent(hookEvent(.sessionStart, at: 0, session: id) { $0.pid = 42; $0.cwd = "/p/Workdeck"; $0.hostBundleID = "com.microsoft.VSCode" }, to: sessionsDirectory)
+        if waiting {
+            writeSessionEvent(hookEvent(.notification, at: 1, session: id) { $0.notificationType = "permission_prompt" }, to: sessionsDirectory)
+        }
+        liveness.startTimes[42] = fixedNow.addingTimeInterval(-60)
+    }
+
+    @Test func connectingHooksEnablesTheIndicator() {
+        let (controller, _) = makeController()
+        controller.connectHooks()
+        #expect(controller.isHooksConnected)
+        #expect(settings.isEnabled)
+        #expect(controller.hasAnySource)
+    }
+
+    @Test func enablingWithOnlyHooksDoesNotAskToConnectTheStatusLine() {
+        hooksConnector.status = .connected
+        let (controller, _) = makeController()
+        controller.start()
+        controller.setEnabled(true)
+        #expect(!controller.isConfirmingConnect)
+        #expect(settings.isEnabled)
+    }
+
+    @Test func subtitleIncludesSessions() {
+        hooksConnector.status = .connected
+        addLiveSession(waiting: true)
+        let (controller, _) = makeController()
+        controller.start()
+        #expect(controller.rowSubtitle == "1 session, 1 waiting")
+    }
+
+    @Test func subtitleJoinsLimitsAndSessions() throws {
+        connector.status = .connected
+        hooksConnector.status = .connected
+        try writeUsage(fiveHour: 42)
+        let (controller, store) = makeController()
+        controller.start()
+        store.reload()
+        #expect(controller.rowSubtitle == "5h 42% · 7d 0% · updated just now · no sessions")
+    }
+
+    @Test func sessionsKeepTheNotchInNearLimitsMode() throws {
+        connector.status = .connected
+        hooksConnector.status = .connected
+        settings.isEnabled = true
+        settings.mode = .nearLimits
+        try writeUsage(fiveHour: 10)
+        addLiveSession()
+        let (controller, store) = makeController()
+        controller.start()
+        store.reload()
+        let state = try #require(presenter.shown.last)
+        #expect(state.display == .notch(.normal))
+        #expect(!state.showsLimits)
+        #expect(state.sessions.totalCount == 1)
+        #expect(state.sessions.rows.first?.projectName == "Workdeck")
+    }
+
+    @Test func sessionsAreHiddenWithoutHooks() {
+        settings.isEnabled = true
+        addLiveSession()
+        let (controller, _) = makeController()
+        controller.start()
+        #expect(presenter.shown.last?.sessions == SessionsViewState.none)
+        #expect(presenter.shown.last?.display == .hidden)
+    }
+
+    @Test func clickingASessionActivatesItsWindow() {
+        hooksConnector.status = .connected
+        addLiveSession()
+        let (controller, _) = makeController()
+        controller.start()
+        presenter.sessionAction?("s1")
+        presenter.sessionAction?("unknown")
+        #expect(activator.activated == ["s1"])
+    }
+
+    @Test func disconnectingHooksHidesSessions() {
+        hooksConnector.status = .connected
+        settings.isEnabled = true
+        addLiveSession()
+        let (controller, _) = makeController()
+        controller.start()
+        #expect(presenter.shown.last?.sessions.totalCount == 1)
+        controller.disconnectHooks()
+        #expect(!controller.isHooksConnected)
+        #expect(presenter.shown.last?.sessions == SessionsViewState.none)
     }
 }

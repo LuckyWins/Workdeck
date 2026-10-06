@@ -10,6 +10,8 @@ protocol LimitsPresenting: AnyObject {
     func present(_ alert: LimitsAlert)
     /// What the refresh button in the expanded notch does.
     func setRefreshAction(_ action: @escaping () -> Void)
+    /// What clicking a session in the expanded notch does.
+    func setSessionAction(_ action: @escaping (String) -> Void)
 }
 
 /// The notch operations the presenter needs; DynamicNotchKit in the app, a fake in tests.
@@ -123,6 +125,10 @@ final class NotchPresenter: LimitsPresenting {
 
     func setRefreshAction(_ action: @escaping () -> Void) {
         model.onRefresh = action
+    }
+
+    func setSessionAction(_ action: @escaping (String) -> Void) {
+        model.onActivateSession = action
     }
 
     /// DynamicNotchKit rebuilds its window on `NSScreen.screens.first` after a screen change, in any

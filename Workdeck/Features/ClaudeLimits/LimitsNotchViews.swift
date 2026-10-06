@@ -6,6 +6,7 @@ final class LimitsNotchModel {
     var state = LimitsViewState.hidden
     var alert: LimitsAlert?
     @ObservationIgnored var onRefresh: (() -> Void)?
+    @ObservationIgnored var onActivateSession: ((String) -> Void)?
 }
 
 extension LimitsLevel {

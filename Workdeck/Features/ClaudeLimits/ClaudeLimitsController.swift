@@ -1,22 +1,29 @@
 import AppKit
 import Observation
 
-/// Owns Claude Code Limits: connection, alerts, and what the notch and menu bar show.
+/// Owns the Claude Code tool: limits (connection, alerts) and sessions, and what the notch and menu bar show.
 @Observable
 final class ClaudeLimitsController {
     let settings: ClaudeLimitsSettings
     let store: ClaudeUsageStore
+    let sessions: ClaudeSessionStore
 
     private(set) var connectionStatus: ClaudeConnectionStatus = .notConnected
     private(set) var connectError: String?
     private(set) var state = LimitsViewState.hidden
     /// Drives the "Connect Claude Code?" confirmation.
     var isConfirmingConnect = false
+    private(set) var hooksStatus: ClaudeConnectionStatus = .notConnected
+    private(set) var hooksError: String?
+    /// Drives the "Connect session hooks?" confirmation.
+    var isConfirmingHooksConnect = false
 
     @ObservationIgnored private let connector: any ClaudeCodeConnecting
     @ObservationIgnored private let presenter: any LimitsPresenting
     @ObservationIgnored private let poller: any UsagePolling
     @ObservationIgnored private let activity: any SessionActivityMonitoring
+    @ObservationIgnored private let hooksConnector: any SessionHooksConnecting
+    @ObservationIgnored private let activator: any WindowActivating
     @ObservationIgnored private let hasNotchScreen: @MainActor () -> Bool
     @ObservationIgnored private var previousWindows: [UsageWindow] = []
     @ObservationIgnored private var screenObserver: (any NSObjectProtocol)?
@@ -28,6 +35,9 @@ final class ClaudeLimitsController {
         presenter: any LimitsPresenting,
         poller: any UsagePolling,
         activity: any SessionActivityMonitoring,
+        sessions: ClaudeSessionStore,
+        hooksConnector: any SessionHooksConnecting,
+        activator: any WindowActivating,
         hasNotchScreen: @escaping @MainActor () -> Bool = NotchPresenter.hasNotchScreen
     ) {
         self.settings = settings
@@ -36,6 +46,9 @@ final class ClaudeLimitsController {
         self.presenter = presenter
         self.poller = poller
         self.activity = activity
+        self.sessions = sessions
+        self.hooksConnector = hooksConnector
+        self.activator = activator
         self.hasNotchScreen = hasNotchScreen
     }
 
@@ -46,6 +59,24 @@ final class ClaudeLimitsController {
     /// Data can arrive from the status line, the usage API, or both.
     var hasDataSource: Bool {
         isConnected || settings.fetchFromAPI
+    }
+
+    var isHooksConnected: Bool {
+        hooksStatus == .connected
+    }
+
+    var canConnectHooks: Bool {
+        hooksConnector.canConnect
+    }
+
+    /// The indicator has something to show: limits, sessions, or both.
+    var hasAnySource: Bool {
+        hasDataSource || isHooksConnected
+    }
+
+    private var sessionsState: SessionsViewState {
+        guard isHooksConnected else { return .none }
+        return SessionsPresentation.viewState(sessions: sessions.sessions, now: sessions.now)
     }
 
     var pollerStatus: UsagePollerStatus {
@@ -73,6 +104,12 @@ final class ClaudeLimitsController {
     }
 
     var rowSubtitle: String {
+        guard isHooksConnected else { return limitsSubtitle }
+        let summary = SessionsText.summary(sessionsState)
+        return hasDataSource ? "\(limitsSubtitle) · \(summary)" : summary
+    }
+
+    private var limitsSubtitle: String {
         // With a working status line, its data matters more than a usage API problem (spec §10.4).
         if !isConnected, settings.fetchFromAPI, poller.status.isProblem,
            let problem = LimitsText.pollerStatusText(poller.status, now: store.now) {
@@ -99,6 +136,10 @@ final class ClaudeLimitsController {
     func start() {
         connector.repairPathIfNeeded()
         connectionStatus = connector.status
+        hooksConnector.repairPathIfNeeded()
+        hooksStatus = hooksConnector.status
+        sessions.onChange = { [weak self] in self?.refresh() }
+        presenter.setSessionAction { [weak self] id in self?.activateSession(id: id) }
         store.onChange = { [weak self] in self?.refresh() }
         poller.onChange = { [weak self] in self?.refresh() }
         presenter.setRefreshAction { [weak self] in self?.refreshNow() }
@@ -110,6 +151,7 @@ final class ClaudeLimitsController {
             MainActor.assumeIsolated { self?.refresh() }
         }
         store.startWatching()
+        sessions.startWatching()
         activity.onChange = { [weak self] active in self?.sessionActivityChanged(active) }
         activity.start()
         poller.setPaused(!activity.isActive)
@@ -160,15 +202,20 @@ final class ClaudeLimitsController {
             }
         }
 
+        let pressing = UsageFormatting.mostPressing(current)
+        let hasData = store.age != nil
+        let sessionsView = sessionsState
         let display = LimitsPresentation.display(
             isEnabled: settings.isEnabled,
             isConnected: hasDataSource,
             mode: settings.mode,
             hasNotchScreen: hasNotchScreen(),
-            pressing: UsageFormatting.mostPressing(current),
-            hasData: store.age != nil,
-            thresholds: settings.thresholds
+            pressing: pressing,
+            hasData: hasData,
+            thresholds: settings.thresholds,
+            hasSessions: sessionsView.totalCount > 0
         )
+        let level = LimitsPresentation.displayLevel(pressing: pressing, hasData: hasData, thresholds: settings.thresholds)
         state = LimitsViewState(
             display: display,
             windows: store.allWindows,
@@ -176,7 +223,9 @@ final class ClaudeLimitsController {
             age: store.age,
             thresholds: settings.thresholds,
             forecasts: forecasts,
-            refresh: refreshState
+            refresh: refreshState,
+            showsLimits: LimitsPresentation.showsLimits(isConnected: hasDataSource, mode: settings.mode, level: level),
+            sessions: sessionsView
         )
         presenter.show(state)
 
@@ -198,7 +247,7 @@ final class ClaudeLimitsController {
     }
 
     func setEnabled(_ enabled: Bool) {
-        if enabled, !hasDataSource {
+        if enabled, !hasAnySource {
             isConfirmingConnect = true
             return
         }
@@ -229,5 +278,33 @@ final class ClaudeLimitsController {
         }
         connectionStatus = connector.status
         refresh()
+    }
+
+    func connectHooks() {
+        do {
+            try hooksConnector.connect()
+            hooksError = nil
+            settings.isEnabled = true
+        } catch {
+            hooksError = error.localizedDescription
+        }
+        hooksStatus = hooksConnector.status
+        refresh()
+    }
+
+    func disconnectHooks() {
+        do {
+            try hooksConnector.disconnect()
+            hooksError = nil
+        } catch {
+            hooksError = error.localizedDescription
+        }
+        hooksStatus = hooksConnector.status
+        refresh()
+    }
+
+    func activateSession(id: String) {
+        guard let session = sessions.sessions.first(where: { $0.id == id }) else { return }
+        activator.activate(session)
     }
 }
