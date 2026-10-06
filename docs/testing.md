@@ -81,6 +81,7 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | S11 | Finished alert | Turn on "Notify when a session finishes", set 1 min; switch to another app; give a session a task longer than a minute. | When it finishes, the notch shows "✓ <project> finished · worked Nm" for about 6 s. A turn shorter than a minute shows nothing; with the session's app in front, nothing either. |
 | S12 | Needs-you alert | Turn on "Notify when a session needs you"; switch to another app; trigger a permission prompt. | "! <project> needs you · permission prompt" appears. |
 | S13 | Keep awake | Turn on "Keep Mac awake while Claude works"; while a session works run `pmset -g assertions \| grep Workdeck`. | "Workdeck: Claude Code is working" is listed while it works and gone a moment after it finishes. |
+| S14 | Agent cards | Start a background agent and a foreground agent in a session, then hover the notch. | Each agent shows two lines: type · model ("Opus" at once, "Opus 5.5" after its first answer), `bg` on the background one, duration; then its current action and `N steps`. |
 | S8 | Disconnect | Disconnect in Settings. | Only Workdeck's hook entries are removed; your own hooks stay; the sessions disappear from the notch. |
 
 ## Results

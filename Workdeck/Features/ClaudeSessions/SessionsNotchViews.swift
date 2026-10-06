@@ -137,26 +137,50 @@ struct SessionsList: View {
         .animation(.easeOut(duration: 0.12), value: isHovered)
     }
 
+    /// Two lines per agent: what it is (type, model, background) and what it does (action, steps).
     private func agentView(_ agent: AgentRow, isLast: Bool, at date: Date) -> some View {
-        HStack(spacing: 6) {
-            Text(SessionsText.branch(isLast: isLast))
-                .foregroundStyle(Terminal.faint)
-            Text(TerminalSpinner.frame(at: date))
-                .foregroundStyle(.cyan)
-            Text(agent.type)
-                .foregroundStyle(Terminal.text)
-            if let detail = agent.action ?? agent.description {
-                Text(detail)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Text(SessionsText.branch(isLast: isLast))
+                    .foregroundStyle(Terminal.faint)
+                Text(TerminalSpinner.frame(at: date))
+                    .foregroundStyle(.cyan)
+                HStack(spacing: 0) {
+                    Text(agent.type)
+                        .foregroundStyle(Terminal.text)
+                    if let model = agent.model {
+                        Text(" · \(model)")
+                            .foregroundStyle(Terminal.dim)
+                    }
+                }
+                .lineLimit(1)
+                .truncationMode(.tail)
+                if agent.isBackground {
+                    Text("bg")
+                        .foregroundStyle(.cyan.opacity(0.7))
+                }
+                Spacer(minLength: 6)
+                Text(SessionsText.duration(from: agent.startedAt, to: state.now))
+                    .foregroundStyle(Terminal.dim)
+            }
+            HStack(spacing: 6) {
+                // Continue the tree line past this agent unless it is the last branch.
+                Text(isLast ? " " : "│")
+                    .foregroundStyle(Terminal.faint)
+                Text(" ")
+                Text(agent.action ?? agent.description ?? "")
                     .foregroundStyle(Terminal.dim)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                Spacer(minLength: 6)
+                if agent.steps > 0 {
+                    Text(SessionsText.steps(agent.steps))
+                        .foregroundStyle(Terminal.dim)
+                }
             }
-            Spacer(minLength: 6)
-            Text(SessionsText.duration(from: agent.startedAt, to: state.now))
-                .foregroundStyle(Terminal.dim)
         }
         .font(Terminal.font(10))
-        .help(agent.description ?? agent.type)
+        .help([agent.description, agent.model, agent.isBackground ? "background" : "foreground"].compactMap { $0 }.joined(separator: " · "))
     }
 
     /// Working sessions pulse, sessions waiting for you blink slowly, idle ones stay still.

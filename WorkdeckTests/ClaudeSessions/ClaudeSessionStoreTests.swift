@@ -221,6 +221,16 @@ struct ClaudeSessionStoreTests {
         #expect(store.sessions.first?.agents.isEmpty == true)
         #expect(store.sessions.first?.isBusy == false)
     }
+
+    @Test func resolvesAgentModelsFromTranscripts() throws {
+        let transcript = makeTemporaryDirectory().appending(path: "agent-a1.jsonl")
+        try (#"{"type":"assistant","message":{"model":"claude-opus-5-5"}}"# + "\n").write(to: transcript, atomically: true, encoding: .utf8)
+        start("s1")
+        writeSessionEvent(hookEvent(.subagentStart, at: 1) { $0.agentID = "a1"; $0.agentType = "Explore"; $0.agentTranscriptPath = transcript.path }, to: directory)
+        let store = makeStore()
+        store.reload()
+        #expect(store.sessions.first?.agents.first?.modelID == "claude-opus-5-5")
+    }
 }
 
 struct SystemProcessLivenessTests {

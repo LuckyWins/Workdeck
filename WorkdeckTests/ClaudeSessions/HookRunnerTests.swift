@@ -28,21 +28,25 @@ struct HookRunnerTests {
 
     @Test func subagentStartGetsItsDescription() throws {
         let requested = Mutex<URL?>(nil)
-        let runner = HookRunner(directory: directory, readDescription: { url in
+        let runner = HookRunner(directory: directory, readMeta: { url in
             requested.withLock { $0 = url }
-            return "Find NotchPresenter usages"
+            return AgentMeta(description: "Find NotchPresenter usages", model: "opus", isBackground: true)
         })
         runner.run(
             stdin: input(["hook_event_name": "SubagentStart", "session_id": sessionID, "agent_id": "a1", "agent_type": "Explore", "transcript_path": "/p/project/\(sessionID).jsonl"]),
             environment: [:],
             now: fixedNow
         )
-        #expect(try events().first?.agentDescription == "Find NotchPresenter usages")
+        let event = try #require(try events().first)
+        #expect(event.agentDescription == "Find NotchPresenter usages")
+        #expect(event.agentModel == "opus")
+        #expect(event.agentBackground == true)
+        #expect(event.agentTranscriptPath == "/p/project/\(sessionID)/subagents/agent-a1.jsonl")
         #expect(requested.withLock { $0 }?.path == "/p/project/\(sessionID)/subagents/agent-a1.meta.json")
     }
 
     @Test func otherEventsDoNotLookForADescription() throws {
-        let runner = HookRunner(directory: directory, readDescription: { _ in
+        let runner = HookRunner(directory: directory, readMeta: { _ in
             Issue.record("description read for a non-agent event")
             return nil
         })

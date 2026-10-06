@@ -30,6 +30,10 @@ final class ClaudeSessionStore {
     /// A file deleted and recreated between reads gets a new file number, so it is read from the start.
     @ObservationIgnored private var fileNumbers: [String: Int] = [:]
     @ObservationIgnored private var lastNotifiedMinute: Int?
+    /// Full model IDs read from agent transcripts, and how often each was looked for without success.
+    @ObservationIgnored private var agentModels: [String: String] = [:]
+    @ObservationIgnored private var agentModelMisses: [String: Int] = [:]
+    static let maxModelLookups = 30
     @ObservationIgnored private var source: (any DispatchSourceFileSystemObject)?
     /// One source per event file: appending to a file does not change its directory.
     @ObservationIgnored private var fileSources: [String: any DispatchSourceFileSystemObject] = [:]
@@ -92,7 +96,8 @@ final class ClaudeSessionStore {
 
         var live: [ClaudeSession] = []
         for id in Array(events.keys) {
-            guard let session = currentSession(id)?.withoutStoppedAgents(now: now) else { continue }
+            guard var session = currentSession(id)?.withoutStoppedAgents(now: now) else { continue }
+            resolveModels(of: &session)
             if isAlive(session) {
                 live.append(session)
             } else {
@@ -132,6 +137,24 @@ final class ClaudeSessionStore {
         }
         events[id] = recent
         return recent.reduce(settled[id]) { SessionReducer.apply($1, to: $0) }
+    }
+
+    /// Fills in each agent's full model ID from its transcript's first answer, once.
+    private func resolveModels(of session: inout ClaudeSession) {
+        for index in session.agents.indices {
+            let agent = session.agents[index]
+            if let model = agentModels[agent.id] {
+                session.agents[index].modelID = model
+                continue
+            }
+            guard let path = agent.transcriptPath, agentModelMisses[agent.id, default: 0] < Self.maxModelLookups else { continue }
+            if let model = AgentTranscript.firstModel(at: URL(filePath: path)) {
+                agentModels[agent.id] = model
+                session.agents[index].modelID = model
+            } else {
+                agentModelMisses[agent.id, default: 0] += 1
+            }
+        }
     }
 
     private func remove(_ id: String) {

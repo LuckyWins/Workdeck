@@ -71,6 +71,9 @@ nonisolated enum SessionReducer {
             setStatus(.working, at: event.time, on: &session)
         case .preToolUse:
             setAction(event.action, for: event.agentID, at: event.time, on: &session)
+            if let agentID = event.agentID, let index = session.agents.firstIndex(where: { $0.id == agentID }) {
+                session.agents[index].steps += 1
+            }
             if event.agentID == nil, event.action == "TaskStop" {
                 session.lastTaskStopAt = event.time
             }
@@ -105,12 +108,16 @@ nonisolated enum SessionReducer {
             setStatus(.idle, at: event.time, on: &session)
         case .subagentStart:
             if let agentID = event.agentID, !session.agents.contains(where: { $0.id == agentID }) {
-                session.agents.append(RunningAgent(
+                var agent = RunningAgent(
                     id: agentID,
                     type: event.agentType ?? "Agent",
                     description: event.agentDescription,
                     startedAt: event.time
-                ))
+                )
+                agent.model = event.agentModel
+                agent.isBackground = event.agentBackground ?? false
+                agent.transcriptPath = event.agentTranscriptPath
+                session.agents.append(agent)
             }
         case .subagentStop:
             session.agents.removeAll { $0.id == event.agentID }

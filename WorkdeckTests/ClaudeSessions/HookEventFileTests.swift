@@ -100,26 +100,26 @@ struct AgentDescriptionReaderTests {
     @Test func readsAndTruncatesTheDescription() throws {
         let url = root.appending(path: "agent.meta.json")
         try writeMeta(["agentType": "Explore", "description": "  " + String(repeating: "d", count: 200) + "  "], to: url)
-        let description = AgentDescriptionReader.description(at: url, sleep: { _ in })
+        let description = AgentDescriptionReader.meta(at: url, sleep: { _ in })?.description
         #expect(description == String(repeating: "d", count: AgentDescriptionReader.maxLength))
     }
 
     @Test func waitsForALateFile() throws {
         let url = root.appending(path: "late.meta.json")
         var sleeps = 0
-        let description = AgentDescriptionReader.description(at: url, sleep: { _ in
+        let description = AgentDescriptionReader.meta(at: url, sleep: { _ in
             sleeps += 1
             if sleeps == 2 {
                 try? writeMeta(["description": "Find NotchPresenter usages"], to: url)
             }
-        })
+        })?.description
         #expect(description == "Find NotchPresenter usages")
         #expect(sleeps == 2)
     }
 
     @Test func givesUpAfterFiveAttempts() {
         var delays: [TimeInterval] = []
-        let description = AgentDescriptionReader.description(at: root.appending(path: "missing.json"), sleep: { delays.append($0) })
+        let description = AgentDescriptionReader.meta(at: root.appending(path: "missing.json"), sleep: { delays.append($0) })?.description
         #expect(description == nil)
         #expect(delays == [0.2, 0.2, 0.2, 0.2])
     }
@@ -127,9 +127,19 @@ struct AgentDescriptionReaderTests {
     @Test func malformedOrEmptyMeansNoDescription() throws {
         let malformed = root.appending(path: "malformed.json")
         try Data("{".utf8).write(to: malformed)
-        #expect(AgentDescriptionReader.description(at: malformed, sleep: { _ in }) == nil)
+        #expect(AgentDescriptionReader.meta(at: malformed, sleep: { _ in }) == nil)
         let empty = root.appending(path: "empty.json")
         try writeMeta(["description": "   "], to: empty)
-        #expect(AgentDescriptionReader.description(at: empty, sleep: { _ in }) == nil)
+        #expect(AgentDescriptionReader.meta(at: empty, sleep: { _ in })?.description == nil)
+    }
+
+    @Test func readsModelAndBackground() throws {
+        let background = root.appending(path: "bg.meta.json")
+        try writeMeta(["agentType": "general-purpose", "description": "Batch B", "model": "opus", "requestShape": "background"], to: background)
+        let meta = try #require(AgentDescriptionReader.meta(at: background, sleep: { _ in }))
+        #expect(meta == AgentMeta(description: "Batch B", model: "opus", isBackground: true))
+        let foreground = root.appending(path: "fg.meta.json")
+        try writeMeta(["description": "Find", "requestShape": "foreground"], to: foreground)
+        #expect(AgentDescriptionReader.meta(at: foreground, sleep: { _ in }) == AgentMeta(description: "Find", model: nil, isBackground: false))
     }
 }

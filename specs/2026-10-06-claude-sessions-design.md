@@ -283,3 +283,17 @@ The Sessions footer and README change from "tool input is never stored" to "Prom
 ### 10.8 Testing
 
 Unit: action extraction for every tool kind, truncation, other input never stored; reducer rows of §10.2; event upgrade on launch; alert policy (threshold, Stop vs idle prompt, frontmost host, first sighting); settings defaults and persistence; keep-awake decisions with a fake; system assertion create and release. Manual `docs/testing.md` S10–S13: action and compacting display, finished alert after the threshold, needs-you alert, `pmset -g assertions` while working.
+
+## 11. Amendment: Agent Cards (2026-10-06)
+
+- `SubagentStart` also records, from the agent's `meta.json`, the model alias (`model`, e.g. "opus") and whether it runs in the background (`requestShape == "background"`), plus the path of the agent's own transcript (`<meta dir>/agent-<id>.jsonl`). Paths and these two fields only; no content.
+- The app reads the agent transcript only up to the first assistant line to take `message.model` (e.g. `claude-opus-5-5`), at most 2 MiB, and remembers it per agent; it gives up after 30 lookups without a model. Token usage is not read: transcripts record output counts at the start of streaming, so they are unreliable.
+- Each agent counts its own `PreToolUse` events as steps.
+- Model names display as "Opus 5.5" / "Haiku 4.5" (the alias capitalized until the transcript names the model).
+- An agent takes two lines in the expanded notch:
+  ```
+  ├ ⠋ general-purpose · Opus 5.5  bg           9m
+  │   Bash cd /Users/andreu/Development/vi…  87 steps
+  ```
+  Line one: full type, model, a cyan `bg` for background agents, duration. Line two: the current action (or the description), and `N steps`. The tree line continues between agents. Help text: description · model · background/foreground.
+- Not yet verified live: the model and `bg` on agents started after this version is installed (agents started earlier were recorded without them).

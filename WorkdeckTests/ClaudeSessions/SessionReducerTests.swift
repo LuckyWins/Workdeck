@@ -301,4 +301,21 @@ struct SessionReducerTests {
         #expect(session.withoutStoppedAgents(now: fixedNow.addingTimeInterval(1700)).agents.count == 1)
         #expect(session.withoutStoppedAgents(now: fixedNow.addingTimeInterval(1801)).agents.isEmpty)
     }
+
+    @Test func agentsCarryTheirMetaAndCountSteps() throws {
+        let agentStart = hookEvent(.subagentStart, at: 1) {
+            $0.agentID = "a1"
+            $0.agentType = "general-purpose"
+            $0.agentModel = "opus"
+            $0.agentBackground = true
+            $0.agentTranscriptPath = "/t/agent-a1.jsonl"
+        }
+        let steps = (2...4).map { second in hookEvent(.preToolUse, at: TimeInterval(second)) { $0.agentID = "a1"; $0.action = "Bash ls" } }
+        let main = hookEvent(.preToolUse, at: 5) { $0.action = "Read x.swift" }
+        let agent = try #require(SessionReducer.reduce([start, agentStart] + steps + [main])?.agents.first)
+        #expect(agent.model == "opus")
+        #expect(agent.isBackground)
+        #expect(agent.transcriptPath == "/t/agent-a1.jsonl")
+        #expect(agent.steps == 3)
+    }
 }

@@ -15,6 +15,10 @@ nonisolated struct AgentRow: Equatable, Sendable, Identifiable {
     /// What the agent is doing now, shown instead of the description when known.
     var action: String?
     var startedAt: Date
+    /// "Opus 5.5", or the alias ("Opus") until the transcript names the model.
+    var model: String?
+    var isBackground = false
+    var steps = 0
 
     /// "Explore · Find NotchPresenter usages", or the type alone.
     var title: String {
@@ -64,7 +68,16 @@ nonisolated enum SessionsPresentation {
                 since: session.since,
                 action: session.action,
                 agents: agents.prefix(maxAgentsPerSession).map { agent in
-                    AgentRow(id: agent.id, type: agent.type, description: agent.description, action: agent.action, startedAt: agent.startedAt)
+                    AgentRow(
+                        id: agent.id,
+                        type: agent.type,
+                        description: agent.description,
+                        action: agent.action,
+                        startedAt: agent.startedAt,
+                        model: (agent.modelID ?? agent.model).map(ModelName.display),
+                        isBackground: agent.isBackground,
+                        steps: agent.steps
+                    )
                 },
                 hiddenAgentCount: max(0, agents.count - maxAgentsPerSession)
             )

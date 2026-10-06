@@ -16,6 +16,13 @@ nonisolated struct RunningAgent: Equatable, Sendable, Identifiable {
     var action: String?
     /// The agent's latest own event; `nil` means only its start was seen.
     var lastSeenAt: Date?
+    /// A model alias from `meta.json` ("opus"); `modelID` is the full ID once read from the transcript.
+    var model: String?
+    var modelID: String?
+    var isBackground = false
+    /// Tool calls the agent made.
+    var steps = 0
+    var transcriptPath: String?
 }
 
 /// A Claude Code session reconstructed from its hook events.

@@ -36,6 +36,11 @@ nonisolated struct HookEvent: Codable, Equatable, Sendable {
     var agentID: String?
     var agentType: String?
     var agentDescription: String?
+    /// From the agent's `meta.json`: a model alias such as "opus", and whether it runs in the background.
+    var agentModel: String?
+    var agentBackground: Bool?
+    /// Where the agent's transcript is; the app reads only the model ID from it.
+    var agentTranscriptPath: String?
     /// `PreToolUse` only: the tool and a short target, e.g. "Read NotchPresenter.swift".
     var action: String?
 }

@@ -75,6 +75,20 @@ struct SessionsPresentationTests {
         #expect(state.totalCount == 5)
         #expect(SessionsPresentation.viewState(sessions: [session("a", .idle)], now: fixedNow).activeCount == 0)
     }
+
+    @Test func agentRowsCarryModelBackgroundAndSteps() throws {
+        var resolved = RunningAgent(id: "x", type: "general-purpose", startedAt: fixedNow)
+        resolved.model = "opus"
+        resolved.modelID = "claude-opus-5-5"
+        resolved.isBackground = true
+        resolved.steps = 87
+        var alias = RunningAgent(id: "y", type: "Explore", startedAt: fixedNow.addingTimeInterval(1))
+        alias.model = "haiku"
+        let row = try #require(SessionsPresentation.viewState(sessions: [session("a", .working, agents: [resolved, alias])], now: fixedNow).rows.first)
+        #expect(row.agents.map(\.model) == ["Opus 5.5", "Haiku"])
+        #expect(row.agents.map(\.isBackground) == [true, false])
+        #expect(row.agents.map(\.steps) == [87, 0])
+    }
 }
 
 struct SessionsTextTests {
@@ -100,5 +114,7 @@ struct SessionsTextTests {
         #expect(SessionsText.moreSessions(2) == "+2 more")
         #expect(SessionsText.moreAgents(1) == "+1 agent")
         #expect(SessionsText.moreAgents(3) == "+3 agents")
+        #expect(SessionsText.steps(1) == "1 step")
+        #expect(SessionsText.steps(87) == "87 steps")
     }
 }

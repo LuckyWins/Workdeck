@@ -32,6 +32,10 @@ nonisolated enum SessionsText {
         isLast ? "└" : "├"
     }
 
+    static func steps(_ count: Int) -> String {
+        count == 1 ? "1 step" : "\(count) steps"
+    }
+
     static func moreSessions(_ count: Int) -> String {
         "+\(count) more"
     }
