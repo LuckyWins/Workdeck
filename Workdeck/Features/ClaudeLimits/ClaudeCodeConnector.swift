@@ -42,13 +42,12 @@ struct ClaudeCodeConnector: ClaudeCodeConnecting {
         )
     }
 
-    var backupURL: URL {
-        settingsURL.deletingLastPathComponent().appending(path: settingsURL.lastPathComponent + ".workdeck-backup")
+    private var file: ClaudeSettingsFile {
+        ClaudeSettingsFile(url: settingsURL)
     }
 
-    /// The real file behind `settingsURL`; dotfile managers often make it a symlink, which must survive.
-    private var targetURL: URL {
-        settingsURL.resolvingSymlinksInPath()
+    var backupURL: URL {
+        file.backupURL
     }
 
     var backupPath: String {
@@ -70,10 +69,7 @@ struct ClaudeCodeConnector: ClaudeCodeConnecting {
         guard canConnect else { throw ClaudeConnectorError.binaryMissing }
         var settings = try readSettings() ?? Settings(root: [:])
 
-        if FileManager.default.fileExists(atPath: targetURL.path) {
-            // Copy the contents, not the link, so the backup is a real snapshot.
-            try Data(contentsOf: targetURL).write(to: backupURL, options: .atomic)
-        }
+        try file.backUp()
         if let original = settings.root["statusLine"], let command = settings.statusLineCommand, !Self.isWorkdeckCommand(command) {
             let originalJSON = try JSONSerialization.data(withJSONObject: original, options: [.sortedKeys])
             try StatusLineConfig(
@@ -138,20 +134,10 @@ struct ClaudeCodeConnector: ClaudeCodeConnecting {
 
     /// `nil` when the file does not exist; throws when it is not a JSON object.
     private func readSettings() throws -> Settings? {
-        guard FileManager.default.fileExists(atPath: targetURL.path) else { return nil }
-        let data = try Data(contentsOf: targetURL)
-        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw ClaudeConnectorError.invalidSettings
-        }
-        return Settings(root: root)
+        try file.read().map(Settings.init(root:))
     }
 
     private func write(_ settings: Settings) throws {
-        try FileManager.default.createDirectory(at: targetURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let data = try JSONSerialization.data(
-            withJSONObject: settings.root,
-            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        )
-        try data.write(to: targetURL, options: .atomic)
+        try file.write(settings.root)
     }
 }
