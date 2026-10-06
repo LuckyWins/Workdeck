@@ -2,8 +2,8 @@ import Foundation
 
 /// Folds a session's hook events into its current state (spec §5.2).
 nonisolated enum SessionReducer {
-    /// How soon after going quiet new activity still counts as the same work.
-    static let workResumeWindow: TimeInterval = 60
+    /// How soon after the last agent stopped a re-invocation still counts as the same work.
+    static let workResumeWindow: TimeInterval = 10
 
     /// Events are applied oldest first: async hooks may have written them out of order.
     static func reduce(_ events: [HookEvent]) -> ClaudeSession? {
@@ -16,9 +16,10 @@ nonisolated enum SessionReducer {
         let wasBusy = current?.isBusy ?? false
         var session = applyEvent(event, to: current)
         // Work starts when a quiet session gets busy and lasts until it is quiet again, agents included.
-        // A background agent's completion re-invokes the model a moment after the session went quiet.
+        // A background agent's completion re-invokes the model a moment after the session went quiet; a
+        // Stop ends the work, so even a quick reply from the user starts new work.
         if wasBusy, !session.isBusy {
-            session.quietSince = event.time
+            session.quietSince = event.name == .subagentStop ? event.time : nil
         } else if !wasBusy, session.isBusy {
             let resumesWork = session.quietSince.map { event.time.timeIntervalSince($0) <= workResumeWindow } ?? false
             if !resumesWork || session.workStartedAt == nil {

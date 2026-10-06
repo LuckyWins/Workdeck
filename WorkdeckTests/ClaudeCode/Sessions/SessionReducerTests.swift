@@ -333,4 +333,12 @@ struct SessionReducerTests {
         let session = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 0), agent, hookEvent(.stop, at: 30)]))
         #expect(session.agents.map(\.id) == ["a1"])
     }
+
+    @Test func aQuickReplyStartsNewWork() throws {
+        // The user answered 20 s after the Stop: a new piece of work, not the previous one continued.
+        let session = try #require(SessionReducer.reduce([
+            start, hookEvent(.userPromptSubmit, at: 10), hookEvent(.stop, at: 60), hookEvent(.userPromptSubmit, at: 80),
+        ]))
+        #expect(session.workStartedAt == fixedNow.addingTimeInterval(80))
+    }
 }

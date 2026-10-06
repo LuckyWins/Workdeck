@@ -48,8 +48,8 @@ nonisolated struct ClaudeSession: Equatable, Sendable, Identifiable {
     var action: String?
     /// When the session last went from quiet to busy: the start of work that background agents may extend.
     var workStartedAt: Date?
-    /// When the session last went quiet; work that resumes soon after (a background agent re-invoking
-    /// the model) continues the same work.
+    /// When the session last went quiet because its last agent stopped; the model re-invoked right after
+    /// (a background agent's result) continues the same work. A Stop closes the work instead.
     var quietSince: Date?
     /// The last `Stop`; an idle status that started then means the turn finished (not an interrupt).
     var lastStopAt: Date?
