@@ -23,7 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         activity: SessionActivityMonitor(),
         sessions: ClaudeSessionStore(directory: SessionsDirectory.standard(), liveness: SystemProcessLiveness()),
         hooksConnector: SessionHooksConnector.standard(),
-        activator: WindowActivator(workspace: SystemWorkspace())
+        activator: WindowActivator(workspace: SystemWorkspace()),
+        sleepPreventer: PowerAssertionSleepPreventer()
     )
 
     func applicationDidFinishLaunching(_ notification: Notification) {

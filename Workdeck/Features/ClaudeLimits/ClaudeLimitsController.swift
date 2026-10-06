@@ -24,6 +24,9 @@ final class ClaudeLimitsController {
     @ObservationIgnored private let activity: any SessionActivityMonitoring
     @ObservationIgnored private let hooksConnector: any SessionHooksConnecting
     @ObservationIgnored private let activator: any WindowActivating
+    @ObservationIgnored private let sleepPreventer: any SleepPreventing
+    @ObservationIgnored private let frontmostBundleID: @MainActor () -> String?
+    @ObservationIgnored private var previousSessions: [ClaudeSession] = []
     @ObservationIgnored private let hasNotchScreen: @MainActor () -> Bool
     @ObservationIgnored private var previousWindows: [UsageWindow] = []
     @ObservationIgnored private var screenObserver: (any NSObjectProtocol)?
@@ -38,7 +41,9 @@ final class ClaudeLimitsController {
         sessions: ClaudeSessionStore,
         hooksConnector: any SessionHooksConnecting,
         activator: any WindowActivating,
-        hasNotchScreen: @escaping @MainActor () -> Bool = NotchPresenter.hasNotchScreen
+        sleepPreventer: any SleepPreventing,
+        hasNotchScreen: @escaping @MainActor () -> Bool = NotchPresenter.hasNotchScreen,
+        frontmostBundleID: @escaping @MainActor () -> String? = { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
     ) {
         self.settings = settings
         self.store = store
@@ -49,6 +54,8 @@ final class ClaudeLimitsController {
         self.sessions = sessions
         self.hooksConnector = hooksConnector
         self.activator = activator
+        self.sleepPreventer = sleepPreventer
+        self.frontmostBundleID = frontmostBundleID
         self.hasNotchScreen = hasNotchScreen
     }
 
@@ -138,10 +145,7 @@ final class ClaudeLimitsController {
         connectionStatus = connector.status
         hooksConnector.repairPathIfNeeded()
         hooksStatus = hooksConnector.status
-        sessions.onChange = { [weak self] in
-            guard let self, self.isHooksConnected else { return }
-            self.refresh()
-        }
+        sessions.onChange = { [weak self] in self?.sessionsChanged() }
         presenter.setSessionAction { [weak self] id in self?.activateSession(id: id) }
         store.onChange = { [weak self] in self?.refresh() }
         poller.onChange = { [weak self] in self?.refresh() }
@@ -195,6 +199,7 @@ final class ClaudeLimitsController {
 
     /// Recomputes alerts and the display from the latest snapshot and settings.
     func refresh() {
+        sleepPreventer.setPreventing(isHooksConnected && settings.keepAwakeWhileWorking && sessions.sessions.contains(where: \.isBusy))
         let current = store.currentWindows
         defer { previousWindows = current }
 
@@ -309,5 +314,26 @@ final class ClaudeLimitsController {
     func activateSession(id: String) {
         guard let session = sessions.sessions.first(where: { $0.id == id }) else { return }
         activator.activate(session)
+    }
+
+    /// New session data: announce transitions, then redraw.
+    private func sessionsChanged() {
+        guard isHooksConnected else { return }
+        let current = sessions.sessions
+        defer { previousSessions = current }
+        if settings.isEnabled {
+            let alerts = SessionAlertPolicy.alerts(
+                previous: previousSessions,
+                current: current,
+                notifyFinished: settings.notifyWhenFinished,
+                finishedAfter: TimeInterval(settings.finishedAfterMinutes * 60),
+                notifyNeedsYou: settings.notifyWhenNeedsYou,
+                frontmostBundleID: frontmostBundleID()
+            )
+            for alert in alerts {
+                presenter.present(alert)
+            }
+        }
+        refresh()
     }
 }

@@ -113,6 +113,16 @@ final class FakeActivator: WindowActivating {
 }
 
 @MainActor
+final class FakeSleepPreventer: SleepPreventing {
+    private(set) var values: [Bool] = []
+    var isPreventing: Bool { values.last ?? false }
+
+    func setPreventing(_ preventing: Bool) {
+        values.append(preventing)
+    }
+}
+
+@MainActor
 struct ClaudeLimitsControllerTests {
     let fileURL = makeTemporaryDirectory().appending(path: "Workdeck/claude-usage.json")
     let connector = FakeConnector()
@@ -123,6 +133,7 @@ struct ClaudeLimitsControllerTests {
     let liveness = FakeLiveness()
     let hooksConnector = FakeHooksConnector()
     let activator = FakeActivator()
+    let sleepPreventer = FakeSleepPreventer()
     let settings = ClaudeLimitsSettings(defaults: UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!)
 
     private func makeController(notch: Bool = true) -> (ClaudeLimitsController, ClaudeUsageStore) {
@@ -137,7 +148,9 @@ struct ClaudeLimitsControllerTests {
             sessions: ClaudeSessionStore(directory: sessionsDirectory, liveness: liveness) { fixedNow },
             hooksConnector: hooksConnector,
             activator: activator,
-            hasNotchScreen: { notch }
+            sleepPreventer: sleepPreventer,
+            hasNotchScreen: { notch },
+            frontmostBundleID: { nil }
         )
         return (controller, store)
     }
@@ -476,5 +489,57 @@ struct ClaudeLimitsControllerTests {
         addLiveSession()
         controller.sessions.reload()
         #expect(presenter.shown.count == shown)
+    }
+
+    @Test func keepsAwakeOnlyWhileBusyAndEnabled() {
+        hooksConnector.status = .connected
+        addLiveSession()
+        let (controller, _) = makeController()
+        controller.start()
+        #expect(!sleepPreventer.isPreventing)
+        settings.keepAwakeWhileWorking = true
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 5, session: "s1"), to: sessionsDirectory)
+        controller.sessions.reload()
+        #expect(sleepPreventer.isPreventing)
+        writeSessionEvent(hookEvent(.stop, at: 9, session: "s1"), to: sessionsDirectory)
+        controller.sessions.reload()
+        #expect(!sleepPreventer.isPreventing)
+    }
+
+    @Test func disconnectReleasesKeepAwake() {
+        hooksConnector.status = .connected
+        settings.keepAwakeWhileWorking = true
+        addLiveSession()
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 5, session: "s1"), to: sessionsDirectory)
+        let (controller, _) = makeController()
+        controller.start()
+        #expect(sleepPreventer.isPreventing)
+        controller.disconnectHooks()
+        #expect(!sleepPreventer.isPreventing)
+    }
+
+    @Test func announcesALongTurnFinishing() {
+        hooksConnector.status = .connected
+        settings.isEnabled = true
+        settings.notifyWhenFinished = true
+        settings.finishedAfterMinutes = 1
+        addLiveSession()
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 5, session: "s1"), to: sessionsDirectory)
+        let (controller, _) = makeController()
+        controller.start()
+        writeSessionEvent(hookEvent(.stop, at: 600, session: "s1"), to: sessionsDirectory)
+        controller.sessions.reload()
+        #expect(presenter.alerts == [.sessionFinished(project: "Workdeck", worked: 595)])
+    }
+
+    @Test func noSessionAlertsWhileTheIndicatorIsOff() {
+        hooksConnector.status = .connected
+        settings.notifyWhenNeedsYou = true
+        addLiveSession()
+        let (controller, _) = makeController()
+        controller.start()
+        writeSessionEvent(hookEvent(.notification, at: 5, session: "s1") { $0.notificationType = "permission_prompt" }, to: sessionsDirectory)
+        controller.sessions.reload()
+        #expect(presenter.alerts.isEmpty)
     }
 }
