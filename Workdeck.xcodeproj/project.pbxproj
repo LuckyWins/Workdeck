@@ -121,6 +121,11 @@
 			path = WorkdeckStatusLine;
 			sourceTree = "<group>";
 		};
+		000000000000000000000017 /* ClaudeHooks */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ClaudeHooks;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -159,6 +164,7 @@
 				000000000000000000000020 /* Products */,
 				000000000000000000000015 /* ClaudeUsage */,
 				000000000000000000000016 /* WorkdeckStatusLine */,
+				000000000000000000000017 /* ClaudeHooks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -205,6 +211,7 @@
 				000000000000000000000010 /* Workdeck */,
 				000000000000000000000012 /* Shared */,
 				000000000000000000000015 /* ClaudeUsage */,
+				000000000000000000000017 /* ClaudeHooks */,
 			);
 			name = Workdeck;
 			packageProductDependencies = (
