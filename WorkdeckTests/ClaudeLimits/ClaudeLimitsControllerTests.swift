@@ -51,6 +51,10 @@ final class FakePoller: UsagePolling {
 
     private(set) var pausedValues: [Bool] = []
     func setPaused(_ paused: Bool) { pausedValues.append(paused) }
+
+    var isFetching = false
+    private(set) var refreshCount = 0
+    func refreshNow() { refreshCount += 1 }
 }
 
 @MainActor
@@ -267,5 +271,27 @@ struct ClaudeLimitsControllerTests {
         activity.send(false)
         activity.send(true)
         #expect(poller.staleCheckCount == 0)
+    }
+
+    @Test func refreshNowOnlyWithUsageAPI() {
+        let (controller, _) = makeController()
+        controller.refreshNow()
+        #expect(poller.refreshCount == 0)
+        settings.fetchFromAPI = true
+        controller.refreshNow()
+        #expect(poller.refreshCount == 1)
+    }
+
+    @Test func refreshIsUnavailableWhileFetchingOrRateLimited() {
+        settings.fetchFromAPI = true
+        let (controller, _) = makeController()
+        #expect(controller.canRefreshNow)
+        poller.isFetching = true
+        #expect(!controller.canRefreshNow)
+        poller.isFetching = false
+        poller.status = .rateLimited(until: fixedNow.addingTimeInterval(60))
+        #expect(!controller.canRefreshNow)
+        poller.status = .rateLimited(until: fixedNow.addingTimeInterval(-1))
+        #expect(controller.canRefreshNow)
     }
 }

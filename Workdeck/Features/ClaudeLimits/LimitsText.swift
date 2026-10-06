@@ -84,7 +84,7 @@ nonisolated enum LimitsText {
         case .noCredentials:
             "Claude Code login not found"
         case .keychainDenied:
-            "Keychain access denied — turn the setting off and on to try again"
+            "Keychain access denied — click Refresh to try again"
         case let .failed(message):
             message
         }

@@ -52,6 +52,21 @@ final class ClaudeLimitsController {
         poller.status
     }
 
+    var isFetching: Bool {
+        poller.isFetching
+    }
+
+    /// The refresh button is off while a fetch runs or Anthropic asked us to wait.
+    var canRefreshNow: Bool {
+        if poller.isFetching {
+            return false
+        }
+        if case let .rateLimited(until) = poller.status, until > store.now {
+            return false
+        }
+        return true
+    }
+
     var canConnect: Bool {
         connector.canConnect
     }
@@ -109,6 +124,11 @@ final class ClaudeLimitsController {
         if settings.fetchFromAPI {
             poller.pollIfStale()
         }
+    }
+
+    func refreshNow() {
+        guard settings.fetchFromAPI else { return }
+        poller.refreshNow()
     }
 
     /// No polling while the screen is locked or asleep; catch up as soon as someone is back.

@@ -7,7 +7,7 @@ nonisolated enum UsagePollerStatus: Equatable, Sendable {
     case loginExpired
     case rateLimited(until: Date)
     case noCredentials
-    /// The user denied the Keychain prompt; polling waits until the setting is toggled.
+    /// Reading the token failed or timed out; polling waits until Refresh or the setting is toggled.
     case keychainDenied
     case failed(String)
 
@@ -28,6 +28,10 @@ protocol UsagePolling: AnyObject {
     func pollIfStale()
     /// While paused (screen locked or asleep) timer ticks and stale checks do nothing.
     func setPaused(_ paused: Bool)
+    /// True while a fetch is in flight.
+    var isFetching: Bool { get }
+    /// The refresh button: polls now despite the 1-minute throttle and retries after a Keychain denial.
+    func refreshNow()
 }
 
 /// Opt-in: fetches usage from Anthropic every 5 minutes and merges it into the shared snapshot file,
@@ -38,6 +42,7 @@ final class UsagePoller: UsagePolling {
     static let minimumInterval: TimeInterval = 60
 
     private(set) var status = UsagePollerStatus.idle
+    private(set) var isFetching = false
 
     @ObservationIgnored private let credentials: any ClaudeCredentialsReading
     @ObservationIgnored private let client: UsageAPIClient
@@ -48,7 +53,7 @@ final class UsagePoller: UsagePolling {
     @ObservationIgnored private var isRunning = false
     @ObservationIgnored private var lastAttempt: Date?
     @ObservationIgnored private var pausedUntil: Date?
-    /// Every Keychain read after a denial shows the system prompt again, so stop asking.
+    /// After a failed token read, stop retrying on a schedule until the user asks.
     @ObservationIgnored private var isBlockedByDenial = false
     @ObservationIgnored private var isPaused = false
     /// The poll in flight; exposed so tests can await it.
@@ -99,6 +104,12 @@ final class UsagePoller: UsagePolling {
         poll()
     }
 
+    func refreshNow() {
+        guard isRunning else { return }
+        isBlockedByDenial = false
+        poll()
+    }
+
     /// Runs one fetch unless one is in flight, the poller is stopped, or a 429 pause is active.
     func poll() {
         guard isRunning, !isPaused, !isBlockedByDenial, pollTask == nil else { return }
@@ -107,8 +118,10 @@ final class UsagePoller: UsagePolling {
             return
         }
         lastAttempt = now
+        isFetching = true
         pollTask = Task {
             await performPoll(now: now)
+            isFetching = false
             pollTask = nil
         }
     }
@@ -117,7 +130,7 @@ final class UsagePoller: UsagePolling {
         let credentials = credentials
         let token: String
         do {
-            // The Keychain read can block on the access prompt, so keep it off the main actor.
+            // Reading the token runs a process, so keep it off the main actor.
             token = try await Task.detached { try credentials.accessToken() }.value
         } catch {
             guard isRunning else { return }

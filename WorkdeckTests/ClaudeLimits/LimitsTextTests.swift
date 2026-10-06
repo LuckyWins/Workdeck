@@ -63,6 +63,7 @@ struct LimitsTextTests {
         #expect(LimitsText.pollerStatusText(.idle, now: fixedNow, calendar: utc) == nil)
         #expect(LimitsText.pollerStatusText(.ok(fetchedAt: fixedNow.addingTimeInterval(-120)), now: fixedNow, calendar: utc) == "Last fetched 2m ago")
         #expect(LimitsText.pollerStatusText(.loginExpired, now: fixedNow, calendar: utc) == "Login expired — open Claude Code to refresh")
+        #expect(LimitsText.pollerStatusText(.keychainDenied, now: fixedNow, calendar: utc) == "Keychain access denied — click Refresh to try again")
         #expect(LimitsText.pollerStatusText(.rateLimited(until: fixedNow.addingTimeInterval(2 * 3600 + 20 * 60)), now: fixedNow, calendar: utc) == "Rate limited — retrying at 14:20")
         #expect(LimitsText.pollerStatusText(.noCredentials, now: fixedNow, calendar: utc) == "Claude Code login not found")
         #expect(LimitsText.pollerStatusText(.failed("HTTP 500"), now: fixedNow, calendar: utc) == "HTTP 500")

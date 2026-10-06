@@ -169,5 +169,64 @@ struct UsagePollerTests {
         await poller.pollTask?.value
         #expect(poller.status == .idle)
     }
-}
 
+    @Test func refreshNowIgnoresTheOneMinuteThrottle() async {
+        var now = fixedNow
+        transport.enqueue(.init(status: 200, body: usageBody(fiveHour: (1, 3600))))
+        transport.enqueue(.init(status: 200, body: usageBody(fiveHour: (2, 3600))))
+        let poller = makePoller { now }
+        poller.start()
+        await poller.pollTask?.value
+        now = fixedNow.addingTimeInterval(10)
+        poller.refreshNow()
+        await poller.pollTask?.value
+        #expect(transport.requests.count == 2)
+    }
+
+    @Test func refreshNowRetriesAfterKeychainDenial() async {
+        let credentials = ScriptedCredentials(failingWith: .accessDenied)
+        let poller = makePoller(credentials: credentials)
+        poller.start()
+        await poller.pollTask?.value
+        poller.poll()
+        await poller.pollTask?.value
+        #expect(credentials.readCount == 1)
+        poller.refreshNow()
+        await poller.pollTask?.value
+        #expect(credentials.readCount == 2)
+    }
+
+    @Test func refreshNowRespectsRateLimitPause() async {
+        var now = fixedNow
+        transport.enqueue(.init(status: 429, body: "", headers: ["Retry-After": "300"]))
+        let poller = makePoller { now }
+        poller.start()
+        await poller.pollTask?.value
+        now = fixedNow.addingTimeInterval(60)
+        poller.refreshNow()
+        await poller.pollTask?.value
+        #expect(transport.requests.count == 1)
+    }
+
+    @Test func refreshNowDoesNothingWhenStopped() async {
+        let poller = makePoller()
+        poller.refreshNow()
+        await poller.pollTask?.value
+        #expect(transport.requests.isEmpty)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func isFetchingWhileAPollRuns() async throws {
+        let credentials = ScriptedCredentials(failingWith: .notFound, held: true)
+        let poller = makePoller(credentials: credentials)
+        #expect(!poller.isFetching)
+        poller.start()
+        #expect(poller.isFetching)
+        while credentials.readCount == 0 {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        credentials.release()
+        await poller.pollTask?.value
+        #expect(!poller.isFetching)
+    }
+}
