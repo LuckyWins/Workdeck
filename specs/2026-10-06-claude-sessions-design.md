@@ -1,7 +1,7 @@
 # Workdeck — Claude Code Sessions Design
 
 **Date:** 2026-10-06
-**Status:** Draft for review
+**Status:** Approved for planning
 
 ## 1. Overview
 
@@ -45,7 +45,7 @@ The row "Claude Code Limits" becomes **Claude Code**. Its toggle still turns the
 
 ### 3.2 Settings
 
-The section "Claude Code Limits" becomes **Claude Code** with two groups:
+The section "Claude Code Limits" becomes two sections, headed **Claude Code · Limits** and **Claude Code · Sessions** (a grouped form cannot nest sections):
 
 ```
 Claude Code
@@ -103,7 +103,7 @@ The Sessions footer: "Adds hooks to ~/.claude/settings.json that tell Workdeck w
 | `ClaudeHooks/HookRunner` | `run(stdin:environment:now:)`: filter, read the agent description when needed, append. Swallows every error. |
 | `ClaudeSessions/SessionReducer` | Pure: folds a session's events (sorted by `time`) into `ClaudeSession` (§5.2). |
 | `ClaudeSessions/ClaudeSessionStore` (`@Observable`) | Watches the sessions directory, reads appended lines per file, keeps reduced sessions, runs liveness checks, deletes files of ended sessions, exposes `sessions` sorted for display. |
-| `ClaudeSessions/ProcessLiveness` | Protocol + system implementation: whether a PID is alive and its executable name is `claude`. |
+| `ClaudeSessions/ProcessLiveness` | Protocol + system implementation: the start time of a running PID (`proc_pidinfo`), `nil` when it is not running. |
 | `ClaudeSessions/SessionHooksConnector` | Connect/disconnect Workdeck's hook entries in `~/.claude/settings.json` (§5.3). |
 | `ClaudeSessions/WindowActivator` | Protocol + system implementation: brings a session's window to the front (§5.4). |
 | `ClaudeSessions/SessionsText` | Pure: status texts, durations, popover subtitle part. |
@@ -123,7 +123,7 @@ All file-system, clock, process, and workspace access is injected so units are t
 
 ### 5.2 Session State
 
-`ClaudeSession { id, cwd, projectName, status: working | waiting | idle, since: Date, agents: [RunningAgent], pid, entrypoint, hostBundleID, termProgram, lastEventAt }`, `RunningAgent { id, type, description?, startedAt }`.
+`ClaudeSession { id, cwd, projectName, status: working | waiting | idle, since: Date, agents: [RunningAgent], pid, pidSince, entrypoint, hostBundleID, termProgram, lastEventAt, hasEnded }` (`pidSince`: time of the first event that reported the current PID), `RunningAgent { id, type, description?, startedAt }`.
 
 | Event | Effect |
 |---|---|
@@ -152,7 +152,7 @@ All file-system, clock, process, and workspace access is injected so units are t
 - The store watches the sessions directory (file system events plus a 10-second timer). It keeps a byte offset per file and reads only appended complete lines; a partial last line waits for the next read. Malformed lines are skipped.
 - Liveness, every 10 seconds and after each read: a session is removed and its file deleted when
   - its last event is `SessionEnd`, or
-  - it has a `pid` and that process is gone or its executable name is not `claude`, or
+  - it has a `pid` and that process is gone, or it started after the event that reported the PID (the PID was reused), or
   - it has no `pid` and no event for 24 hours.
 - On launch, files of sessions found dead are deleted; the rest are read from the start.
 - Activation on click:
@@ -173,7 +173,7 @@ All file-system, clock, process, and workspace access is injected so units are t
 | Workdeck not running | Hooks keep writing; on launch dead sessions are dropped and live ones restored. |
 | Malformed or partial line | Skipped / read on the next pass. |
 | No `CLAUDE_PID` (older Claude Code) | Removed on `SessionEnd`, or after 24 hours without events. |
-| PID reused by another process | Not `claude` by executable name → removed. |
+| PID reused by another process | The process started after the event that reported the PID → removed. (The executable name is not checked: native installs name the binary after its version and npm installs run `node`.) |
 | Resume in a new process | `SessionStart` resets the session with the new PID. |
 | Hook cannot write | Exits 0; Claude Code is unaffected. |
 | `meta.json` missing or late | Agent shown by type only. |
@@ -191,7 +191,7 @@ Unit (Swift Testing; never the real `~/.claude`, the real sessions directory, or
 - `HookEventFile`: append and read from offset, partial last line, file and directory modes.
 - `HookRunner`: end to end into a temporary directory; never throws.
 - `SessionReducer`: every row of §5.2, ordering by time, resume, missing fields.
-- `ClaudeSessionStore`: incremental reads, liveness with a fake (`SessionEnd`, dead PID, wrong executable, 24-hour expiry), file deletion, sort order, "+N more" sessions and "+N agents".
+- `ClaudeSessionStore`: incremental reads, liveness with a fake (`SessionEnd`, dead PID, reused PID, 24-hour expiry), file deletion, sort order, "+N more" sessions and "+N agents".
 - `SessionHooksConnector`: connect next to existing hooks, idempotent connect, partial repair, disconnect cleanup, symlink, backup, invalid JSON, path repair.
 - `WindowActivator` with a fake workspace: editor vs. terminal vs. none.
 - Controller and presentation: subtitle, counter level, visibility in "Only near limits", expanded view without limits.
