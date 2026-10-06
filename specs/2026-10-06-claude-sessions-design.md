@@ -220,3 +220,61 @@ After trying the first version, the user chose a terminal-style notch (htop-like
 - **Motion (expanded only, up to 10 frames per second):** working session dots pulse, waiting dots blink slowly, agent spinners turn. Idle sessions are static and dimmed.
 - **Clickable cues:** hovering a session highlights its block, shows a pointing-hand cursor, and replaces the duration with `↗ open`. With the usage API on, the age line itself is the refresh control: hovering highlights it and shows `click to refresh ↻`; it shows `refreshing…` with a spinner while fetching and is dimmed and disabled during a 429 pause.
 - Alerts use the same style: `! 5-hour limit at 80%` with the reset time below.
+
+## 10. Amendment: Keep Awake, Session Alerts, Current Action, Compacting (2026-10-06)
+
+### 10.1 Hooks and Data
+
+- Two more hook events: `PreToolUse` (the current action) and `PreCompact` (context compaction starts), ten in total. On launch, if any Workdeck hook entry exists but some events are missing, the connector adds them (no new Connect needed).
+- `HookEvent.action`: for `PreToolUse` only, the tool name and a short target, at most 30 characters (longer → 29 + "…"):
+  - `Read`, `Edit`, `MultiEdit`, `Write` → file name of `file_path` (no directories); `NotebookEdit` → file name of `notebook_path`;
+  - `Bash` → the first line of `command`, whitespace collapsed;
+  - `WebFetch` → host of `url`; `WebSearch` → `query`; `Grep`, `Glob` → `pattern`;
+  - `Agent`, `Task` → `subagent_type`;
+  - `mcp__<server>__<tool>` → `mcp:<server>`;
+  - any other tool → its name.
+  Nothing else from `tool_input` is read or stored.
+
+### 10.2 Session State
+
+| Event | Effect |
+|---|---|
+| `UserPromptSubmit` | As before; also starts the turn (`turnStartedAt`). |
+| `PreToolUse` | Sets the action of the agent with that `agent_id` when it is running, otherwise of the session. Status working unless the session is waiting. |
+| `PostToolUse` | As before; also clears the action it belongs to. |
+| `Stop` | As before; clears the session action and records `lastStopAt`. |
+| `PreCompact` | Status compacting. |
+| `SessionStart` with `source == "compact"` | A compacting session returns to working (compaction ends; idle follows on `Stop` or `idle_prompt`). |
+
+Compacting counts as working for the counter color, ordering and keep-awake.
+
+### 10.3 Display
+
+- Session row: while working with an action, the action replaces the word "working" (`● Workdeck   Bash xcodebuild -sch…  12m`). Compacting shows a cyan dot and "compacting".
+- Agent row: the action, when known, replaces the description; the description becomes the row's help text.
+
+### 10.4 Settings (section "Claude Code · Sessions", shown only with hooks connected; all off by default)
+
+- **Keep Mac awake while Claude works** (`claudeSessions.keepAwake`).
+- **Notify when a session finishes** (`claudeSessions.notifyFinished`) with **after working for** 1, 2, 5, 10, 15 or 30 minutes (`claudeSessions.finishedAfterMinutes`, default 10), shown when the toggle is on.
+- **Notify when a session needs you** (`claudeSessions.notifyNeedsYou`).
+
+### 10.5 Alerts
+
+- New `LimitsAlert` cases: `sessionFinished(project:worked:)` → "✓ Workdeck finished" / "worked 14m" (green); `sessionNeedsYou(project:)` → "! vitastir needs you" / "permission prompt" (orange). They use the existing notch alert (6 seconds, one at a time) and require the indicator to be on.
+- `SessionAlertPolicy` (pure) compares the previous and current session lists:
+  - finished: a session that was working or compacting is now idle because of `Stop` (`since == lastStopAt`), and `lastStopAt − turnStartedAt` (or the previous `since` without a turn start) is at least the threshold;
+  - needs you: a session that was not waiting is now waiting;
+  - none for sessions seen for the first time (launch, connect) or when the session's host app is frontmost.
+
+### 10.6 Keep Awake
+
+- While the setting is on and hooks are connected, a `PreventUserIdleSystemSleep` power assertion named "Workdeck: Claude Code is working" is held whenever any session is working or compacting or has running agents; it is released otherwise. The display may still sleep; a closed lid still sleeps unless Closed-Lid Mode is on. The assertion is behind a protocol (`SleepPreventing`) for tests.
+
+### 10.7 Privacy Wording
+
+The Sessions footer and README change from "tool input is never stored" to "Prompts and answers are never stored; for tool calls only the tool name and a short target (file name, start of a command, domain) are kept."
+
+### 10.8 Testing
+
+Unit: action extraction for every tool kind, truncation, other input never stored; reducer rows of §10.2; event upgrade on launch; alert policy (threshold, Stop vs idle prompt, frontmost host, first sighting); settings defaults and persistence; keep-awake decisions with a fake; system assertion create and release. Manual `docs/testing.md` S10–S13: action and compacting display, finished alert after the threshold, needs-you alert, `pmset -g assertions` while working.
