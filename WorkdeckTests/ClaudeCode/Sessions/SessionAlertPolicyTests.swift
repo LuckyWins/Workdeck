@@ -107,4 +107,14 @@ struct SessionAlertPolicyTests {
         let current = [session(.idle, since: 1520, work: 0, stop: 1520)]
         #expect(alerts(previous, current) == [.sessionFinished(project: "Workdeck", worked: 1520)])
     }
+
+    @Test func decisionsExplainQuietAlerts() {
+        func notes(_ previous: [ClaudeSession], _ current: [ClaudeSession], frontmost: String? = "com.apple.Terminal") -> [String] {
+            SessionAlertPolicy.evaluate(previous: previous, current: current, notifyFinished: true, finishedAfter: 600, notifyNeedsYou: true, frontmostBundleID: frontmost).notes
+        }
+        #expect(notes([session(.working, since: 0)], [session(.idle, since: 300, stop: 300)]) == ["Workdeck: finished after 5m, below 10m"])
+        #expect(notes([session(.working, since: 0)], [session(.idle, since: 900, stop: 900, agents: 2)]) == ["Workdeck: stopped with 2 agents running, waiting for them"])
+        #expect(notes([session(.working, since: 0)], [session(.waiting, since: 10)], frontmost: "com.microsoft.VSCode") == ["Workdeck: not shown, its app is in front"])
+        #expect(notes([session(.working, since: 0)], [session(.idle, since: 900, stop: 900)]) == ["Workdeck: finished after 15m, shown"])
+    }
 }

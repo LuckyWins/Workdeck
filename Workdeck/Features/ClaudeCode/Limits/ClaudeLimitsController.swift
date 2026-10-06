@@ -1,4 +1,5 @@
 import AppKit
+import OSLog
 import Observation
 
 /// The Limits part of the Claude Code tool: status line connection, usage API polling, limit alerts.
@@ -19,6 +20,7 @@ final class ClaudeLimitsController {
     @ObservationIgnored private let poller: any UsagePolling
     @ObservationIgnored private let activity: any SessionActivityMonitoring
     @ObservationIgnored private var previousWindows: [UsageWindow] = []
+    @ObservationIgnored private var lastLoggedPollerStatus: UsagePollerStatus?
 
     init(
         settings: ClaudeCodeSettings,
@@ -96,7 +98,14 @@ final class ClaudeLimitsController {
         connector.repairPathIfNeeded()
         connectionStatus = connector.status
         store.onChange = { [weak self] in self?.onChange?() }
-        poller.onChange = { [weak self] in self?.onChange?() }
+        poller.onChange = { [weak self] in
+            guard let self else { return }
+            if self.poller.status != self.lastLoggedPollerStatus {
+                self.lastLoggedPollerStatus = self.poller.status
+                WorkdeckLog.limits.info("Usage API: \(String(describing: self.poller.status), privacy: .public)")
+            }
+            self.onChange?()
+        }
         store.startWatching()
         activity.onChange = { [weak self] active in self?.sessionActivityChanged(active) }
         activity.start()
@@ -142,6 +151,7 @@ final class ClaudeLimitsController {
             settings.isEnabled = true
         } catch {
             connectError = error.localizedDescription
+            WorkdeckLog.limits.error("Status line: \(error.localizedDescription, privacy: .public)")
         }
         onChange?()
     }
@@ -153,6 +163,7 @@ final class ClaudeLimitsController {
             settings.connectedAt = nil
         } catch {
             connectError = error.localizedDescription
+            WorkdeckLog.limits.error("Status line: \(error.localizedDescription, privacy: .public)")
         }
         connectionStatus = connector.status
         onChange?()

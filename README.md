@@ -115,6 +115,7 @@ sudo pmset -a disablesleep 0
   /usr/bin/log show --last 1h --predicate 'subsystem == "com.appcreators.workdeck.helper"'
   ```
 - **"Couldn't change the sleep setting" after rebuilding in Xcode:** launchd may still be running an older helper build. Turn Workdeck off and on again in Login Items & Extensions. As a last resort, `sudo sfltool resetbtm` resets all background item approvals (for every app) and requires a restart.
+- **Claude Code tool:** Settings → About → **Copy Diagnostics** copies Workdeck's recent log and current state (no prompts, answers or tool details). Live log: `/usr/bin/log stream --predicate 'subsystem == "com.appcreators.workdeck"'`.
 
 ## Project Structure
 

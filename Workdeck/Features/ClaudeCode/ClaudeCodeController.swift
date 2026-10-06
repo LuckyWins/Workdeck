@@ -69,6 +69,18 @@ final class ClaudeCodeController {
         sessions.start()
     }
 
+    func diagnosticsText(logLines: [String], now: Date = Date()) -> String {
+        DiagnosticsReport.text(
+            appVersion: HelperConstants.version(of: .main),
+            now: now,
+            settings: settings,
+            statusLineConnected: limits.isConnected,
+            hooksConnected: sessions.isHooksConnected,
+            sessions: sessions.store.sessions,
+            logLines: logLines
+        )
+    }
+
     func popoverOpened() {
         limits.popoverOpened()
     }

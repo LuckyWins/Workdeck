@@ -1,4 +1,5 @@
 import IOKit.pwr_mgt
+import OSLog
 
 protocol SleepPreventing {
     func setPreventing(_ preventing: Bool)
@@ -20,10 +21,14 @@ final class PowerAssertionSleepPreventer: SleepPreventing {
                 Self.reason as CFString,
                 &assertionID
             )
-            guard result == kIOReturnSuccess else { return }
+            guard result == kIOReturnSuccess else {
+                WorkdeckLog.keepAwake.error("Could not create the power assertion: \(result, privacy: .public)")
+                return
+            }
         } else {
             IOPMAssertionRelease(assertionID)
         }
         isPreventing = preventing
+        WorkdeckLog.keepAwake.info("\(preventing ? "Holding" : "Released", privacy: .public) the power assertion")
     }
 }

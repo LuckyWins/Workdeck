@@ -1,9 +1,12 @@
+import AppKit
 import SwiftUI
 
 struct SettingsView: View {
     @Bindable var settings: AppSettings
     let controller: LidSleepController
     let claudeCode: ClaudeCodeController
+
+    @State private var copiedDiagnostics = false
 
     var body: some View {
         Form {
@@ -33,8 +36,21 @@ struct SettingsView: View {
             ClaudeLimitsSettingsSection(controller: claudeCode.limits)
             ClaudeSessionsSettingsSection(controller: claudeCode.sessions)
 
-            Section("About") {
+            Section {
                 LabeledContent("Version", value: HelperConstants.version(of: .main))
+                LabeledContent("Diagnostics") {
+                    Button(copiedDiagnostics ? "Copied" : "Copy Diagnostics") {
+                        let text = claudeCode.diagnosticsText(logLines: DiagnosticsReport.recentLogLines(since: Date().addingTimeInterval(-3600)))
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(text, forType: .string)
+                        copiedDiagnostics = true
+                    }
+                }
+            } header: {
+                Text("About")
+            } footer: {
+                Text("Copies Workdeck's recent log and current state, without prompts, answers or tool details, for troubleshooting.")
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

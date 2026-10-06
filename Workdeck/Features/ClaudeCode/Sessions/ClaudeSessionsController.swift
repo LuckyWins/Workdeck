@@ -1,4 +1,5 @@
 import AppKit
+import OSLog
 import Observation
 
 /// The Sessions part of the Claude Code tool: session hooks, live sessions, alerts, keep-awake.
@@ -76,6 +77,7 @@ final class ClaudeSessionsController {
             settings.isEnabled = true
         } catch {
             hooksError = error.localizedDescription
+            WorkdeckLog.sessions.error("Session hooks: \(error.localizedDescription, privacy: .public)")
         }
         hooksStatus = hooksConnector.status
         onChange?()
@@ -87,6 +89,7 @@ final class ClaudeSessionsController {
             hooksError = nil
         } catch {
             hooksError = error.localizedDescription
+            WorkdeckLog.sessions.error("Session hooks: \(error.localizedDescription, privacy: .public)")
         }
         hooksStatus = hooksConnector.status
         onChange?()
@@ -113,18 +116,22 @@ final class ClaudeSessionsController {
         guard isHooksConnected else { return }
         let current = store.sessions
         defer { previousSessions = current }
-        if settings.isEnabled {
-            let alerts = SessionAlertPolicy.alerts(
-                previous: previousSessions,
-                current: current,
-                notifyFinished: settings.notifyWhenFinished,
-                finishedAfter: TimeInterval(settings.finishedAfterMinutes * 60),
-                notifyNeedsYou: settings.notifyWhenNeedsYou,
-                frontmostBundleID: frontmostBundleID()
-            )
-            if !alerts.isEmpty {
-                onAlerts?(alerts)
-            }
+        for line in SessionChangeLog.lines(previous: previousSessions, current: current) {
+            WorkdeckLog.sessions.info("\(line, privacy: .public)")
+        }
+        let outcome = SessionAlertPolicy.evaluate(
+            previous: previousSessions,
+            current: current,
+            notifyFinished: settings.notifyWhenFinished,
+            finishedAfter: TimeInterval(settings.finishedAfterMinutes * 60),
+            notifyNeedsYou: settings.notifyWhenNeedsYou,
+            frontmostBundleID: frontmostBundleID()
+        )
+        for note in outcome.notes {
+            WorkdeckLog.alerts.info("\(note, privacy: .public)\(self.settings.isEnabled ? "" : " (indicator off, nothing shown)", privacy: .public)")
+        }
+        if settings.isEnabled, !outcome.alerts.isEmpty {
+            onAlerts?(outcome.alerts)
         }
         onChange?()
     }
