@@ -19,6 +19,14 @@ nonisolated enum UsageWindowKind: String, Codable, Sendable, CaseIterable {
         case .sevenDay: "Weekly"
         }
     }
+
+    /// How long one period of the window lasts.
+    var duration: TimeInterval {
+        switch self {
+        case .fiveHour: 5 * 60 * 60
+        case .sevenDay: 7 * 24 * 60 * 60
+        }
+    }
 }
 
 nonisolated struct UsageWindow: Codable, Equatable, Sendable {

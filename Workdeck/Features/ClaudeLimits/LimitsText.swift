@@ -20,6 +20,20 @@ nonisolated enum LimitsText {
     /// For a window that is not running: it begins with the next Claude Code message.
     static let notStartedText = "starts with your next message"
 
+    /// "runs out ~16:40" within a day, otherwise "runs out ~Wed 12:00".
+    static func forecastText(_ date: Date, now: Date, calendar: Calendar = .current) -> String {
+        "runs out ~\(clockText(date, now: now, calendar: calendar))"
+    }
+
+    /// "resets 18:00" within a day, otherwise "resets Thu 09:00"; shown next to a forecast.
+    static func resetClockText(_ resetsAt: Date, now: Date, calendar: Calendar = .current) -> String {
+        "resets \(clockText(resetsAt, now: now, calendar: calendar))"
+    }
+
+    private static func clockText(_ date: Date, now: Date, calendar: Calendar) -> String {
+        formatted(date, date.timeIntervalSince(now) < 24 * 60 * 60 ? "HH:mm" : "EEE HH:mm", calendar: calendar)
+    }
+
     static func ageText(_ age: TimeInterval) -> String {
         if age < 60 {
             return "Updated just now"

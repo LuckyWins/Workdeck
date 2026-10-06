@@ -18,6 +18,7 @@ final class ClaudeLimitsSettings {
         static let connectedAt = "claudeLimits.connectedAt"
         static let firedAlertKeys = "claudeLimits.firedAlertKeys"
         static let fetchFromAPI = "claudeLimits.fetchFromAPI"
+        static let showForecast = "claudeLimits.showForecast"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -73,6 +74,11 @@ final class ClaudeLimitsSettings {
         didSet { defaults.set(fetchFromAPI, forKey: Keys.fetchFromAPI) }
     }
 
+    /// Show when a limit will run out at the current pace (expanded notch).
+    var showForecast: Bool {
+        didSet { defaults.set(showForecast, forKey: Keys.showForecast) }
+    }
+
     var thresholds: [Int] {
         [firstThreshold, secondThreshold]
     }
@@ -88,6 +94,7 @@ final class ClaudeLimitsSettings {
         connectedAt = defaults.object(forKey: Keys.connectedAt) as? Date
         firedAlertKeys = Set(defaults.stringArray(forKey: Keys.firedAlertKeys) ?? [])
         fetchFromAPI = defaults.bool(forKey: Keys.fetchFromAPI)
+        showForecast = defaults.object(forKey: Keys.showForecast) as? Bool ?? true
     }
 
     /// 50–95 in steps of 5.
