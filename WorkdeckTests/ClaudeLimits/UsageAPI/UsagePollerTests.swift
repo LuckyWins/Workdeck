@@ -229,4 +229,16 @@ struct UsagePollerTests {
         await poller.pollTask?.value
         #expect(!poller.isFetching)
     }
+
+    @Test func refreshNowWorksWhilePaused() async {
+        // A click proves someone is at the screen, even if a missed unlock left polling paused.
+        transport.enqueue(.init(status: 200, body: usageBody(fiveHour: (5, 3600))))
+        let poller = makePoller()
+        poller.setPaused(true)
+        poller.start()
+        await poller.pollTask?.value
+        poller.refreshNow()
+        await poller.pollTask?.value
+        #expect(transport.requests.count == 1)
+    }
 }

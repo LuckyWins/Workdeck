@@ -27,14 +27,43 @@ nonisolated struct SystemProcessRunner: ProcessRunning {
         } catch {
             return ProcessResult(exitCode: -1, stdout: Data(), timedOut: false)
         }
-        // The expected output is a few kilobytes, well under the pipe buffer, so reading after exit cannot deadlock;
-        // anything larger blocks the child until the timeout kills it.
+        // Drain stdout while the child runs; a full pipe buffer would otherwise block it until the timeout.
+        let reader = PipeReader(output.fileHandleForReading)
         guard exited.wait(timeout: .now() + timeout) == .success else {
-            process.terminate()
-            _ = exited.wait(timeout: .now() + 1)
+            Self.stop(process, exited: exited)
             return ProcessResult(exitCode: process.isRunning ? -1 : process.terminationStatus, stdout: Data(), timedOut: true)
         }
-        let data = output.fileHandleForReading.readDataToEndOfFile()
+        // EOF follows exit unless a grandchild still holds the pipe; do not wait for it forever.
+        guard let data = reader.wait(until: .now() + 1) else {
+            return ProcessResult(exitCode: process.terminationStatus, stdout: Data(), timedOut: true)
+        }
         return ProcessResult(exitCode: process.terminationStatus, stdout: data, timedOut: false)
+    }
+
+    /// SIGTERM, then SIGKILL if the child ignores it.
+    private static func stop(_ process: Process, exited: DispatchSemaphore) {
+        process.terminate()
+        if exited.wait(timeout: .now() + 1) == .timedOut {
+            kill(process.processIdentifier, SIGKILL)
+            _ = exited.wait(timeout: .now() + 1)
+        }
+    }
+}
+
+/// Reads a pipe to EOF on a background queue.
+private nonisolated final class PipeReader: @unchecked Sendable {
+    private let done = DispatchSemaphore(value: 0)
+    /// Written once before `done` is signalled and read only after waiting on it.
+    private var data = Data()
+
+    init(_ handle: FileHandle) {
+        DispatchQueue.global(qos: .utility).async { [self] in
+            data = handle.readDataToEndOfFile()
+            done.signal()
+        }
+    }
+
+    func wait(until deadline: DispatchTime) -> Data? {
+        done.wait(timeout: deadline) == .success ? data : nil
     }
 }

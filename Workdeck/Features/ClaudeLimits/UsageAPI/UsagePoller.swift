@@ -107,12 +107,13 @@ final class UsagePoller: UsagePolling {
     func refreshNow() {
         guard isRunning else { return }
         isBlockedByDenial = false
-        poll()
+        // A click proves someone is at the screen, even if a missed unlock left polling paused.
+        poll(ignoringPause: true)
     }
 
     /// Runs one fetch unless one is in flight, the poller is stopped, or a 429 pause is active.
-    func poll() {
-        guard isRunning, !isPaused, !isBlockedByDenial, pollTask == nil else { return }
+    func poll(ignoringPause: Bool = false) {
+        guard isRunning, ignoringPause || !isPaused, !isBlockedByDenial, pollTask == nil else { return }
         let now = clock()
         if let pausedUntil, now < pausedUntil {
             return

@@ -90,4 +90,21 @@ struct SystemProcessRunnerTests {
         #expect(result.exitCode == -1)
         #expect(!result.timedOut)
     }
+
+    @Test(.timeLimit(.minutes(1)))
+    func readsOutputLargerThanThePipeBuffer() {
+        let result = SystemProcessRunner().run(URL(filePath: "/usr/bin/head"), arguments: ["-c", "200000", "/dev/zero"], timeout: 5)
+        #expect(!result.timedOut)
+        #expect(result.exitCode == 0)
+        #expect(result.stdout.count == 200_000)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func killsAProcessThatIgnoresTerminate() {
+        let start = Date()
+        let result = SystemProcessRunner().run(URL(filePath: "/bin/sh"), arguments: ["-c", "trap '' TERM; sleep 3"], timeout: 0.3)
+        #expect(result.timedOut)
+        #expect(result.exitCode == SIGKILL)
+        #expect(Date().timeIntervalSince(start) < 2.5)
+    }
 }
