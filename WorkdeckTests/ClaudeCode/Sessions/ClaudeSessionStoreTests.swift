@@ -11,8 +11,8 @@ struct ClaudeSessionStoreTests {
         ClaudeSessionStore(directory: directory, liveness: liveness, clock: now)
     }
 
-    private func start(_ session: String, pid: Int32? = 42, at seconds: TimeInterval = 0) {
-        writeSessionEvent(hookEvent(.sessionStart, at: seconds, session: session) { $0.pid = pid; $0.cwd = "/p/\(session)" }, to: directory)
+    private func start(_ session: String, pid: Int32? = 42, at seconds: TimeInterval = 0, source: String? = nil) {
+        writeSessionEvent(hookEvent(.sessionStart, at: seconds, session: session) { $0.pid = pid; $0.cwd = "/p/\(session)"; $0.source = source }, to: directory)
         if let pid {
             liveness.startTimes[pid] = fixedNow.addingTimeInterval(-60)
         }
@@ -192,6 +192,29 @@ struct ClaudeSessionStoreTests {
         let store = makeStore()
         store.reload()
         #expect(store.sessions.map(\.id) == ["new"])
+        #expect(!fileExists("old"))
+    }
+
+    @Test func blankSessionIsListedOnceUsed() {
+        // A new conversation tab nobody has written in yet runs its own process.
+        start("used", pid: 1)
+        start("blank", pid: 2, at: 10, source: "startup")
+        let store = makeStore()
+        store.reload()
+        #expect(store.sessions.map(\.id) == ["used"])
+        #expect(fileExists("blank"))
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 20, session: "blank"), to: directory)
+        store.reload()
+        #expect(store.sessions.map(\.id) == ["blank", "used"])
+    }
+
+    @Test func clearReplacesTheSessionWithABlankOne() {
+        start("old", pid: 42, at: 0)
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 5, session: "old"), to: directory)
+        start("new", pid: 42, at: 10, source: "clear")
+        let store = makeStore()
+        store.reload()
+        #expect(store.sessions.isEmpty)
         #expect(!fileExists("old"))
     }
 

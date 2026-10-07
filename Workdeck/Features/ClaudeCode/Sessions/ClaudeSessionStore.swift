@@ -114,7 +114,8 @@ final class ClaudeSessionStore {
             }
         }
 
-        let sorted = live.sorted(by: Self.displayOrder)
+        // A blank session stays tracked and is listed with its first prompt.
+        let sorted = live.filter { !$0.isBlank }.sorted(by: Self.displayOrder)
         // Durations are shown in minutes, so a new minute is worth a redraw even without new events.
         let minute = Int(now.timeIntervalSince1970 / 60)
         guard sorted != sessions || minute != lastNotifiedMinute else { return }

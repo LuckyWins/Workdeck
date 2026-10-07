@@ -44,8 +44,11 @@ nonisolated enum SessionReducer {
                 entrypoint: session.entrypoint,
                 hostBundleID: session.hostBundleID,
                 termProgram: session.termProgram,
-                lastEventAt: event.time
+                lastEventAt: event.time,
+                isBlank: event.source == "startup" || event.source == "clear"
             )
+        } else if event.name != .sessionStart {
+            session.isBlank = false
         }
         // The Bash tool keeps `cd` between commands, so a later `cwd` is not the project.
         if let projectDir = event.projectDir {

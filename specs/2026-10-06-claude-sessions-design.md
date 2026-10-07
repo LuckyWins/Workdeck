@@ -327,3 +327,11 @@ Unit: the split keeps every existing test's assertions (only constructors and th
 
 - An agent's first line shows its task description instead of its type; a user-defined type follows the model as a dim tag (`Review auth module · Sonnet 5.5 · code-reviewer`). Claude Code's own types (`general-purpose`, `Explore`, `Plan`) appear only in the help text. Without a description, the type is the name. The second line shows the current command, or "starting…" before the first one.
 - Session alerts (`finished`, `needs you`) are clickable: hovering shows the pointing hand, a highlight and "↗ open"; a click opens the project's window, found by project name (sessions in one project share a window). In a batch, each line opens its own project. Limit alerts are not clickable.
+
+## 14. Amendment: Blank Sessions (2026-10-07)
+
+Observed: the VS Code extension keeps a separate `claude` process for a new conversation tab. It sends `SessionStart` (`source: startup`) and nothing else until the first prompt, and Claude Code writes no transcript for it. The notch listed it as a second idle row with the same project name, which read as a duplicate.
+
+- A session started with `source` `startup` or `clear` is blank until any event other than `SessionStart` arrives. A blank session is tracked (its file, PID and liveness checks as usual) but not listed, so it is not counted, alerted on or activated. It appears with its first prompt.
+- `resume` sessions are not blank: they reopen a conversation that has content. A `SessionStart` without a `source`, or a session whose first seen event is not a start (hooks connected mid-session), is not blank either.
+- The PID rule runs before this filter: after `/clear` in a terminal the previous session is dropped and the new blank one stays hidden until used.

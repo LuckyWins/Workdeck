@@ -85,6 +85,22 @@ struct SessionReducerTests {
         #expect(session.since == fixedNow.addingTimeInterval(30))
     }
 
+    @Test func newConversationIsBlankUntilSomethingHappens() throws {
+        for source in ["startup", "clear"] {
+            let fresh = hookEvent(.sessionStart, at: 0) { $0.source = source }
+            #expect(try #require(SessionReducer.reduce([fresh])).isBlank)
+            #expect(try #require(SessionReducer.reduce([fresh, hookEvent(.userPromptSubmit, at: 5)])).isBlank == false)
+        }
+    }
+
+    @Test func resumedOrUnknownStartIsNotBlank() throws {
+        let resume = hookEvent(.sessionStart, at: 0) { $0.source = "resume" }
+        #expect(try #require(SessionReducer.reduce([resume])).isBlank == false)
+        #expect(try #require(SessionReducer.reduce([start])).isBlank == false)
+        // Hooks connected mid-session: the first event seen is not a start.
+        #expect(try #require(SessionReducer.reduce([hookEvent(.postToolUse, at: 0)])).isBlank == false)
+    }
+
     @Test func sessionEndMarksTheSessionEnded() throws {
         let session = try #require(SessionReducer.reduce([start, hookEvent(.sessionEnd, at: 5)]))
         #expect(session.hasEnded)
