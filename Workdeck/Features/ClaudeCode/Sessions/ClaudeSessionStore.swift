@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 
 /// Live Claude Code sessions, read from the event files `workdeck-hook` writes (spec §5.4).
 @Observable
@@ -38,10 +39,20 @@ final class ClaudeSessionStore {
     /// One source per event file: appending to a file does not change its directory.
     @ObservationIgnored private var fileSources: [String: any DispatchSourceFileSystemObject] = [:]
     @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private let maxFileSize: Int
+    @ObservationIgnored private let keptFileSize: Int
 
-    init(directory: URL, liveness: any ProcessLiveness, clock: @escaping () -> Date = { Date() }) {
+    init(
+        directory: URL,
+        liveness: any ProcessLiveness,
+        maxFileSize: Int = SessionFileTrimmer.maxFileSize,
+        keptFileSize: Int = SessionFileTrimmer.keptFileSize,
+        clock: @escaping () -> Date = { Date() }
+    ) {
         self.directory = directory
         self.liveness = liveness
+        self.maxFileSize = maxFileSize
+        self.keptFileSize = keptFileSize
         self.clock = clock
         now = clock()
     }
@@ -114,6 +125,10 @@ final class ClaudeSessionStore {
             }
         }
 
+        for session in live {
+            trimIfLarge(session)
+        }
+
         // A blank session stays tracked and is listed with its first prompt.
         let sorted = live.filter { !$0.isBlank }.sorted(by: Self.displayOrder)
         // Durations are shown in minutes, so a new minute is worth a redraw even without new events.
@@ -156,6 +171,21 @@ final class ClaudeSessionStore {
                 agentModelMisses[agent.id, default: 0] += 1
             }
         }
+    }
+
+    /// Cuts a large event file down to its newest events (spec §15). The state in memory stays as it is; only a
+    /// relaunch reads the trimmed file. Lines appended since the last read are kept, and reading goes on from them.
+    private func trimIfLarge(_ session: ClaudeSession) {
+        guard let offset = offsets[session.id], offset > maxFileSize else { return }
+        var unread = 0
+        let url = HookEventFile.url(for: session.id, in: directory)
+        guard let sizes = try? HookEventFile.rewrite(url, keep: { lines in
+            unread = max(0, lines.reduce(0) { $0 + $1.count } - Int(offset))
+            return SessionFileTrimmer.kept(lines, session: session, tailSize: max(keptFileSize, unread))
+        }) else { return }
+        offsets[session.id] = sizes.after - UInt64(unread)
+        let label = SessionChangeLog.label(session)
+        WorkdeckLog.sessions.notice("\(label, privacy: .public): trimmed its event file from \(sizes.before / 1024) KB to \(sizes.after / 1024) KB")
     }
 
     private func remove(_ id: String) {

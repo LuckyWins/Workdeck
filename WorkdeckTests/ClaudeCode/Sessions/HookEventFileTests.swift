@@ -82,6 +82,44 @@ struct HookEventFileTests {
         let result = try HookEventFile.read(from: fileURL, offset: 0)
         #expect(result.events.count == 50)
     }
+
+    @Test func rewriteKeepsChosenLinesAndAPartialLastLine() throws {
+        try HookEventFile.append(event(.sessionStart), to: directory)
+        try HookEventFile.append(event(.userPromptSubmit, at: 1), to: directory)
+        try HookEventFile.append(event(.stop, at: 2), to: directory)
+        let partial = try HookEventFile.line(for: event(.postToolUse, at: 3)).prefix(10)
+        let handle = try FileHandle(forWritingTo: fileURL)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: partial)
+        try handle.close()
+        var seen: [Data] = []
+        let sizes = try HookEventFile.rewrite(fileURL) { lines in
+            seen = lines
+            return [lines[0], lines[2]]
+        }
+        #expect(seen.count == 3)
+        #expect(seen.allSatisfy { $0.last == UInt8(ascii: "\n") })
+        #expect(sizes.before == UInt64(seen.reduce(0) { $0 + $1.count }))
+        #expect(sizes.after == UInt64(seen[0].count + seen[2].count))
+        #expect(try Data(contentsOf: fileURL) == seen[0] + seen[2] + partial)
+        #expect(try HookEventFile.read(from: fileURL, offset: 0).events.map(\.name) == [.sessionStart, .stop])
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func appendWaitsWhileTheFileIsLocked() async throws {
+        try HookEventFile.append(event(.sessionStart), to: directory)
+        let descriptor = open(fileURL.path, O_RDONLY)
+        #expect(flock(descriptor, LOCK_EX) == 0)
+        let directory = self.directory
+        let appending = Task.detached {
+            try HookEventFile.append(HookEvent(time: fixedNow.addingTimeInterval(1), name: .stop, sessionID: "s1"), to: directory)
+        }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(try HookEventFile.read(from: fileURL, offset: 0).events.count == 1)
+        close(descriptor)
+        try await appending.value
+        #expect(try HookEventFile.read(from: fileURL, offset: 0).events.map(\.name) == [.sessionStart, .stop])
+    }
 }
 
 struct AgentDescriptionReaderTests {

@@ -218,6 +218,34 @@ struct ClaudeSessionStoreTests {
         #expect(!fileExists("old"))
     }
 
+    @Test func trimsALargeFileAndKeepsReadingIt() throws {
+        start("s1", pid: 1)
+        writeSessionEvent(hookEvent(.subagentStart, at: 1) { $0.agentID = "a1"; $0.agentType = "Plan" }, to: directory)
+        for index in 0..<100 {
+            writeSessionEvent(hookEvent(.preToolUse, at: 2 + Double(index)) { $0.agentID = "a1"; $0.action = "Read A.swift" }, to: directory)
+        }
+        let url = HookEventFile.url(for: "s1", in: directory)
+        let store = ClaudeSessionStore(directory: directory, liveness: liveness, maxFileSize: 8_000, keptFileSize: 2_000) { fixedNow }
+        store.reload()
+        let size = try #require(try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int)
+        #expect(size < 8_000)
+        #expect(store.sessions.first?.agents.first?.steps == 100)
+
+        // Appends after the trim are read once: no step counted twice, none missed.
+        writeSessionEvent(hookEvent(.preToolUse, at: 110) { $0.agentID = "a1"; $0.action = "Read B.swift" }, to: directory)
+        writeSessionEvent(hookEvent(.notification, at: 111) { $0.notificationType = "permission_prompt" }, to: directory)
+        store.reload()
+        #expect(store.sessions.first?.status == .waiting)
+        #expect(store.sessions.first?.agents.first?.steps == 101)
+
+        // A relaunch rebuilds the session from the trimmed file.
+        let relaunched = makeStore()
+        relaunched.reload()
+        #expect(relaunched.sessions.first?.status == .waiting)
+        #expect(relaunched.sessions.first?.agents.map(\.id) == ["a1"])
+        #expect(relaunched.sessions.first?.agents.first?.action == "Read B.swift")
+    }
+
     @Test func notifiesOnlyOnChangesOrANewMinute() {
         start("s1")
         var now = fixedNow

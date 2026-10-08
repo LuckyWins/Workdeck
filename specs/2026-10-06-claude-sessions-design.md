@@ -335,3 +335,12 @@ Observed: the VS Code extension keeps a separate `claude` process for a new conv
 - A session started with `source` `startup` or `clear` is blank until any event other than `SessionStart` arrives. A blank session is tracked (its file, PID and liveness checks as usual) but not listed, so it is not counted, alerted on or activated. It appears with its first prompt.
 - `resume` sessions are not blank: they reopen a conversation that has content. A `SessionStart` without a `source`, or a session whose first seen event is not a start (hooks connected mid-session), is not blank either.
 - The PID rule runs before this filter: after `/clear` in a terminal the previous session is dropped and the new blank one stays hidden until used.
+
+## 15. Amendment: Event File Size Limit (2026-10-07)
+
+Observed: a VS Code session that ran for two days wrote 20,000 events (7.8 MB) to its file. The file lives as long as the session, and a relaunch of Workdeck decodes all of it.
+
+- When the part of a session's file Workdeck has read exceeds 1 MB, Workdeck rewrites the file with about its newest 500 KB of events. Older events are kept only where they still shape the session: the latest `SessionStart` (not `compact`), the event that first reported the current process (`pidSince`), the events that set the current status (`since`) and started the current work (`workStartedAt`, while busy), and each running agent's `SubagentStart` and latest event. A relaunch rebuilds the same status, project, process, running agents and their current actions; step counts restart from the kept events.
+- The state in memory is not touched: the store moves its read offset to the trimmed file and keeps reading appends from there. Lines appended since the last read are always kept.
+- `workdeck-hook` appends under an exclusive `flock` on the file, and the trim rewrites the file in place while holding the same lock, so no event is lost or split. If the lock cannot be taken the hook writes anyway.
+- Each trim is logged: `<project> (<id>): trimmed its event file from N KB to M KB`.
