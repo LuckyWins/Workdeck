@@ -42,6 +42,10 @@ struct LimitsTextTests {
         let usage = window(.fiveHour, 81, resetsIn: 2 * 3600)
         #expect(LimitsText.alertTitle(.threshold(usage, threshold: 80)) == "5-hour limit at 80%")
         #expect(LimitsText.alertSubtitle(.threshold(usage, threshold: 80), now: fixedNow, calendar: utc) == "Resets at 14:00")
+        let overnight = window(.fiveHour, 81, resetsIn: 14 * 3600)
+        #expect(LimitsText.alertSubtitle(.threshold(overnight, threshold: 80), now: fixedNow, calendar: utc) == "Resets tomorrow 02:00")
+        let later = window(.sevenDay, 81, resetsIn: 3 * 86_400)
+        #expect(LimitsText.alertSubtitle(.threshold(later, threshold: 80), now: fixedNow, calendar: utc) == "Resets Thu 12:00")
         #expect(LimitsText.alertTitle(.reset(.sevenDay)) == "Weekly limit reset")
         #expect(LimitsText.alertSubtitle(.reset(.sevenDay), now: fixedNow, calendar: utc) == nil)
     }

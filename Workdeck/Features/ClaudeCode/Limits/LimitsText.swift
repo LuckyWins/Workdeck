@@ -26,18 +26,25 @@ nonisolated enum LimitsText {
     /// For a window that is not running: it begins with the next Claude Code message.
     static let notStartedText = "starts with your next message"
 
-    /// "runs out ~16:40" within a day, otherwise "runs out ~Wed 12:00".
+    /// "runs out ~16:40" today, "runs out ~tomorrow 09:00", otherwise "runs out ~Wed 12:00".
     static func forecastText(_ date: Date, now: Date, calendar: Calendar = .current) -> String {
         "runs out ~\(clockText(date, now: now, calendar: calendar))"
     }
 
-    /// "resets 18:00" within a day, otherwise "resets Thu 09:00"; shown next to a forecast.
+    /// "resets 18:00" today, "resets tomorrow 09:00", otherwise "resets Thu 09:00"; shown next to a forecast.
     static func resetClockText(_ resetsAt: Date, now: Date, calendar: Calendar = .current) -> String {
         "resets \(clockText(resetsAt, now: now, calendar: calendar))"
     }
 
+    /// The time alone only for today: a time tomorrow, less than a day away, would read as a time that has passed.
     private static func clockText(_ date: Date, now: Date, calendar: Calendar) -> String {
-        formatted(date, date.timeIntervalSince(now) < 24 * 60 * 60 ? "HH:mm" : "EEE HH:mm", calendar: calendar)
+        if calendar.isDate(date, inSameDayAs: now) {
+            return formatted(date, "HH:mm", calendar: calendar)
+        }
+        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now), calendar.isDate(date, inSameDayAs: tomorrow) {
+            return "tomorrow " + formatted(date, "HH:mm", calendar: calendar)
+        }
+        return formatted(date, "EEE HH:mm", calendar: calendar)
     }
 
     static func ageText(_ age: TimeInterval) -> String {
@@ -66,8 +73,8 @@ nonisolated enum LimitsText {
     static func alertSubtitle(_ alert: LimitsAlert, now: Date, calendar: Calendar = .current) -> String? {
         switch alert {
         case let .threshold(window, _):
-            let format = window.resetsAt.timeIntervalSince(now) < 24 * 60 * 60 ? "HH:mm" : "EEE HH:mm"
-            return "Resets at \(formatted(window.resetsAt, format, calendar: calendar))"
+            let today = calendar.isDate(window.resetsAt, inSameDayAs: now)
+            return "Resets \(today ? "at " : "")\(clockText(window.resetsAt, now: now, calendar: calendar))"
         case .reset:
             return nil
         case let .sessionFinished(_, worked):

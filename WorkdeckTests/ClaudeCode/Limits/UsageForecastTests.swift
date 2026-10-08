@@ -54,10 +54,13 @@ struct LimitsForecastTextTests {
     @Test func forecastText() {
         #expect(LimitsText.forecastText(fixedNow.addingTimeInterval(4 * 3600 + 40 * 60), now: fixedNow, calendar: utc) == "runs out ~16:40")
         #expect(LimitsText.forecastText(fixedNow.addingTimeInterval(2 * 86_400), now: fixedNow, calendar: utc) == "runs out ~Wed 12:00")
+        // Tomorrow, less than a day away: the time alone would read as today. Later days show the weekday.
+        #expect(LimitsText.forecastText(fixedNow.addingTimeInterval(23 * 3600), now: fixedNow, calendar: utc) == "runs out ~tomorrow 11:00")
     }
 
     @Test func resetClockText() {
         #expect(LimitsText.resetClockText(fixedNow.addingTimeInterval(6 * 3600), now: fixedNow, calendar: utc) == "resets 18:00")
+        #expect(LimitsText.resetClockText(fixedNow.addingTimeInterval(13 * 3600), now: fixedNow, calendar: utc) == "resets tomorrow 01:00")
         #expect(LimitsText.resetClockText(fixedNow.addingTimeInterval(3 * 86_400 - 3 * 3600), now: fixedNow, calendar: utc) == "resets Thu 09:00")
     }
 }

@@ -312,7 +312,7 @@ The footers stay; the API footnote drops "macOS will ask for Keychain access —
 - `UsageForecast.exhaustion(window:now:) -> Date?` (pure, `nonisolated`), the same for both windows: rate = percent / (now − window start), where window start = `resetsAt − duration`; exhaustion = now + (100 − percent) / rate, returned only when it is before `resetsAt`. `nil` when the window is at 0 % or at 100 % or more, has expired, or started less than 15 minutes (5-hour) or 6 hours (weekly) ago.
 - Simplified after the first implementation: an earlier version used the last hour's rate for the 5-hour window, kept in an in-memory history; the user chose the single average-rate formula instead.
 - `refresh()` computes forecasts only when `showForecast` is on and passes them in `LimitsViewState` (per window kind).
-- Expanded notch only: a window with a forecast shows "runs out ~16:40 · resets 18:00" in place of the reset text, with "runs out ~16:40" in orange. Times use the reset text's format: `HH:mm` within a day, otherwise `EEE HH:mm`. Nothing changes when the limit lasts until the reset.
+- Expanded notch only: a window with a forecast shows "runs out ~16:40 · resets 18:00" in place of the reset text, with "runs out ~16:40" in orange. Times are `HH:mm` for today, `tomorrow HH:mm` for tomorrow, otherwise `EEE HH:mm` (amended 2026-10-08: "within a day" showed a time tomorrow as if it were today). The threshold alert follows the same rule: "Resets at 14:00", "Resets tomorrow 02:00", "Resets Thu 12:00". The reset column (`↺ 2h 42m`, `↺ Sat 13:59`) is unchanged. Nothing changes when the limit lasts until the reset.
 
 ### 11.6 Testing
 
