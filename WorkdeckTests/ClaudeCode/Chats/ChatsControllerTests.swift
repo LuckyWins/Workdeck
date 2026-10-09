@@ -44,11 +44,11 @@ struct ChatsControllerTests {
     let defaults = UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!
     var project: URL { home.appending(path: "project") }
 
-    private func makeChat(_ id: String = "c1", title: String = "Fix login", modified: Date = fixedNow, in projectName: String = "project") throws {
+    private func makeChat(_ id: String = "c1", title: String = "Fix login", modified: Date = fixedNow, in projectName: String = "project", configFolder: String = ".claude") throws {
         let project = home.appending(path: projectName)
         let projectName = projectName.replacingOccurrences(of: "/", with: "-")
         try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
-        let folder = home.appending(path: ".claude/projects/-\(projectName)")
+        let folder = home.appending(path: "\(configFolder)/projects/-\(projectName)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let url = folder.appending(path: "\(id).jsonl")
         let user = String(data: try JSONSerialization.data(withJSONObject: ["type": "user", "cwd": project.path]), encoding: .utf8)!
@@ -56,14 +56,14 @@ struct ChatsControllerTests {
         try FileManager.default.setAttributes([.modificationDate: modified], ofItemAtPath: url.path)
     }
 
-    private func makeController(launcher: FakeTerminalLauncher, live: [ClaudeSession] = []) async -> ChatsController {
+    private func makeController(launcher: FakeTerminalLauncher, live: [ClaudeSession] = [], now: @escaping () -> Date = { fixedNow }) async -> ChatsController {
         let instances = ClaudeInstancesController(
             store: ClaudeInstanceStore(defaults: defaults, home: home),
             aliasFile: ShellAliasFile(url: home.appending(path: ".zshrc")),
             launcher: FakeTerminalLauncher()
         )
         await instances.add(named: "work")
-        let controller = ChatsController(instances: instances, index: ChatIndex(), launcher: launcher, liveSessions: { live }, vscode: vscode, vscodeWorkspaces: home.appending(path: "vscode"), defaults: defaults, now: { fixedNow })
+        let controller = ChatsController(instances: instances, index: ChatIndex(), launcher: launcher, liveSessions: { live }, vscode: vscode, vscodeWorkspaces: home.appending(path: "vscode"), defaults: defaults, now: now)
         await controller.reload()
         return controller
     }
@@ -301,6 +301,107 @@ struct ChatsControllerTests {
         await controller.reload()
         await controller.openInVSCode(try #require(controller.chats.first), in: try #require(controller.instances.instances.first))
         #expect(controller.actionError == "Couldn’t open VS Code.")
+    }
+
+    @Test func accountFilterShowsOwnAndLinkedChats() async throws {
+        try makeChat("m1", in: "alpha")
+        try makeChat("m2", modified: fixedNow.addingTimeInterval(-60), in: "beta")
+        try makeChat("w1", modified: fixedNow.addingTimeInterval(-120), in: "alpha", configFolder: ".claude-work")
+        let controller = await makeController(launcher: FakeTerminalLauncher())
+        #expect(controller.showsAccountFilter)
+        let work = try #require(controller.instances.instances.last)
+        await controller.link(try #require(controller.chats.first { $0.id == "m2" }), into: work)
+        controller.toggleAccount("work")
+        #expect(controller.selectedAccount == "work")
+        #expect(controller.groups.flatMap(\.chats).map(\.id) == ["m2", "w1"])
+        #expect(controller.projectChips.map(\.title) == ["beta", "alpha"])
+        controller.toggleAccount("main")
+        #expect(controller.groups.flatMap(\.chats).map(\.id).sorted() == ["m1", "m2"])
+        let reopened = await makeController(launcher: FakeTerminalLauncher())
+        #expect(reopened.selectedAccount == "main")
+        reopened.toggleAccount("main")
+        #expect(reopened.selectedAccount == nil)
+        #expect(reopened.groups.flatMap(\.chats).count == 3)
+    }
+
+    @Test func anUnknownAccountFiltersNothing() async throws {
+        try makeChat("m1")
+        let controller = await makeController(launcher: FakeTerminalLauncher())
+        controller.toggleAccount("gone")
+        #expect(controller.groups.flatMap(\.chats).map(\.id) == ["m1"])
+    }
+
+    @Test func theDefaultBelongsToTheProject() async throws {
+        try makeChat("a1", in: "alpha")
+        try makeChat("a2", modified: fixedNow.addingTimeInterval(-60), in: "alpha")
+        try makeChat("b1", modified: fixedNow.addingTimeInterval(-120), in: "beta")
+        let controller = await makeController(launcher: FakeTerminalLauncher())
+        let work = try #require(controller.instances.instances.last)
+        let a1 = try #require(controller.chats.first { $0.id == "a1" })
+        #expect(controller.defaultAccount(for: a1) == nil)
+        controller.setDefaultAccount("work", for: a1)
+        #expect(controller.defaultAccount(for: try #require(controller.chats.first { $0.id == "a2" })) == work)
+        #expect(controller.defaultAccount(for: try #require(controller.chats.first { $0.id == "b1" })) == nil)
+        let reopened = await makeController(launcher: FakeTerminalLauncher())
+        #expect(reopened.defaultAccount(for: a1)?.name == "work")
+        reopened.setDefaultAccount(nil, for: a1)
+        #expect(reopened.defaultAccount(for: a1) == nil)
+        #expect(defaults.dictionary(forKey: ChatsController.defaultAccountsKey)?.isEmpty ?? true)
+    }
+
+    @Test func aDefaultForAMissingInstanceIsIgnored() async throws {
+        try makeChat()
+        defaults.set(["-project": "gone"], forKey: ChatsController.defaultAccountsKey)
+        let controller = await makeController(launcher: FakeTerminalLauncher())
+        let chat = try #require(controller.chats.first)
+        #expect(chat.projectDirectoryName == "-project")
+        #expect(controller.defaultAccount(for: chat) == nil)
+        #expect(controller.defaultAccounts == ["-project": "gone"])
+    }
+
+    @Test func aDefaultStillWarnsForALiveChat() async throws {
+        try makeChat()
+        let launcher = FakeTerminalLauncher()
+        let controller = await makeController(launcher: launcher, live: [ClaudeSession(id: "c1", status: .idle, since: fixedNow, lastEventAt: fixedNow)])
+        let chat = try #require(controller.chats.first)
+        controller.setDefaultAccount("work", for: chat)
+        await controller.continueChat(chat, in: try #require(controller.defaultAccount(for: chat)))
+        #expect(controller.pendingContinue?.target.name == "work")
+        #expect(launcher.commands.isEmpty)
+    }
+
+    @Test func oneInstanceHasNoDefaultMenu() async throws {
+        let controller = await makeController(launcher: FakeTerminalLauncher())
+        #expect(controller.showsDefaultAccountMenu)
+        controller.instances.remove(try #require(controller.instances.instances.last))
+        #expect(!controller.showsDefaultAccountMenu)
+    }
+
+    @Test func focusingAChatHiddenByTheAccountFilterClearsIt() async throws {
+        try makeChat("m1", in: "alpha")
+        try makeChat("w1", modified: fixedNow.addingTimeInterval(-60), in: "beta", configFolder: ".claude-work")
+        let controller = await makeController(launcher: FakeTerminalLauncher())
+        controller.toggleAccount("work")
+        await controller.focus(onChat: "w1")
+        #expect(controller.selectedAccount == "work")
+        await controller.focus(onChat: "m1")
+        #expect(controller.selectedAccount == nil)
+        #expect(controller.visibleProject == "-alpha")
+    }
+
+    @Test func aRepeatedOpenRightAfterTheFirstIsIgnored() async throws {
+        try makeChat()
+        var clock = fixedNow
+        let launcher = FakeTerminalLauncher()
+        let controller = await makeController(launcher: launcher, now: { clock })
+        let chat = try #require(controller.chats.first)
+        let work = try #require(controller.instances.instances.last)
+        await controller.continueChat(chat, in: work)
+        await controller.continueChat(try #require(controller.chats.first), in: work)
+        #expect(launcher.commands.count == 1)
+        clock = fixedNow.addingTimeInterval(ChatsController.repeatOpenInterval)
+        await controller.continueChat(try #require(controller.chats.first), in: work)
+        #expect(launcher.commands.count == 2)
     }
 
     @Test func aMissingProjectFolderCannotBeOpened() async throws {

@@ -42,12 +42,24 @@ final class ChatsController {
 
     static let recentPeriod: TimeInterval = 30 * 24 * 60 * 60
     static let selectedProjectKey = "claudeChats.selectedProject"
+    static let selectedAccountKey = "claudeChats.selectedAccount"
+    static let defaultAccountsKey = "claudeChats.defaultAccounts"
+    /// A second open of the same chat sooner than this is a double click, not a request: two `claude --resume` would write to one transcript.
+    static let repeatOpenInterval: TimeInterval = 2
 
     var search = ""
     var period = Period.lastMonth
     /// The project directory name of the chip the user picked; `nil` is All. Remembered between launches.
     var selectedProject: String? {
         didSet { defaults.set(selectedProject, forKey: Self.selectedProjectKey) }
+    }
+    /// The account chip the user picked; `nil` shows every account. Remembered between launches.
+    private(set) var selectedAccount: String? {
+        didSet { defaults.set(selectedAccount, forKey: Self.selectedAccountKey) }
+    }
+    /// The account each project opens on without asking: project directory name → instance name (spec §15).
+    private(set) var defaultAccounts: [String: String] {
+        didSet { defaults.set(defaultAccounts, forKey: Self.defaultAccountsKey) }
     }
     private(set) var chats: [ChatSummary] = []
     private(set) var isLoading = false
@@ -67,6 +79,8 @@ final class ChatsController {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let linkStore: ChatLinkStore
     @ObservationIgnored private let now: () -> Date
+    /// The chat opened last and when, to drop a double click's second open.
+    @ObservationIgnored private var lastOpen: (id: String, at: Date)?
 
     init(
         instances: ClaudeInstancesController,
@@ -88,12 +102,19 @@ final class ChatsController {
         linkStore = ChatLinkStore(defaults: defaults)
         self.now = now
         selectedProject = defaults.string(forKey: Self.selectedProjectKey)
+        selectedAccount = defaults.string(forKey: Self.selectedAccountKey)
+        defaultAccounts = defaults.dictionary(forKey: Self.defaultAccountsKey) as? [String: String] ?? [:]
     }
 
     /// Opens on a chat's project, e.g. the latest session of an account at its limit; All without one.
     func focus(onChat id: String?) async {
         await reload()
-        selectedProject = id.flatMap { id in chats.first { $0.id == id }?.projectDirectoryName }
+        let chat = id.flatMap { id in chats.first { $0.id == id } }
+        // A remembered account filter must not hide the chat the user was sent to.
+        if let chat, let account = selectedAccount, chat.owner != account, !chat.linkedInto.contains(account) {
+            selectedAccount = nil
+        }
+        selectedProject = chat?.projectDirectoryName
     }
 
     func reload() async {
@@ -179,10 +200,39 @@ final class ChatsController {
         return titles
     }
 
+    /// Account chips are shown once there is more than one account to tell apart.
+    var showsAccountFilter: Bool {
+        instances.instances.count > 1
+    }
+
+    /// Selects an account's chips, or clears the filter when it is already selected.
+    func toggleAccount(_ name: String) {
+        selectedAccount = selectedAccount == name ? nil : name
+    }
+
+    var showsDefaultAccountMenu: Bool {
+        instances.instances.count > 1
+    }
+
+    /// The account the chat's project opens on without asking; `nil` without one or when that instance is gone.
+    func defaultAccount(for chat: ChatSummary) -> ClaudeInstance? {
+        defaultAccounts[chat.projectDirectoryName].flatMap { name in instances.instances.first { $0.name == name } }
+    }
+
+    /// Sets the project's default account; `nil` asks each time again.
+    func setDefaultAccount(_ name: String?, for chat: ChatSummary) {
+        defaultAccounts[chat.projectDirectoryName] = name
+    }
+
+    /// Chats in the period that the selected account can open: its own and those linked into it. An account that
+    /// no longer exists filters nothing.
     private var periodChats: [ChatSummary] {
-        guard period == .lastMonth else { return chats }
         let cutoff = now().addingTimeInterval(-Self.recentPeriod)
-        return chats.filter { $0.modifiedAt >= cutoff }
+        let account = selectedAccount.flatMap { name in instances.instances.contains { $0.name == name } ? name : nil }
+        return chats.filter { chat in
+            (period == .all || chat.modifiedAt >= cutoff)
+                && (account.map { chat.owner == $0 || chat.linkedInto.contains($0) } ?? true)
+        }
     }
 
     func liveSession(of chat: ChatSummary) -> ClaudeSession? {
@@ -209,6 +259,9 @@ final class ChatsController {
     /// Continues the chat in `target`: links it when `target` is not the owner, then opens Terminal. A chat that is
     /// open now waits for `confirm(_:)`.
     func continueChat(_ chat: ChatSummary, in target: ClaudeInstance, destination: Destination = .terminal) async {
+        if let lastOpen, lastOpen.id == chat.id, now().timeIntervalSince(lastOpen.at) < Self.repeatOpenInterval {
+            return
+        }
         if let session = liveSession(of: chat) {
             pendingContinue = PendingContinue(chat: chat, target: target, hostName: ChatsText.hostName(of: session), destination: destination)
             return
@@ -264,6 +317,7 @@ final class ChatsController {
     private func perform(_ chat: ChatSummary, in target: ClaudeInstance, destination: Destination) async {
         actionError = nil
         guard let owner = owner(of: chat), let cwd = chat.cwd else { return }
+        lastOpen = (chat.id, now())
         if target != owner {
             do {
                 try ChatLinker.link(chat, from: owner, into: target)

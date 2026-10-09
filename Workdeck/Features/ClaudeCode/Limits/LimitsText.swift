@@ -62,8 +62,10 @@ nonisolated enum LimitsText {
         switch alert {
         case let .threshold(window, threshold, _):
             return "\(window.kind.title) limit at \(threshold)%" + suffix
-        case let .reset(kind, _):
-            return "\(kind.title) limit reset" + suffix
+        case let .reset(kinds, _):
+            // "5-hour limit reset", "5-hour and weekly limits reset".
+            let names = kinds.enumerated().map { $0.offset == 0 ? $0.element.title : $0.element.title.lowercased() }
+            return names.joined(separator: " and ") + (kinds.count > 1 ? " limits reset" : " limit reset") + suffix
         case let .sessionFinished(project, _):
             return "\(project) finished"
         case let .sessionNeedsYou(project):
@@ -77,7 +79,7 @@ nonisolated enum LimitsText {
             let today = calendar.isDate(window.resetsAt, inSameDayAs: now)
             return "Resets \(today ? "at " : "")\(clockText(window.resetsAt, now: now, calendar: calendar))"
         case .reset:
-            return nil
+            return "back to 0%"
         case let .sessionFinished(_, worked):
             return "worked \(SessionsText.duration(from: now.addingTimeInterval(-worked), to: now))"
         case .sessionNeedsYou:

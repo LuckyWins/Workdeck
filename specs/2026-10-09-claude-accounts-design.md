@@ -148,3 +148,8 @@ Probed on 2026-10-09 with Claude Code 2.1.289:
 
 1. **Keychain item name.** The user listed the generic password service names (names only): `Claude Code-credentials`, `Claude Code-credentials-e24fc4e6` and `Claude Code-credentials-6cccec2c`. The first 8 hex digits of the SHA-256 of `/Users/andreu/.claude-personal` are `e24fc4e6`, and `security find-generic-password -s "Claude Code-credentials-e24fc4e6"` (attributes only) exits 0. Rule: the default folder uses the plain name; another `CLAUDE_CONFIG_DIR` adds `-` and the first 8 hex digits of the SHA-256 of its path. The third item belongs to some other configuration folder used on this Mac and is not read.
 2. **Status line input and `--instance` hook** were not probed by hand: the first launch of the build reconciles `~/.claude-personal`, so the manual checklist rows A1–A3 check both on the real account.
+
+## 11. Amendment: Reset Alert (2026-10-09)
+
+- When one check finds several windows of one account reset, they make one alert instead of one per window: `5-hour and weekly limits reset`, subtitle `back to 0%`. A single window reads `5-hour limit reset` (or `Weekly limit reset`), subtitle `back to 0%`.
+- The rule for when a reset alerts is unchanged: the window was at or above the first threshold before it reset, and "Notify when a limit resets" is on. The account suffix (`· main`), the click and the batching of alerts from different accounts are unchanged.

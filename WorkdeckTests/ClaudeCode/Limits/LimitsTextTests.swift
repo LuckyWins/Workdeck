@@ -46,8 +46,10 @@ struct LimitsTextTests {
         #expect(LimitsText.alertSubtitle(.threshold(overnight, threshold: 80), now: fixedNow, calendar: utc) == "Resets tomorrow 02:00")
         let later = window(.sevenDay, 81, resetsIn: 3 * 86_400)
         #expect(LimitsText.alertSubtitle(.threshold(later, threshold: 80), now: fixedNow, calendar: utc) == "Resets Thu 12:00")
-        #expect(LimitsText.alertTitle(.reset(.sevenDay)) == "Weekly limit reset")
-        #expect(LimitsText.alertSubtitle(.reset(.sevenDay), now: fixedNow, calendar: utc) == nil)
+        #expect(LimitsText.alertTitle(.reset([.sevenDay])) == "Weekly limit reset")
+        #expect(LimitsText.alertSubtitle(.reset([.sevenDay]), now: fixedNow, calendar: utc) == "back to 0%")
+        #expect(LimitsText.alertTitle(.reset([.fiveHour, .sevenDay])) == "5-hour and weekly limits reset")
+        #expect(LimitsText.alertSubtitle(.reset([.fiveHour, .sevenDay]), now: fixedNow, calendar: utc) == "back to 0%")
     }
 
     @Test func rowSubtitleStates() {
@@ -82,7 +84,7 @@ struct LimitsTextTests {
         #expect(LimitsText.alertSubtitle(needsYou, now: fixedNow, calendar: utc) == "permission prompt")
         #expect(LimitsText.alertSymbol(finished) == "✓")
         #expect(LimitsText.alertSymbol(needsYou) == "!")
-        #expect(LimitsText.alertSymbol(.reset(.fiveHour)) == "✓")
+        #expect(LimitsText.alertSymbol(.reset([.fiveHour])) == "✓")
         #expect(LimitsText.alertSymbol(.threshold(window(.fiveHour, 80), threshold: 80)) == "!")
     }
 
@@ -95,12 +97,12 @@ struct LimitsTextTests {
         #expect(LimitsText.batchTitle([finishedA, waiting]) == "2 alerts")
         #expect(LimitsText.batchLine(finishedA, now: fixedNow) == "vitastir  worked 3m")
         #expect(LimitsText.batchLine(waiting, now: fixedNow) == "pokemon  needs you")
-        #expect(LimitsText.batchLine(.reset(.sevenDay), now: fixedNow) == "Weekly limit reset")
+        #expect(LimitsText.batchLine(.reset([.sevenDay]), now: fixedNow) == "Weekly limit reset")
     }
 
     @Test func onlySessionAlertsOpenAProject() {
         #expect(LimitsText.alertProject(.sessionFinished(project: "vitastir", worked: 60)) == "vitastir")
         #expect(LimitsText.alertProject(.sessionNeedsYou(project: "Workdeck")) == "Workdeck")
-        #expect(LimitsText.alertProject(.reset(.fiveHour)) == nil)
+        #expect(LimitsText.alertProject(.reset([.fiveHour])) == nil)
     }
 }

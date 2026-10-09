@@ -49,7 +49,7 @@ Watch the snapshot with `cat ~/Library/Application\ Support/Workdeck/claude-usag
 | L6 | Only near limits | Set Show to "Only near limits" with usage below the first threshold. | Notch disappears completely (no empty pill); an alert from L5 still pops and hides again. |
 | L7 | Lid closed | Connect an external display, close the lid. | Usage text appears next to the Workdeck icon; at or above the first threshold the icon becomes a warning triangle. Opening the lid brings the notch back. |
 | L8 | Existing status line | With your own `statusLine` set, connect. | Claude Code shows `5h N% · <your output>`; Disconnect restores your original `statusLine` exactly. |
-| L9 | Reset alert | Wait for (or simulate by editing `resets_at` in the snapshot to the past) a window that was above the first threshold. | "5-hour limit reset" appears once when "Notify when a limit resets" is on; nothing when it is off. |
+| L9 | Reset alert | Wait for (or simulate by editing `resets_at` in the snapshot to the past) a window that was above the first threshold. | "5-hour limit reset" with "back to 0%" appears once when "Notify when a limit resets" is on; when both windows were above the first threshold and reset at one check, one "5-hour and weekly limits reset" appears; nothing when the setting is off. |
 | L10 | Moved app | Connect from the Xcode build, then run `make install` and launch from `/Applications`. | `statusLine` command is updated to the `/Applications` path on launch. |
 | L11 | Quick pass over the notch | Brush the pointer quickly across the compact notch on the way to the menu bar, several times. | The notch never stays expanded after the pointer has left. |
 | L12 | External display as main | With the lid open, make an external display the main display (Displays settings), then change its resolution or sleep/wake. | The compact notch stays on the built-in screen; no black pill appears on the external display. |
@@ -100,6 +100,7 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | C5 | Unlink and remove | Unlink the chat from work (confirm the alert); then Settings → Remove… work. | The link is gone from `~/.claude-work/projects/…` and the original transcript is untouched; the alias line is gone from `~/.zshrc`; `~/.claude-work` stays. |
 | C6 | Unusual paths | Continue a chat whose project folder name has spaces or quotes; add an instance while `~/.zshrc` is a symbolic link (dotfiles). | Terminal opens in the right folder; the alias is written into the linked file and the link stays. |
 | C7 | Open in VS Code | Follow Settings → Instances → personal → VS Code…; then in Chats use VS Code → personal on a main chat. | The project opens in a window of the `Claude personal` profile; the Claude panel's history lists the chat and `/status` shows the second account; other VS Code windows stay on the main account. |
+| C8 | Default account | Chats → hover a chat → `…` → Default Account → personal; click Terminal, then VS Code; then set Ask Each Time. | With personal set, both buttons open on personal at once and their help names it; another project still asks; after Ask Each Time the chooser returns. |
 
 ## Claude Code Accounts Checklist
 

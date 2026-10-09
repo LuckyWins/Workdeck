@@ -101,9 +101,9 @@ struct NotchPresenterTests {
     func alertExpandsThenReturnsToRestingState() async throws {
         let (presenter, _) = makePresenter()
         presenter.show(state(.hidden))
-        presenter.present(.reset(.fiveHour))
+        presenter.present(.reset([.fiveHour]))
         await settle(presenter)
-        #expect(surface.alertsAtExpand == [.reset(.fiveHour)])
+        #expect(surface.alertsAtExpand == [.reset([.fiveHour])])
         #expect(presenter.appliedTarget == .hidden)
         #expect(surface.calls == ["expand", "hide"])
         #expect(presenter.model.alert == nil)
@@ -131,7 +131,7 @@ struct NotchPresenterTests {
 
     @Test func noScreenMeansNoAlert() async {
         let (presenter, created) = makePresenter(screen: nil)
-        presenter.present(.reset(.sevenDay))
+        presenter.present(.reset([.sevenDay]))
         await settle(presenter)
         #expect(created() == 0)
     }
@@ -165,12 +165,12 @@ struct NotchPresenterTests {
     @Test(.timeLimit(.minutes(1)))
     func anAlertArrivingDuringAnotherJoinsIt() async throws {
         let (presenter, _) = makePresenter(alertDuration: .seconds(1))
-        presenter.present(.reset(.fiveHour))
+        presenter.present(.reset([.fiveHour]))
         while surface.batchesAtExpand.isEmpty {
             try await Task.sleep(for: .milliseconds(5))
         }
         presenter.present(.sessionNeedsYou(project: "pokemon"))
-        #expect(presenter.model.alerts == [.reset(.fiveHour), .sessionNeedsYou(project: "pokemon")])
+        #expect(presenter.model.alerts == [.reset([.fiveHour]), .sessionNeedsYou(project: "pokemon")])
         await settle(presenter)
         #expect(surface.calls.filter { $0 == "expand" }.count == 1)
         #expect(presenter.model.alerts.isEmpty)

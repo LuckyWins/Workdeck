@@ -60,7 +60,7 @@ struct LimitsAlertPolicyTests {
 
     @Test func resetAfterReachingFirstThreshold() {
         let result = evaluate(previous: [window(.fiveHour, 85, resetsIn: 0)], current: [])
-        #expect(result.alerts == [.reset(.fiveHour)])
+        #expect(result.alerts == [.reset([.fiveHour])])
     }
 
     @Test func windowMissingBeforeItsResetIsNotAReset() {
@@ -71,7 +71,30 @@ struct LimitsAlertPolicyTests {
 
     @Test func resetWithNewPeriodData() {
         let result = evaluate(previous: [window(.fiveHour, 85)], current: [window(.fiveHour, 2, resetsIn: 5 * 3600)])
-        #expect(result.alerts == [.reset(.fiveHour)])
+        #expect(result.alerts == [.reset([.fiveHour])])
+    }
+
+    @Test func bothWindowsResetMakeOneAlert() {
+        let result = evaluate(
+            previous: [window(.sevenDay, 90, resetsIn: 0), window(.fiveHour, 85, resetsIn: 0)],
+            current: []
+        )
+        #expect(result.alerts == [.reset([.fiveHour, .sevenDay])])
+    }
+
+    @Test func onlyWindowsAboveTheThresholdJoinTheReset() {
+        let result = evaluate(
+            previous: [window(.fiveHour, 85, resetsIn: 0), window(.sevenDay, 40, resetsIn: 0)],
+            current: []
+        )
+        #expect(result.alerts == [.reset([.fiveHour])])
+    }
+
+    @MainActor @Test func bothWindowsResetLabeledWithAccount() {
+        let alert = LimitsAlert.reset([.fiveHour, .sevenDay]).forAccount("personal")
+        #expect(alert == .reset([.fiveHour, .sevenDay], account: "personal"))
+        #expect(LimitsText.alertAccount(alert) == "personal")
+        #expect(LimitsText.alertTitle(alert, showsAccount: true) == "5-hour and weekly limits reset · personal")
     }
 
     @Test func noResetAlertBelowFirstThreshold() {

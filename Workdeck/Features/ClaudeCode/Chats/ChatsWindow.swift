@@ -72,6 +72,20 @@ struct ChatsWindow: View {
         let selected = controller.visibleProject
         return ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
+                if controller.showsAccountFilter {
+                    ForEach(controller.instances.instances) { instance in
+                        AccountChipButton(
+                            name: instance.name,
+                            tint: instance.isMain ? Color.secondary : Color.purple,
+                            isSelected: controller.selectedAccount == instance.name
+                        ) {
+                            controller.toggleAccount(instance.name)
+                        }
+                    }
+                    Divider()
+                        .frame(height: 16)
+                        .padding(.horizontal, 2)
+                }
                 ProjectChipButton(name: "All", count: chips.reduce(0) { $0 + $1.count }, isSelected: selected == nil) {
                     controller.selectedProject = nil
                 }
@@ -146,32 +160,33 @@ private struct ChatRow: View {
             }
             Spacer(minLength: 8)
             if isHovering || choosing != nil {
-                Button("Terminal") { choosing = .terminal }
+                let account = controller.defaultAccount(for: chat)
+                Button("Terminal") { open(.terminal, on: account) }
                     .disabled(!canOpen)
-                    .help("Open in Terminal as…")
+                    .help(account.map { "Open in Terminal as \($0.name)" } ?? "Open in Terminal as…")
                     .popover(isPresented: chooserBinding(.terminal), arrowEdge: .bottom) { chooser(.terminal) }
                 if controller.canOpenVSCode {
-                    Button("VS Code") { choosing = .vscode }
+                    Button("VS Code") { open(.vscode, on: account) }
                         .disabled(!canOpen)
-                        .help("Open in VS Code as…")
+                        .help(account.map { "Open in VS Code as \($0.name)" } ?? "Open in VS Code as…")
                         .popover(isPresented: chooserBinding(.vscode), arrowEdge: .bottom) { chooser(.vscode) }
                 }
-                if hasLinkActions {
+                if hasMenuActions {
                     Menu {
-                        linkActions
+                        menuActions
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
                     .menuStyle(.borderlessButton)
                     .fixedSize()
-                    .help("Links")
+                    .help("More")
                 }
             }
         }
         .padding(.vertical, 2)
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
-        .contextMenu { linkActions }
+        .contextMenu { menuActions }
         .help(canOpen ? "" : "The project folder is gone.")
         .alert(
             "Unlink from \(unlinking?.name ?? "")?",
@@ -183,6 +198,15 @@ private struct ChatRow: View {
         } message: { target in
             Text("Close this chat in \(target.name) first, or it continues there as a separate copy. The chat itself is not changed.")
         }
+    }
+
+    /// Opens on the project's default account at once; without one, asks which account.
+    private func open(_ destination: ChatsController.Destination, on account: ClaudeInstance?) {
+        guard let account else {
+            choosing = destination
+            return
+        }
+        Task { await controller.continueChat(chat, in: account, destination: destination) }
     }
 
     /// Each button anchors its own chooser, so it opens right under the button.
@@ -201,9 +225,21 @@ private struct ChatRow: View {
         }
     }
 
-    /// The `…` and context menus manage links; opening is on the Terminal and VS Code buttons.
+    /// The `…` and context menus: the project's default account, then links; opening is on the Terminal and VS Code buttons.
     @ViewBuilder
-    private var linkActions: some View {
+    private var menuActions: some View {
+        if controller.showsDefaultAccountMenu {
+            Picker("Default Account", selection: defaultAccountBinding) {
+                Text("Ask Each Time").tag(String?.none)
+                ForEach(controller.instances.instances) { instance in
+                    Text(instance.name).tag(Optional(instance.name))
+                }
+            }
+            .pickerStyle(.menu)
+            if hasLinkActions {
+                Divider()
+            }
+        }
         ForEach(controller.linkTargets(for: chat)) { target in
             Button("Link to \(target.name)") {
                 Task { await controller.link(chat, into: target) }
@@ -222,8 +258,19 @@ private struct ChatRow: View {
         }
     }
 
+    private var defaultAccountBinding: Binding<String?> {
+        Binding(
+            get: { controller.defaultAccount(for: chat)?.name },
+            set: { controller.setDefaultAccount($0, for: chat) }
+        )
+    }
+
     private var hasLinkActions: Bool {
         !controller.linkTargets(for: chat).isEmpty || !controller.linkedInstances(of: chat).isEmpty
+    }
+
+    private var hasMenuActions: Bool {
+        controller.showsDefaultAccountMenu || hasLinkActions
     }
 
 }
@@ -270,6 +317,34 @@ private struct AccountChooser: View {
         }
         .padding(8)
         .frame(minWidth: 220)
+    }
+}
+
+/// An account filter chip: a colored dot and the name, outlined while selected.
+private struct AccountChipButton: View {
+    let name: String
+    let tint: Color
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(tint)
+                    .frame(width: 7, height: 7)
+                Text(name)
+                    .lineLimit(1)
+            }
+            .font(.callout)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(isSelected ? AnyShapeStyle(tint.opacity(0.25)) : AnyShapeStyle(.quaternary), in: Capsule())
+            .overlay(Capsule().strokeBorder(isSelected ? tint : .clear, lineWidth: 1))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(isSelected ? "Show every account's chats" : "Show the chats \(name) can open")
     }
 }
 

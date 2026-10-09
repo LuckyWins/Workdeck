@@ -191,3 +191,14 @@ Observed: Claude Code lists only regular files. A chat linked with a symbolic li
 - **Split:** if a program ever rewrites one name as a new file, the two names stop sharing data. A recorded link whose file is no longer the owner's is listed on its own with an orange `split` tag; restoring the link is in `TODO.md`.
 - With links visible to VS Code, opening another account's VS Code window uses the workspace file again (§11).
 
+## 14. Amendment: Account Filter (2026-10-09)
+
+With two or more instances, the chip row starts with one chip per account (a dot colored like the account's tags: main neutral, others purple), then a divider and the project chips. Selecting an account shows the chats it can open: those it owns and those linked into it. Clicking the selected chip clears the filter. Project chips, their counts, search and the period work within the selection. The choice is remembered (`claudeChats.selectedAccount`); an account that no longer exists filters nothing. Opening the window on a chat the filter hides (a limit alert's click) clears the filter.
+
+
+## 15. Amendment: Default Account per Project (2026-10-09)
+
+- With two or more instances, a chat row's `…` menu (and its context menu) always shows, and holds a **Default Account** submenu above the link actions: `Ask Each Time`, then one item per instance; the current choice has a checkmark.
+- The choice belongs to the project (the chat's project folder name, as the project chips use), not to one chat, and is remembered in `claudeChats.defaultAccounts` (`[projectDirectoryName: instanceName]`). `Ask Each Time` removes the entry.
+- With a default set, the Terminal and VS Code buttons open the chat on that account at once, without the account chooser; their help reads "Open in Terminal as <name>" and "Open in VS Code as <name>". The warning for a chat open elsewhere (§3.3) still applies. Without a default, or when the named instance no longer exists, the buttons ask as before.
+- Removing an instance leaves its entries in place; they are ignored until an instance with that name exists again.
