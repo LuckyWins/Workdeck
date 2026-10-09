@@ -108,18 +108,15 @@ struct ChatsWindow: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if groups.isEmpty {
             ContentUnavailableView("No chats yet.", systemImage: "bubble.left.and.bubble.right")
-        } else if controller.visibleProject != nil {
-            // One project: its name is on the selected chip, so no section header.
-            List(groups.flatMap(\.chats), id: \.rowID) { chat in
-                ChatRow(chat: chat, controller: controller)
-            }
         } else {
             List {
                 ForEach(groups) { group in
-                    Section(group.title) {
+                    Section {
                         ForEach(group.chats, id: \.rowID) { chat in
                             ChatRow(chat: chat, controller: controller)
                         }
+                    } header: {
+                        ProjectHeader(group: group, controller: controller)
                     }
                 }
             }
@@ -171,22 +168,22 @@ private struct ChatRow: View {
                         .help(account.map { "Open in VS Code as \($0.name)" } ?? "Open in VS Code as…")
                         .popover(isPresented: chooserBinding(.vscode), arrowEdge: .bottom) { chooser(.vscode) }
                 }
-                if hasMenuActions {
+                if hasLinkActions {
                     Menu {
-                        menuActions
+                        linkActions
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
                     .menuStyle(.borderlessButton)
                     .fixedSize()
-                    .help("More")
+                    .help("Links")
                 }
             }
         }
         .padding(.vertical, 2)
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
-        .contextMenu { menuActions }
+        .contextMenu { linkActions }
         .help(canOpen ? "" : "The project folder is gone.")
         .alert(
             "Unlink from \(unlinking?.name ?? "")?",
@@ -225,21 +222,9 @@ private struct ChatRow: View {
         }
     }
 
-    /// The `…` and context menus: the project's default account, then links; opening is on the Terminal and VS Code buttons.
+    /// The `…` and context menus manage links; opening is on the Terminal and VS Code buttons.
     @ViewBuilder
-    private var menuActions: some View {
-        if controller.showsDefaultAccountMenu {
-            Picker("Default Account", selection: defaultAccountBinding) {
-                Text("Ask Each Time").tag(String?.none)
-                ForEach(controller.instances.instances) { instance in
-                    Text(instance.name).tag(Optional(instance.name))
-                }
-            }
-            .pickerStyle(.menu)
-            if hasLinkActions {
-                Divider()
-            }
-        }
+    private var linkActions: some View {
         ForEach(controller.linkTargets(for: chat)) { target in
             Button("Link to \(target.name)") {
                 Task { await controller.link(chat, into: target) }
@@ -258,21 +243,99 @@ private struct ChatRow: View {
         }
     }
 
-    private var defaultAccountBinding: Binding<String?> {
-        Binding(
-            get: { controller.defaultAccount(for: chat)?.name },
-            set: { controller.setDefaultAccount($0, for: chat) }
-        )
-    }
-
     private var hasLinkActions: Bool {
         !controller.linkTargets(for: chat).isEmpty || !controller.linkedInstances(of: chat).isEmpty
     }
 
-    private var hasMenuActions: Bool {
-        controller.showsDefaultAccountMenu || hasLinkActions
+}
+
+/// A project's section header: its title, and on hover a new chat in Terminal or VS Code and the default account (spec §16).
+private struct ProjectHeader: View {
+    let group: ChatsController.Group
+    let controller: ChatsController
+    @State private var isHovering = false
+    @State private var choosing: ChatsController.Destination?
+
+    var body: some View {
+        let canOpen = controller.projectFolder(of: group) != nil
+        let account = controller.defaultAccount(forProject: group.id)
+        HStack(spacing: 8) {
+            Text(group.title)
+            if let account {
+                ChatTag(text: account.name, tint: account.isMain ? .secondary : .purple)
+                    .help("Opens on \(account.name) by default")
+            }
+            Spacer(minLength: 8)
+            if isHovering || choosing != nil {
+                Button("Terminal") { open(.terminal, on: account) }
+                    .disabled(!canOpen)
+                    .help(account.map { "New chat in Terminal as \($0.name)" } ?? "New chat in Terminal as…")
+                    .popover(isPresented: chooserBinding(.terminal), arrowEdge: .bottom) { chooser(.terminal) }
+                if controller.canOpenVSCode {
+                    Button("VS Code") { open(.vscode, on: account) }
+                        .disabled(!canOpen)
+                        .help(account.map { "New chat in VS Code as \($0.name)" } ?? "New chat in VS Code as…")
+                        .popover(isPresented: chooserBinding(.vscode), arrowEdge: .bottom) { chooser(.vscode) }
+                }
+                if controller.showsDefaultAccountMenu {
+                    Menu {
+                        defaultAccountPicker
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help("Project")
+                }
+            }
+        }
+        .controlSize(.small)
+        .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
+        .contextMenu {
+            if controller.showsDefaultAccountMenu {
+                defaultAccountPicker
+            }
+        }
+        .help(canOpen ? "" : "The project folder is gone.")
     }
 
+    private var defaultAccountPicker: some View {
+        Picker("Default Account", selection: Binding(
+            get: { controller.defaultAccount(forProject: group.id)?.name },
+            set: { controller.setDefaultAccount($0, forProject: group.id) }
+        )) {
+            Text("Ask Each Time").tag(String?.none)
+            ForEach(controller.instances.instances) { instance in
+                Text(instance.name).tag(Optional(instance.name))
+            }
+        }
+        .pickerStyle(.menu)
+    }
+
+    /// Opens on the project's default account at once; without one, asks which account.
+    private func open(_ destination: ChatsController.Destination, on account: ClaudeInstance?) {
+        guard let account else {
+            choosing = destination
+            return
+        }
+        Task { await controller.newChat(in: group, on: account, destination: destination) }
+    }
+
+    private func chooserBinding(_ destination: ChatsController.Destination) -> Binding<Bool> {
+        Binding(get: { choosing == destination }, set: { if !$0, choosing == destination { choosing = nil } })
+    }
+
+    private func chooser(_ destination: ChatsController.Destination) -> some View {
+        AccountChooser(
+            title: destination == .vscode ? "New chat in VS Code as…" : "New chat in Terminal as…",
+            instances: controller.instances.instances,
+            plans: controller.instances.plans
+        ) { instance in
+            choosing = nil
+            Task { await controller.newChat(in: group, on: instance, destination: destination) }
+        }
+    }
 }
 
 /// "Open in … as…": the accounts to open a chat with, colored like their tags (main neutral, others purple).

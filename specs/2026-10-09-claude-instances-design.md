@@ -195,10 +195,23 @@ Observed: Claude Code lists only regular files. A chat linked with a symbolic li
 
 With two or more instances, the chip row starts with one chip per account (a dot colored like the account's tags: main neutral, others purple), then a divider and the project chips. Selecting an account shows the chats it can open: those it owns and those linked into it. Clicking the selected chip clears the filter. Project chips, their counts, search and the period work within the selection. The choice is remembered (`claudeChats.selectedAccount`); an account that no longer exists filters nothing. Opening the window on a chat the filter hides (a limit alert's click) clears the filter.
 
-
 ## 15. Amendment: Default Account per Project (2026-10-09)
 
-- With two or more instances, a chat row's `…` menu (and its context menu) always shows, and holds a **Default Account** submenu above the link actions: `Ask Each Time`, then one item per instance; the current choice has a checkmark.
-- The choice belongs to the project (the chat's project folder name, as the project chips use), not to one chat, and is remembered in `claudeChats.defaultAccounts` (`[projectDirectoryName: instanceName]`). `Ask Each Time` removes the entry.
-- With a default set, the Terminal and VS Code buttons open the chat on that account at once, without the account chooser; their help reads "Open in Terminal as <name>" and "Open in VS Code as <name>". The warning for a chat open elsewhere (§3.3) still applies. Without a default, or when the named instance no longer exists, the buttons ask as before.
+- The default account is set on the project, in the project header's `…` menu (§16): a **Default Account** submenu with `Ask Each Time`, then one item per instance; the current choice has a checkmark. It shows with two or more instances. A chat row's `…` menu holds only its link actions and shows only when it has some.
+- The choice belongs to the project (its project folder name, as the project chips use) and is remembered in `claudeChats.defaultAccounts` (`[projectDirectoryName: instanceName]`). `Ask Each Time` removes the entry.
+- With a default set, a chat row's Terminal and VS Code buttons open the chat on that account at once, without the account chooser; their help reads "Open in Terminal as <name>" and "Open in VS Code as <name>". The warning for a chat open elsewhere (§3.3) still applies. Without a default, or when the named instance no longer exists, the buttons ask as before.
 - Removing an instance leaves its entries in place; they are ignored until an instance with that name exists again.
+- A second open of the same chat within 2 seconds is ignored, so a double click cannot start two `claude --resume` on one transcript.
+
+## 16. Amendment: New Chat from the Project Header (2026-10-09)
+
+- Every group of chats has a header with the project's title, also when one project chip is selected (the list no longer drops the header then).
+- Hovering the header shows **Terminal**, **VS Code** and `…` at its right, like a chat row.
+  - **Terminal** opens Terminal in the project folder running the account's `claude` without `--resume`: a new chat.
+  - **VS Code** opens the project folder in the account's VS Code window, exactly as for a chat (main: the folder; another account: its workspace file and profile); the new chat starts in the Claude panel.
+  - Both use the project's default account (§15) at once; without one they ask with the account chooser titled "New chat in Terminal as…" / "New chat in VS Code as…". Their help reads "New chat in Terminal as <name>" or "New chat in Terminal as…".
+  - `…` (and the header's context menu) holds the Default Account submenu (§15).
+- With a default account set, the header shows it as a tag after the project title, colored like the account's tags (main neutral, others purple).
+- The project folder is the working directory of the group's newest chat that has one. When no chat has one, or that folder no longer exists, the buttons are disabled.
+- Nothing is linked or changed in any instance. A second new chat in the same project within 2 seconds is ignored.
+- Errors are the same as for a chat: a Terminal that cannot run the command offers it for copying; a failed VS Code launch shows "Couldn’t open VS Code."

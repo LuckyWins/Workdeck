@@ -79,8 +79,9 @@ final class ChatsController {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let linkStore: ChatLinkStore
     @ObservationIgnored private let now: () -> Date
-    /// The chat opened last and when, to drop a double click's second open.
-    @ObservationIgnored private var lastOpen: (id: String, at: Date)?
+    /// What opened last (a chat ID, or "project:" and a project directory name) and when, to drop a double click's
+    /// second open.
+    @ObservationIgnored private var lastOpen: (key: String, at: Date)?
 
     init(
         instances: ClaudeInstancesController,
@@ -214,14 +215,39 @@ final class ChatsController {
         instances.instances.count > 1
     }
 
-    /// The account the chat's project opens on without asking; `nil` without one or when that instance is gone.
-    func defaultAccount(for chat: ChatSummary) -> ClaudeInstance? {
-        defaultAccounts[chat.projectDirectoryName].flatMap { name in instances.instances.first { $0.name == name } }
+    /// The account a project opens on without asking; `nil` without one or when that instance is gone.
+    func defaultAccount(forProject id: String) -> ClaudeInstance? {
+        defaultAccounts[id].flatMap { name in instances.instances.first { $0.name == name } }
     }
 
-    /// Sets the project's default account; `nil` asks each time again.
-    func setDefaultAccount(_ name: String?, for chat: ChatSummary) {
-        defaultAccounts[chat.projectDirectoryName] = name
+    func defaultAccount(for chat: ChatSummary) -> ClaudeInstance? {
+        defaultAccount(forProject: chat.projectDirectoryName)
+    }
+
+    /// Sets a project's default account; `nil` asks each time again.
+    func setDefaultAccount(_ name: String?, forProject id: String) {
+        defaultAccounts[id] = name
+    }
+
+    /// Where a new chat in the project starts: the working directory of its newest chat with one, while it exists.
+    func projectFolder(of group: Group) -> URL? {
+        guard let chat = group.chats.first(where: { $0.cwd != nil }), chat.projectExists, let cwd = chat.cwd else { return nil }
+        return URL(filePath: cwd)
+    }
+
+    /// Starts a new chat in the project on `target`'s account: Terminal running `claude`, or its VS Code window.
+    /// Nothing is linked (spec §16).
+    func newChat(in group: Group, on target: ClaudeInstance, destination: Destination = .terminal) async {
+        actionError = nil
+        let key = "project:\(group.id)"
+        guard !isRepeatOpen(key), let folder = projectFolder(of: group) else { return }
+        lastOpen = (key, now())
+        await launch(in: folder, on: target, destination: destination, resuming: nil, subject: "new chat in \(folder.lastPathComponent)")
+    }
+
+    private func isRepeatOpen(_ key: String) -> Bool {
+        guard let lastOpen, lastOpen.key == key else { return false }
+        return now().timeIntervalSince(lastOpen.at) < Self.repeatOpenInterval
     }
 
     /// Chats in the period that the selected account can open: its own and those linked into it. An account that
@@ -259,9 +285,7 @@ final class ChatsController {
     /// Continues the chat in `target`: links it when `target` is not the owner, then opens Terminal. A chat that is
     /// open now waits for `confirm(_:)`.
     func continueChat(_ chat: ChatSummary, in target: ClaudeInstance, destination: Destination = .terminal) async {
-        if let lastOpen, lastOpen.id == chat.id, now().timeIntervalSince(lastOpen.at) < Self.repeatOpenInterval {
-            return
-        }
+        guard !isRepeatOpen(chat.id) else { return }
         if let session = liveSession(of: chat) {
             pendingContinue = PendingContinue(chat: chat, target: target, hostName: ChatsText.hostName(of: session), destination: destination)
             return
@@ -331,14 +355,21 @@ final class ChatsController {
             linkStore.add(target.name, chat.id)
             WorkdeckLog.chats.notice("Linked chat \(chat.id.prefix(8), privacy: .public) (\(chat.projectName, privacy: .public)) into \(target.name, privacy: .public)")
         }
+        await launch(in: URL(filePath: cwd), on: target, destination: destination, resuming: chat.id, subject: "chat \(chat.id.prefix(8))")
+        await reload()
+    }
+
+    /// Opens Terminal running `claude` (resuming `sessionID` when given) or VS Code on `target`'s account in `folder`.
+    /// `subject` names what opens in the log, e.g. "chat 1a2b3c4d" or "new chat in project".
+    private func launch(in folder: URL, on target: ClaudeInstance, destination: Destination, resuming sessionID: String?, subject: String) async {
         switch destination {
         case .terminal:
-            guard let command = ShellCommand.claude(target, in: URL(filePath: cwd), resuming: chat.id) else { return }
+            guard let command = ShellCommand.claude(target, in: folder, resuming: sessionID) else { return }
             if await launcher.open(command) {
-                WorkdeckLog.chats.notice("Opened Terminal for chat \(chat.id.prefix(8), privacy: .public) in \(target.name, privacy: .public)")
+                WorkdeckLog.chats.notice("Opened Terminal for \(subject, privacy: .public) in \(target.name, privacy: .public)")
             } else {
                 failedCommand = command
-                WorkdeckLog.chats.error("Could not open Terminal for chat \(chat.id.prefix(8), privacy: .public)")
+                WorkdeckLog.chats.error("Could not open Terminal for \(subject, privacy: .public)")
             }
         case .vscode:
             let vscode = self.vscode
@@ -346,17 +377,15 @@ final class ChatsController {
             do {
                 // Another account opens a workspace file: the folder may already be open in a main window, and
                 // VS Code would only bring that window forward, whatever `--profile` says.
-                let folder = profile == nil
-                    ? URL(filePath: cwd)
-                    : try VSCodeSetup.workspaceFile(for: URL(filePath: cwd), instance: target, in: vscodeWorkspaces)
-                try await Task.detached { try vscode.open(folder: folder, profile: profile) }.value
-                WorkdeckLog.chats.notice("Opened VS Code for chat \(chat.id.prefix(8), privacy: .public) in \(target.name, privacy: .public)")
+                let opened = profile == nil
+                    ? folder
+                    : try VSCodeSetup.workspaceFile(for: folder, instance: target, in: vscodeWorkspaces)
+                try await Task.detached { try vscode.open(folder: opened, profile: profile) }.value
+                WorkdeckLog.chats.notice("Opened VS Code for \(subject, privacy: .public) in \(target.name, privacy: .public)")
             } catch {
                 actionError = "Couldn’t open VS Code."
-                WorkdeckLog.chats.error("Could not open VS Code for chat \(chat.id.prefix(8), privacy: .public)")
+                WorkdeckLog.chats.error("Could not open VS Code for \(subject, privacy: .public)")
             }
         }
-        await reload()
     }
-
 }

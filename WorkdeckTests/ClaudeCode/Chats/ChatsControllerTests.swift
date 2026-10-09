@@ -339,12 +339,12 @@ struct ChatsControllerTests {
         let work = try #require(controller.instances.instances.last)
         let a1 = try #require(controller.chats.first { $0.id == "a1" })
         #expect(controller.defaultAccount(for: a1) == nil)
-        controller.setDefaultAccount("work", for: a1)
+        controller.setDefaultAccount("work", forProject: a1.projectDirectoryName)
         #expect(controller.defaultAccount(for: try #require(controller.chats.first { $0.id == "a2" })) == work)
         #expect(controller.defaultAccount(for: try #require(controller.chats.first { $0.id == "b1" })) == nil)
         let reopened = await makeController(launcher: FakeTerminalLauncher())
         #expect(reopened.defaultAccount(for: a1)?.name == "work")
-        reopened.setDefaultAccount(nil, for: a1)
+        reopened.setDefaultAccount(nil, forProject: a1.projectDirectoryName)
         #expect(reopened.defaultAccount(for: a1) == nil)
         #expect(defaults.dictionary(forKey: ChatsController.defaultAccountsKey)?.isEmpty ?? true)
     }
@@ -364,7 +364,7 @@ struct ChatsControllerTests {
         let launcher = FakeTerminalLauncher()
         let controller = await makeController(launcher: launcher, live: [ClaudeSession(id: "c1", status: .idle, since: fixedNow, lastEventAt: fixedNow)])
         let chat = try #require(controller.chats.first)
-        controller.setDefaultAccount("work", for: chat)
+        controller.setDefaultAccount("work", forProject: chat.projectDirectoryName)
         await controller.continueChat(chat, in: try #require(controller.defaultAccount(for: chat)))
         #expect(controller.pendingContinue?.target.name == "work")
         #expect(launcher.commands.isEmpty)
@@ -402,6 +402,60 @@ struct ChatsControllerTests {
         clock = fixedNow.addingTimeInterval(ChatsController.repeatOpenInterval)
         await controller.continueChat(try #require(controller.chats.first), in: work)
         #expect(launcher.commands.count == 2)
+    }
+
+    @Test func aNewChatInAProjectOpensTerminalWithoutResume() async throws {
+        try makeChat()
+        let launcher = FakeTerminalLauncher()
+        let controller = await makeController(launcher: launcher)
+        let group = try #require(controller.groups.first)
+        let work = try #require(controller.instances.instances.last)
+        #expect(controller.projectFolder(of: group) == project)
+        await controller.newChat(in: group, on: work)
+        #expect(launcher.commands == [try #require(ShellCommand.claude(work, in: project))])
+        #expect(controller.chats.first?.linkedInto == [])
+    }
+
+    @Test func aNewChatInVSCodeUsesTheAccountsWindow() async throws {
+        try makeChat()
+        var clock = fixedNow
+        let controller = await makeController(launcher: FakeTerminalLauncher(), now: { clock })
+        let group = try #require(controller.groups.first)
+        await controller.newChat(in: group, on: try #require(controller.instances.instances.first), destination: .vscode)
+        #expect(vscode.opened == ["\(project.path)|-"])
+        clock = fixedNow.addingTimeInterval(ChatsController.repeatOpenInterval)
+        await controller.newChat(in: group, on: try #require(controller.instances.instances.last), destination: .vscode)
+        #expect(vscode.opened.last?.hasSuffix("/project (work).code-workspace|Claude work") == true)
+    }
+
+    @Test func aNewChatNeedsTheProjectFolder() async throws {
+        try makeChat()
+        let launcher = FakeTerminalLauncher()
+        let controller = await makeController(launcher: launcher)
+        try FileManager.default.removeItem(at: project)
+        await controller.reload()
+        let group = try #require(controller.groups.first)
+        #expect(controller.projectFolder(of: group) == nil)
+        await controller.newChat(in: group, on: try #require(controller.instances.instances.last))
+        #expect(launcher.commands.isEmpty)
+    }
+
+    @Test func aRepeatedNewChatRightAfterTheFirstIsIgnored() async throws {
+        try makeChat()
+        var clock = fixedNow
+        let launcher = FakeTerminalLauncher()
+        let controller = await makeController(launcher: launcher, now: { clock })
+        let group = try #require(controller.groups.first)
+        let work = try #require(controller.instances.instances.last)
+        await controller.newChat(in: group, on: work)
+        await controller.newChat(in: group, on: work)
+        #expect(launcher.commands.count == 1)
+        // A chat of the same project is a different open.
+        await controller.continueChat(try #require(controller.chats.first), in: work)
+        #expect(launcher.commands.count == 2)
+        clock = fixedNow.addingTimeInterval(ChatsController.repeatOpenInterval)
+        await controller.newChat(in: group, on: work)
+        #expect(launcher.commands.count == 3)
     }
 
     @Test func aMissingProjectFolderCannotBeOpened() async throws {

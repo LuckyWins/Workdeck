@@ -100,7 +100,8 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | C5 | Unlink and remove | Unlink the chat from work (confirm the alert); then Settings → Remove… work. | The link is gone from `~/.claude-work/projects/…` and the original transcript is untouched; the alias line is gone from `~/.zshrc`; `~/.claude-work` stays. |
 | C6 | Unusual paths | Continue a chat whose project folder name has spaces or quotes; add an instance while `~/.zshrc` is a symbolic link (dotfiles). | Terminal opens in the right folder; the alias is written into the linked file and the link stays. |
 | C7 | Open in VS Code | Follow Settings → Instances → personal → VS Code…; then in Chats use VS Code → personal on a main chat. | The project opens in a window of the `Claude personal` profile; the Claude panel's history lists the chat and `/status` shows the second account; other VS Code windows stay on the main account. |
-| C8 | Default account | Chats → hover a chat → `…` → Default Account → personal; click Terminal, then VS Code; then set Ask Each Time. | With personal set, both buttons open on personal at once and their help names it; another project still asks; after Ask Each Time the chooser returns. |
+| C8 | Default account | Chats → hover a project header → `…` → Default Account → personal; click Terminal, then VS Code on one of its chats; then set Ask Each Time. | With personal set, both buttons open on personal at once and their help names it; a chat row's `…` holds only link actions; another project still asks; after Ask Each Time the chooser returns. |
+| C9 | New chat in a project | Hover a project header (also with its chip selected) → Terminal → work; then VS Code → work. | Terminal opens in the project folder running `claude` on work without `--resume`; VS Code opens the project in the `Claude work` window; no chat gets linked. With the project folder deleted, both buttons are disabled. |
 
 ## Claude Code Accounts Checklist
 
