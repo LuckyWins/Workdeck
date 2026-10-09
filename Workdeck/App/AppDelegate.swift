@@ -72,6 +72,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { await lidSleep.refresh() }
         instances.onAdded = { [unowned self] in claudeCode.instanceAdded($0) }
         instances.onRemoving = { [unowned self] in claudeCode.instanceRemoving($0) }
+        claudeCode.onOpenChats = { [unowned self] sessionID in
+            Task { await chats.focus(onChat: sessionID) }
+            WindowOpener.shared.open(ChatsWindow.id)
+        }
         claudeCode.setInstances(instances.instances)
         claudeCode.start()
 

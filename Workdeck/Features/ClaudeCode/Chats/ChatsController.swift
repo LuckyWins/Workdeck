@@ -73,6 +73,12 @@ final class ChatsController {
         selectedProject = defaults.string(forKey: Self.selectedProjectKey)
     }
 
+    /// Opens on a chat's project, e.g. the latest session of an account at its limit; All without one.
+    func focus(onChat id: String?) async {
+        await reload()
+        selectedProject = id.flatMap { id in chats.first { $0.id == id }?.projectDirectoryName }
+    }
+
     func reload() async {
         isLoading = true
         chats = await index.scan(instances.instances)

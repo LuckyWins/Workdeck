@@ -74,7 +74,7 @@ struct LimitsCompactLeading: View {
                     color: level(of: model.state).notchColor
                 )
                 .frame(width: 14, height: 14)
-                Text(LimitsPresentation.compactNotchText(pressing: model.state.pressing, hasData: model.state.hasData))
+                Text((model.state.compactLabel.map { "\($0) " } ?? "") + LimitsPresentation.compactNotchText(pressing: model.state.pressing, hasData: model.state.hasData))
                     .font(Terminal.font(12, weight: .semibold))
                     .foregroundStyle(level(of: model.state).compactTextColor)
                     .contentTransition(.numericText(value: model.state.pressing?.usedPercent ?? 0))
@@ -96,7 +96,7 @@ struct LimitsCompactTrailing: View {
 struct LimitsExpandedView: View {
     let model: LimitsNotchModel
 
-    @State private var isRefreshHovered = false
+    @State private var hoveredRefresh: String?
     /// Which alert line the pointer is over, for the clickable session alerts.
     @State private var hoveredAlert: String?
 
@@ -127,11 +127,11 @@ struct LimitsExpandedView: View {
                     Text(LimitsText.alertSymbol(alert))
                         .fontWeight(.bold)
                         .foregroundStyle(alertColor(alert))
-                    Text(LimitsText.alertTitle(alert))
+                    Text(LimitsText.alertTitle(alert, showsAccount: model.state.limitBlocks.count > 1))
                         .fontWeight(.semibold)
                     Spacer(minLength: 6)
-                    if hoveredAlert == "single", LimitsText.alertProject(alert) != nil {
-                        Text("↗ open")
+                    if hoveredAlert == "single", let hint = clickTarget(alert)?.hint {
+                        Text(hint)
                     }
                 }
                 if let subtitle = LimitsText.alertSubtitle(alert, now: model.state.now) {
@@ -142,13 +142,11 @@ struct LimitsExpandedView: View {
         }
     }
 
-    /// Session alerts open their project on click, with the same hover cues as session rows.
+    /// Session alerts open their project and limit alerts open Chats on click, with the hover cues of session rows.
     @ViewBuilder
     private func openable(_ alert: LimitsAlert, id: String, @ViewBuilder content: () -> some View) -> some View {
-        if let project = LimitsText.alertProject(alert) {
-            Button {
-                model.onActivateProject?(project)
-            } label: {
+        if let target = clickTarget(alert) {
+            Button(action: target.action) {
                 content()
                     .padding(.horizontal, 4)
                     .padding(.vertical, 2)
@@ -169,10 +167,20 @@ struct LimitsExpandedView: View {
                 }
             }
             .animation(.easeOut(duration: 0.12), value: hoveredAlert)
-            .help("Open \(project)")
+            .help(target.help)
         } else {
             content()
         }
+    }
+
+    private func clickTarget(_ alert: LimitsAlert) -> (action: () -> Void, help: String, hint: String)? {
+        if let project = LimitsText.alertProject(alert) {
+            return ({ model.onActivateProject?(project) }, "Open \(project)", "↗ open")
+        }
+        if let account = LimitsText.alertAccount(alert), let open = model.onOpenChats {
+            return ({ open(account) }, "Open Chats", "↗ chats")
+        }
+        return nil
     }
 
     /// Several alerts that arrived together: a header and one line each, at most three.
@@ -191,12 +199,12 @@ struct LimitsExpandedView: View {
                     HStack(spacing: 6) {
                         Text(LimitsText.alertSymbol(alert))
                             .foregroundStyle(alertColor(alert))
-                        Text(LimitsText.batchLine(alert, now: model.state.now))
+                        Text(LimitsText.batchLine(alert, now: model.state.now, showsAccount: model.state.limitBlocks.count > 1))
                             .lineLimit(1)
                             .truncationMode(.tail)
                         Spacer(minLength: 6)
                         if hoveredAlert == "line\(index)" {
-                            Text("↗ open")
+                            Text(clickTarget(alert)?.hint ?? "")
                         }
                     }
                 }
@@ -216,12 +224,16 @@ struct LimitsExpandedView: View {
     private var details: some View {
         VStack(alignment: .leading, spacing: 4) {
             if model.state.showsLimits {
-                TerminalHeader(title: "limits")
-                ForEach(UsageWindowKind.allCases, id: \.self) { kind in
-                    windowRow(kind)
-                }
-                if model.state.age != nil || model.state.refresh != .hidden {
-                    ageRow
+                let blocks = model.state.limitBlocks
+                ForEach(blocks) { account in
+                    TerminalHeader(title: blocks.count > 1 ? "limits · \(account.name)" : "limits")
+                        .padding(.top, account.id == blocks.first?.id ? 0 : 4)
+                    ForEach(UsageWindowKind.allCases, id: \.self) { kind in
+                        windowRow(kind, in: account)
+                    }
+                    if account.age != nil || account.refresh != .hidden {
+                        ageRow(account)
+                    }
                 }
             }
             if !model.state.sessions.rows.isEmpty {
@@ -236,9 +248,10 @@ struct LimitsExpandedView: View {
 
     /// "updated 2 min ago ↻": with the usage API on, the whole line refreshes on click.
     @ViewBuilder
-    private var ageRow: some View {
-        let age = model.state.age.map { LimitsText.ageText($0).lowercased() } ?? ""
-        switch model.state.refresh {
+    private func ageRow(_ account: AccountLimitsViewState) -> some View {
+        let age = account.age.map { LimitsText.ageText($0).lowercased() } ?? ""
+        let isRefreshHovered = hoveredRefresh == account.name
+        switch account.refresh {
         case .hidden:
             Text(age)
                 .foregroundStyle(Terminal.dim)
@@ -282,16 +295,16 @@ struct LimitsExpandedView: View {
             }
             .buttonStyle(.plain)
             .pointerStyle(.link)
-            .onHover { isRefreshHovered = $0 }
+            .onHover { hoveredRefresh = $0 ? account.name : nil }
             .animation(.easeOut(duration: 0.12), value: isRefreshHovered)
             .help("Refresh usage")
         }
     }
 
-    private func windowRow(_ kind: UsageWindowKind) -> some View {
-        let window = model.state.windows.first { $0.kind == kind }
+    private func windowRow(_ kind: UsageWindowKind, in account: AccountLimitsViewState) -> some View {
+        let window = account.windows.first { $0.kind == kind }
         let isCurrent = window.map { $0.resetsAt > model.state.now } ?? false
-        let notStarted = !isCurrent && model.state.hasData
+        let notStarted = !isCurrent && account.hasData
         let percent = isCurrent ? window?.usedPercent : (notStarted ? 0 : nil)
         let level = notStarted ? .normal : LimitsPresentation.level(of: isCurrent ? window : nil, thresholds: model.state.thresholds)
         let color = percent == nil ? Terminal.dim : level.notchColor
@@ -324,7 +337,7 @@ struct LimitsExpandedView: View {
                 Text(reset)
                     .foregroundStyle(Terminal.dim)
             }
-            if isCurrent, let forecast = model.state.forecasts[kind] {
+            if isCurrent, let forecast = account.forecasts[kind] {
                 Text("   " + LimitsText.forecastText(forecast, now: model.state.now))
                     .foregroundStyle(.orange)
             }

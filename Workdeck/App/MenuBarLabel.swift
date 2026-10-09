@@ -4,6 +4,7 @@ import SwiftUI
 struct MenuBarLabel: View {
     let lidSleep: LidSleepController
     let claudeCode: ClaudeCodeController
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         HStack(spacing: 4) {
@@ -14,6 +15,7 @@ struct MenuBarLabel: View {
             }
         }
         .accessibilityLabel("Workdeck")
+        .onAppear { WindowOpener.shared.openWindow = openWindow }
     }
 
     /// Menu bar items are rendered as templates, so threshold state is shown by the symbol rather than color.

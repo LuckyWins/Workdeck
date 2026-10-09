@@ -213,6 +213,16 @@ struct ChatsControllerTests {
         #expect(controller.groups.isEmpty)
     }
 
+    @Test func focusSelectsTheChatsProject() async throws {
+        try makeChat("a1", in: "alpha")
+        try makeChat("b1", in: "beta")
+        let controller = await makeController(launcher: FakeTerminalLauncher())
+        await controller.focus(onChat: "b1")
+        #expect(controller.selectedProject == "-beta")
+        await controller.focus(onChat: nil)
+        #expect(controller.selectedProject == nil)
+    }
+
     @Test func aMissingProjectFolderCannotBeOpened() async throws {
         try makeChat()
         let controller = await makeController(launcher: FakeTerminalLauncher())

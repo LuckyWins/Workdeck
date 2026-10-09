@@ -3,6 +3,7 @@ import SwiftUI
 
 struct InstancesSettingsSection: View {
     @Bindable var controller: ClaudeInstancesController
+    let claudeCode: ClaudeCodeController
     @Environment(\.openWindow) private var openWindow
     @State private var isAdding = false
     @State private var removing: ClaudeInstance?
@@ -77,6 +78,11 @@ struct InstancesSettingsSection: View {
                 Text(controller.accounts[instance.name].map { "Signed in as \($0)" } ?? "Not signed in")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if let summary = claudeCode.connectionSummary(for: instance) {
+                    Text(summary)
+                        .font(.caption)
+                        .foregroundStyle(summary.hasSuffix("✓") ? AnyShapeStyle(.secondary) : AnyShapeStyle(.orange))
+                }
                 if let note = controller.aliasNotes[instance.name] {
                     Text(note)
                         .font(.caption)

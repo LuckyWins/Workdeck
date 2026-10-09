@@ -36,7 +36,7 @@ struct SettingsView: View {
 
             ClaudeLimitsSettingsSection(controller: claudeCode.limits)
             ClaudeSessionsSettingsSection(controller: claudeCode.sessions)
-            InstancesSettingsSection(controller: instances)
+            InstancesSettingsSection(controller: instances, claudeCode: claudeCode)
 
             Section {
                 LabeledContent("Version", value: HelperConstants.version(of: .main))
