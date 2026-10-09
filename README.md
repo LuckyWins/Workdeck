@@ -40,6 +40,12 @@ Workdeck adds asynchronous hooks for `SessionStart`, `SessionEnd`, `UserPromptSu
 
 While a session works, its row shows what it is doing (`Bash xcodebuild -sch…`, `Read NotchPresenter.swift`), and agents show their own current step. Optional, all off by default in Settings: **Keep Mac awake while Claude works** (a standard power assertion, visible in `pmset -g assertions`; the display still sleeps and a closed lid still sleeps unless Closed-Lid Mode is on), **Notify when a session finishes** after it worked for at least the chosen time (10 minutes by default), and **Notify when a session needs you**. Alerts are skipped while that session's app is in front.
 
+#### Instances and Chats
+
+Run a second Claude Code account side by side. In Settings → Claude Code · Instances, **Add Instance…** creates `~/.claude-<name>` (its own login, settings, skills and plugins — Workdeck copies none of them), adds `alias claude-<name>='CLAUDE_CONFIG_DIR="$HOME/.claude-<name>" claude'  # Workdeck` to `~/.zshrc` (backup: `~/.zshrc.workdeck-backup`), and opens Terminal so you can `/login`. **Remove…** deletes only that alias line; the folder and its login stay.
+
+**Chats…** in the popover lists the chats of every instance by project, with their titles (read from the transcripts, shown only in the window, never stored or logged). **Continue in <instance>** links the chat's transcript into that instance with a symbolic link and opens Terminal with `claude --resume`, so a chat goes on with the other account when a plan limit runs out; both instances then share one transcript. Workdeck warns before continuing a chat that is open somewhere else: writing to it from two places corrupts it. **Unlink** removes only the link.
+
 ## Requirements
 
 - macOS 26 or later
