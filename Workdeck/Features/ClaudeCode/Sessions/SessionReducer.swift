@@ -63,6 +63,7 @@ nonisolated enum SessionReducer {
         session.entrypoint = event.entrypoint ?? session.entrypoint
         session.hostBundleID = event.hostBundleID ?? session.hostBundleID
         session.termProgram = event.termProgram ?? session.termProgram
+        session.instance = event.instance ?? session.instance
         session.lastEventAt = max(session.lastEventAt, event.time)
 
         switch event.name {

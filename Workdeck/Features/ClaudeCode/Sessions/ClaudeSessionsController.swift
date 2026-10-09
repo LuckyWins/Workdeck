@@ -17,6 +17,14 @@ final class ClaudeSessionsController {
     /// Drives the "Connect session hooks?" confirmation.
     var isConfirmingHooksConnect = false
 
+    struct InstanceHooks: Equatable {
+        var status: ClaudeConnectionStatus
+        var error: String?
+    }
+
+    /// Extra instances' hook connections, by instance name.
+    private(set) var instanceHooks: [String: InstanceHooks] = [:]
+
     /// Sessions or their settings changed; the composer redraws.
     @ObservationIgnored var onChange: (() -> Void)?
     /// Alerts to show in the notch.
@@ -27,6 +35,9 @@ final class ClaudeSessionsController {
     @ObservationIgnored private let sleepPreventer: any SleepPreventing
     @ObservationIgnored private let frontmostBundleID: @MainActor () -> String?
     @ObservationIgnored private var previousSessions: [ClaudeSession] = []
+    @ObservationIgnored private let makeHooksConnector: ((ClaudeInstance) -> any SessionHooksConnecting)?
+    @ObservationIgnored private var extraConnectors: [String: (connector: any SessionHooksConnecting, directory: URL)] = [:]
+    @ObservationIgnored private var isStarted = false
 
     init(
         settings: ClaudeCodeSettings,
@@ -34,7 +45,8 @@ final class ClaudeSessionsController {
         hooksConnector: any SessionHooksConnecting,
         activator: any WindowActivating,
         sleepPreventer: any SleepPreventing,
-        frontmostBundleID: @escaping @MainActor () -> String? = { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
+        frontmostBundleID: @escaping @MainActor () -> String? = { NSWorkspace.shared.frontmostApplication?.bundleIdentifier },
+        makeHooksConnector: ((ClaudeInstance) -> any SessionHooksConnecting)? = nil
     ) {
         self.settings = settings
         self.store = store
@@ -42,6 +54,7 @@ final class ClaudeSessionsController {
         self.activator = activator
         self.sleepPreventer = sleepPreventer
         self.frontmostBundleID = frontmostBundleID
+        self.makeHooksConnector = makeHooksConnector
     }
 
     var isHooksConnected: Bool {
@@ -54,13 +67,33 @@ final class ClaudeSessionsController {
 
     var viewState: SessionsViewState {
         guard isHooksConnected else { return .none }
-        return SessionsPresentation.viewState(sessions: store.sessions, now: store.now)
+        // Sessions of an instance Workdeck does not know (an old hook entry) are not shown.
+        let known = store.sessions.filter { $0.instance.map { extraConnectors[$0] != nil } ?? true }
+        return SessionsPresentation.viewState(sessions: known, now: store.now, showsAccounts: !extraConnectors.isEmpty)
+    }
+
+    /// The account of the session with the latest event; `nil` (main) without sessions.
+    var activeAccount: String? {
+        store.sessions.max { $0.lastEventAt < $1.lastEventAt }?.instance
+    }
+
+    /// The latest session of an account, by label ("main", "personal").
+    func latestSessionID(ofAccount label: String) -> String? {
+        let instance = label == ClaudeInstance.mainName ? nil : label
+        return store.sessions.filter { $0.instance == instance }.max { $0.lastEventAt < $1.lastEventAt }?.id
     }
 
     func start() {
         hooksConnector.repairPathIfNeeded(addingMissingEvents: settings.hookEventsVersion < SessionHooksConnector.events.count)
-        settings.hookEventsVersion = SessionHooksConnector.events.count
         hooksStatus = hooksConnector.status
+        let addingEvents = settings.hookEventsVersion < SessionHooksConnector.events.count
+        for (name, entry) in extraConnectors {
+            entry.connector.repairPathIfNeeded(addingMissingEvents: addingEvents)
+            instanceHooks[name] = InstanceHooks(status: entry.connector.status, error: nil)
+        }
+        isStarted = true
+        reconcile()
+        settings.hookEventsVersion = SessionHooksConnector.events.count
         store.onChange = { [weak self] in self?.sessionsChanged() }
         store.startWatching()
     }
@@ -80,6 +113,11 @@ final class ClaudeSessionsController {
             WorkdeckLog.sessions.error("Session hooks: \(error.localizedDescription, privacy: .public)")
         }
         hooksStatus = hooksConnector.status
+        if isHooksConnected {
+            for name in extraConnectors.keys {
+                connectExtra(name)
+            }
+        }
         onChange?()
     }
 
@@ -91,8 +129,67 @@ final class ClaudeSessionsController {
             hooksError = error.localizedDescription
             WorkdeckLog.sessions.error("Session hooks: \(error.localizedDescription, privacy: .public)")
         }
+        for (name, entry) in extraConnectors {
+            try? entry.connector.disconnect()
+            instanceHooks[name] = InstanceHooks(status: entry.connector.status, error: nil)
+        }
         hooksStatus = hooksConnector.status
         onChange?()
+    }
+
+    /// Hook connectors for the extra instances that exist at launch; call before `start()`.
+    func setInstances(_ instances: [ClaudeInstance]) {
+        for instance in instances where !instance.isMain {
+            addConnector(for: instance)
+        }
+    }
+
+    func addInstance(_ instance: ClaudeInstance) {
+        guard !instance.isMain else { return }
+        addConnector(for: instance)
+        if isStarted {
+            reconcile()
+        }
+        onChange?()
+    }
+
+    func removeInstance(named name: String) {
+        guard let entry = extraConnectors.removeValue(forKey: name) else { return }
+        try? entry.connector.disconnect()
+        instanceHooks[name] = nil
+        onChange?()
+    }
+
+    /// Connects every extra instance while the main one is connected (spec §3.2); no confirmation.
+    func reconcile() {
+        guard isHooksConnected else { return }
+        for name in extraConnectors.keys where extraConnectors[name]?.connector.status != .connected {
+            connectExtra(name)
+        }
+    }
+
+    private func addConnector(for instance: ClaudeInstance) {
+        guard extraConnectors[instance.name] == nil, let connector = makeHooksConnector?(instance) else { return }
+        extraConnectors[instance.name] = (connector, instance.directory)
+        instanceHooks[instance.name] = InstanceHooks(status: connector.status, error: nil)
+    }
+
+    private func connectExtra(_ name: String) {
+        guard let entry = extraConnectors[name] else { return }
+        guard FileManager.default.fileExists(atPath: entry.directory.path) else {
+            instanceHooks[name] = InstanceHooks(status: .notConnected, error: "Folder missing")
+            return
+        }
+        do {
+            try entry.connector.connect()
+            instanceHooks[name] = InstanceHooks(status: entry.connector.status, error: nil)
+        } catch {
+            let message = (error as? ClaudeConnectorError) == .invalidSettings
+                ? ClaudeConnectorError.invalidSettingsMessage(directory: entry.directory)
+                : error.localizedDescription
+            instanceHooks[name] = InstanceHooks(status: entry.connector.status, error: message)
+            WorkdeckLog.sessions.error("Session hooks (\(name, privacy: .public)): \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     func activateSession(id: String) {

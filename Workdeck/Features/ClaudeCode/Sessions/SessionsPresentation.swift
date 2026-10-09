@@ -45,6 +45,8 @@ nonisolated struct AgentRow: Equatable, Sendable, Identifiable {
 nonisolated struct SessionRow: Equatable, Sendable, Identifiable {
     var id: String
     var projectName: String
+    /// The extra account the session runs on, shown when several instances are connected.
+    var account: String?
     var status: SessionStatus
     var since: Date
     /// What the main agent is doing now.
@@ -76,12 +78,13 @@ nonisolated enum SessionsPresentation {
     static let builtInAgentTypes: Set<String> = ["general-purpose", "Explore", "Plan"]
 
     /// `sessions` arrive in display order from `ClaudeSessionStore`.
-    static func viewState(sessions: [ClaudeSession], now: Date) -> SessionsViewState {
+    static func viewState(sessions: [ClaudeSession], now: Date, showsAccounts: Bool = false) -> SessionsViewState {
         let rows = sessions.prefix(maxSessions).map { session in
             let agents = session.agents.sorted { $0.startedAt < $1.startedAt }
             return SessionRow(
                 id: session.id,
                 projectName: session.projectName,
+                account: showsAccounts ? session.instance : nil,
                 status: session.status,
                 since: session.since,
                 action: session.action,

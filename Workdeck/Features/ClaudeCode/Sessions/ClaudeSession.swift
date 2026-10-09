@@ -40,6 +40,8 @@ nonisolated struct ClaudeSession: Equatable, Sendable, Identifiable {
     var entrypoint: String?
     var hostBundleID: String?
     var termProgram: String?
+    /// The extra instance the session runs in; `nil` for the main one.
+    var instance: String?
     var lastEventAt: Date
     var hasEnded = false
     /// A new conversation (startup or `/clear`) with nothing in it yet, e.g. an empty VS Code tab; not listed.

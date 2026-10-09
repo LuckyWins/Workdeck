@@ -3,7 +3,7 @@ import Foundation
 /// Human-readable session changes for the diagnostics log: statuses, agents, sessions. Never content.
 nonisolated enum SessionChangeLog {
     static func label(_ session: ClaudeSession) -> String {
-        "\(session.projectName) (\(session.id.prefix(8)))"
+        "\(session.projectName)\(session.instance.map { " [\($0)]" } ?? "") (\(session.id.prefix(8)))"
     }
 
     static func status(_ status: SessionStatus) -> String {
