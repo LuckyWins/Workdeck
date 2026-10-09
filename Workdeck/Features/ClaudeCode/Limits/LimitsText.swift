@@ -57,22 +57,23 @@ nonisolated enum LimitsText {
         return "Updated \(Int(age / 3600)) h ago — open Claude Code to refresh"
     }
 
-    static func alertTitle(_ alert: LimitsAlert) -> String {
+    static func alertTitle(_ alert: LimitsAlert, showsAccount: Bool = false) -> String {
+        let suffix = showsAccount ? alertAccount(alert).map { " · \($0)" } ?? "" : ""
         switch alert {
-        case let .threshold(window, threshold):
-            "\(window.kind.title) limit at \(threshold)%"
-        case let .reset(kind):
-            "\(kind.title) limit reset"
+        case let .threshold(window, threshold, _):
+            return "\(window.kind.title) limit at \(threshold)%" + suffix
+        case let .reset(kind, _):
+            return "\(kind.title) limit reset" + suffix
         case let .sessionFinished(project, _):
-            "\(project) finished"
+            return "\(project) finished"
         case let .sessionNeedsYou(project):
-            "\(project) needs you"
+            return "\(project) needs you"
         }
     }
 
     static func alertSubtitle(_ alert: LimitsAlert, now: Date, calendar: Calendar = .current) -> String? {
         switch alert {
-        case let .threshold(window, _):
+        case let .threshold(window, _, _):
             let today = calendar.isDate(window.resetsAt, inSameDayAs: now)
             return "Resets \(today ? "at " : "")\(clockText(window.resetsAt, now: now, calendar: calendar))"
         case .reset:
@@ -97,14 +98,22 @@ nonisolated enum LimitsText {
     }
 
     /// One alert as a line under a batch header.
-    static func batchLine(_ alert: LimitsAlert, now: Date) -> String {
+    static func batchLine(_ alert: LimitsAlert, now: Date, showsAccount: Bool = false) -> String {
         switch alert {
         case let .sessionFinished(project, worked):
             "\(project)  worked \(SessionsText.duration(from: now.addingTimeInterval(-worked), to: now))"
         case let .sessionNeedsYou(project):
             "\(project)  needs you"
         case .threshold, .reset:
-            alertTitle(alert)
+            alertTitle(alert, showsAccount: showsAccount)
+        }
+    }
+
+    /// The account a limit alert is about; clicking it opens the Chats window (spec §4.4).
+    static func alertAccount(_ alert: LimitsAlert) -> String? {
+        switch alert {
+        case let .threshold(_, _, account), let .reset(_, account): account ?? ClaudeInstance.mainName
+        case .sessionFinished, .sessionNeedsYou: nil
         }
     }
 

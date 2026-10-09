@@ -75,6 +75,25 @@ final class ClaudeCodeSettings {
         didSet { defaults.set(Array(firedAlertKeys).sorted(), forKey: Keys.firedAlertKeys) }
     }
 
+    /// The main account keeps `claudeLimits.firedAlertKeys`; an extra one `claudeLimits.firedAlertKeys.<name>` (spec §3.4).
+    func firedAlertKeys(for account: String?) -> Set<String> {
+        guard let account else { return firedAlertKeys }
+        return Set(defaults.stringArray(forKey: Keys.firedAlertKeys + "." + account) ?? [])
+    }
+
+    func setFiredAlertKeys(_ keys: Set<String>, for account: String?) {
+        guard let account else {
+            firedAlertKeys = keys
+            return
+        }
+        let key = Keys.firedAlertKeys + "." + account
+        if keys.isEmpty {
+            defaults.removeObject(forKey: key)
+        } else {
+            defaults.set(Array(keys).sorted(), forKey: key)
+        }
+    }
+
     /// Opt-in: poll Anthropic's undocumented usage endpoint with Claude Code's Keychain token.
     var fetchFromAPI: Bool {
         didSet { defaults.set(fetchFromAPI, forKey: Keys.fetchFromAPI) }
