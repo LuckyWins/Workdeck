@@ -141,4 +141,7 @@ README (Claude Code: accounts), CLAUDE.md (per-instance files and commands), `do
 
 ## 10. Probe Results
 
-To be filled in by the first implementation task.
+Probed on 2026-10-09 with Claude Code 2.1.289:
+
+1. **Keychain item name.** The user listed the generic password service names (names only): `Claude Code-credentials`, `Claude Code-credentials-e24fc4e6` and `Claude Code-credentials-6cccec2c`. The first 8 hex digits of the SHA-256 of `/Users/andreu/.claude-personal` are `e24fc4e6`, and `security find-generic-password -s "Claude Code-credentials-e24fc4e6"` (attributes only) exits 0. Rule: the default folder uses the plain name; another `CLAUDE_CONFIG_DIR` adds `-` and the first 8 hex digits of the SHA-256 of its path. The third item belongs to some other configuration folder used on this Mac and is not read.
+2. **Status line input and `--instance` hook** were not probed by hand: the first launch of the build reconciles `~/.claude-personal`, so the manual checklist rows A1–A3 check both on the real account.
