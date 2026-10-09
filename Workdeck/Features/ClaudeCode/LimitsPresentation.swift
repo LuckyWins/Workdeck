@@ -36,6 +36,22 @@ nonisolated enum LimitsRefreshState: Equatable, Sendable {
     case unavailable
 }
 
+/// One account's limits block in the expanded notch (spec §4.2).
+nonisolated struct AccountLimitsViewState: Equatable, Sendable, Identifiable {
+    /// "main" or the instance name.
+    var name: String
+    var windows: [UsageWindow]
+    var age: TimeInterval?
+    var forecasts: [UsageWindowKind: Date] = [:]
+    var refresh = LimitsRefreshState.hidden
+
+    var id: String { name }
+
+    var hasData: Bool {
+        age != nil
+    }
+}
+
 /// Everything the notch and menu bar need to render.
 nonisolated struct LimitsViewState: Equatable, Sendable {
     var display: LimitsDisplay
@@ -50,6 +66,16 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
     /// False when the notch is shown only for sessions (no limits source, or "Only near limits" below the threshold).
     var showsLimits = true
     var sessions = SessionsViewState.none
+    /// One block per account with data; the main account alone when none has data.
+    var accounts: [AccountLimitsViewState] = []
+    /// The compact account's first letter, shown before its percent when several accounts have data.
+    var compactLabel: String?
+
+    /// The blocks to draw; states built without accounts (tests, the hidden state) draw their own windows as main.
+    var limitBlocks: [AccountLimitsViewState] {
+        guard accounts.isEmpty else { return accounts }
+        return [AccountLimitsViewState(name: ClaudeInstance.mainName, windows: windows, age: age, forecasts: forecasts, refresh: refresh)]
+    }
 
     static let hidden = LimitsViewState(display: .hidden, windows: [], now: .distantPast, age: nil, thresholds: [80, 95])
 
@@ -88,7 +114,8 @@ nonisolated enum LimitsPresentation {
         pressing: UsageWindow?,
         hasData: Bool,
         thresholds: [Int],
-        hasSessions: Bool = false
+        hasSessions: Bool = false,
+        label: String? = nil
     ) -> LimitsDisplay {
         guard isEnabled else { return .hidden }
         let level = displayLevel(pressing: pressing, hasData: hasData, thresholds: thresholds)
@@ -100,7 +127,7 @@ nonisolated enum LimitsPresentation {
             return hasSessions ? .notch(level) : .hidden
         }
         guard limitsVisible else { return .hidden }
-        return .menuBar(text: compactText(pressing: pressing, hasData: hasData), level: level)
+        return .menuBar(text: (label.map { "\($0) " } ?? "") + compactText(pressing: pressing, hasData: hasData), level: level)
     }
 
     /// The indicator level; with data but no running window the next window starts at 0%.

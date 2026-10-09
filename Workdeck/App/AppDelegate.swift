@@ -23,14 +23,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     client: UsageAPIClient(transport: URLSessionTransport()),
                     snapshotURL: WorkdeckPaths.standard().snapshotURL
                 ),
-                activity: SessionActivityMonitor()
+                activity: SessionActivityMonitor(),
+                makeAccount: { instance in
+                    let snapshot = WorkdeckPaths.standard().snapshotURL(for: instance.name)
+                    return AccountLimits(
+                        name: instance.name,
+                        directory: instance.directory,
+                        store: ClaudeUsageStore(fileURL: snapshot),
+                        connector: ClaudeCodeConnector.forInstance(instance),
+                        poller: UsagePoller(
+                            credentials: SecurityCLICredentialsReader(
+                                service: ClaudeCredentials.keychainService(forConfigDirectory: instance.directory.path)
+                            ),
+                            client: UsageAPIClient(transport: URLSessionTransport()),
+                            snapshotURL: snapshot
+                        )
+                    )
+                }
             ),
             sessions: ClaudeSessionsController(
                 settings: settings,
                 store: ClaudeSessionStore(directory: SessionsDirectory.standard(), liveness: SystemProcessLiveness()),
                 hooksConnector: SessionHooksConnector.standard(),
                 activator: WindowActivator(workspace: SystemWorkspace()),
-                sleepPreventer: PowerAssertionSleepPreventer()
+                sleepPreventer: PowerAssertionSleepPreventer(),
+                makeHooksConnector: { SessionHooksConnector.forInstance($0) }
             ),
             presenter: NotchPresenter()
         )
@@ -53,7 +70,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Unit tests are hosted in this app; keep them away from the real privileged helper.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
         Task { await lidSleep.refresh() }
+        instances.onAdded = { [unowned self] in claudeCode.instanceAdded($0) }
+        instances.onRemoving = { [unowned self] in claudeCode.instanceRemoving($0) }
+        claudeCode.setInstances(instances.instances)
         claudeCode.start()
+
     }
 
     func applicationWillTerminate(_ notification: Notification) {

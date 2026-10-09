@@ -12,6 +12,7 @@ final class LimitsNotchModel {
     @ObservationIgnored var onRefresh: (() -> Void)?
     @ObservationIgnored var onActivateSession: ((String) -> Void)?
     @ObservationIgnored var onActivateProject: ((String) -> Void)?
+    @ObservationIgnored var onOpenChats: ((String) -> Void)?
 }
 
 extension LimitsLevel {

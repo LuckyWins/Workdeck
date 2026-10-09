@@ -15,6 +15,9 @@ final class ClaudeInstancesController {
     var failedCommand: String?
     /// The alias line Workdeck could not remove from `~/.zshrc`, for the user to delete.
     var aliasLeftBehind: String?
+    /// The Claude Code tool connects a new instance and cleans up a removed one.
+    @ObservationIgnored var onAdded: ((ClaudeInstance) -> Void)?
+    @ObservationIgnored var onRemoving: ((ClaudeInstance) -> Void)?
 
     @ObservationIgnored let home: URL
     @ObservationIgnored private let store: ClaudeInstanceStore
@@ -58,6 +61,7 @@ final class ClaudeInstancesController {
         }
         guard (try? store.add(name)) != nil else { return false }
         instances = store.instances
+        onAdded?(instance)
         WorkdeckLog.chats.notice("Added instance \(name, privacy: .public)")
         await refreshAccounts()
         if accounts[name] == nil {
@@ -77,6 +81,7 @@ final class ClaudeInstancesController {
     /// Removes Workdeck's alias and forgets the instance; its folder and login stay.
     func remove(_ instance: ClaudeInstance) {
         guard !instance.isMain else { return }
+        onRemoving?(instance)
         do {
             try aliasFile.remove(instance)
         } catch {
