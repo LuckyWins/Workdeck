@@ -160,4 +160,8 @@ Status line and hooks in every instance, limits and sessions per account in the 
 
 ## 10. Probe Results
 
-To be filled in by the first implementation task.
+Probed on 2026-10-09 with Claude Code 2.1.289, a second instance at `~/.claude-personal` signed in to a second account:
+
+- `~/.claude-personal/.claude.json` has `oauthAccount.emailAddress` after `/login`.
+- A chat started in the main instance (`claude -p`) and linked into the second instance with a symbolic link resumed there with `CLAUDE_CONFIG_DIR=~/.claude-personal claude -p --resume <id>`: same session ID, the main instance's transcript grew, and the link stayed a link. `/compact` through the link worked the same way (compact summary written to the shared transcript, link kept). Claude Code also created `projects/<dir>/memory/` in the second instance.
+- A `.command` script opened with `open -a Terminal` that runs `/bin/zsh -il -c 'command -v claude'` found `/Users/andreu/.local/bin/claude`, and `rm -f -- "$0"` deleted the script.
