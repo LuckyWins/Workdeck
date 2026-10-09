@@ -117,7 +117,7 @@ final class ClaudeCodeController {
         guard !instance.isMain else { return nil }
         let account = limits.account(named: instance.name)
         let hooks = sessions.instanceHooks[instance.name]
-        if let error = account?.connectError ?? hooks?.error {
+        if let error = account?.connectError ?? hooks?.error ?? account.flatMap(usageProblem(of:)) {
             return error
         }
         var parts: [String] = []
@@ -146,7 +146,7 @@ final class ClaudeCodeController {
     /// Recomputes keep-awake, the notch state, and limit alerts from both parts.
     func refresh() {
         sessions.updateKeepAwake()
-        let withData = limits.accounts.filter(\.hasData)
+        let withData = limits.accounts.filter { $0.hasData || usageProblem(of: $0) != nil }
         let shown = withData.isEmpty ? [limits.main] : withData
         let compact = compactAccount(among: shown)
         let store = compact.store
@@ -182,7 +182,8 @@ final class ClaudeCodeController {
                     windows: account.store.allWindows,
                     age: account.store.age,
                     forecasts: limits.forecasts(for: account),
-                    refresh: limits.refreshState(for: account)
+                    refresh: limits.refreshState(for: account),
+                    problem: usageProblem(of: account)
                 )
             },
             compactLabel: label
@@ -192,6 +193,12 @@ final class ClaudeCodeController {
             WorkdeckLog.alerts.notice("\(LimitsText.alertTitle(alert, showsAccount: true), privacy: .public), shown")
             presenter.present(alert)
         }
+    }
+
+    /// Why the usage API brings no data for an account, e.g. its Keychain item is missing (spec §6).
+    private func usageProblem(of account: AccountLimits) -> String? {
+        guard settings.fetchFromAPI, account.poller.status.isProblem else { return nil }
+        return LimitsText.pollerStatusText(account.poller.status, now: account.store.now)
     }
 
     /// Near limits, the account closest to its limit; otherwise the account of the latest session (spec §4.3).

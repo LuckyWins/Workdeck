@@ -37,7 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                             ),
                             client: UsageAPIClient(transport: URLSessionTransport()),
                             snapshotURL: snapshot
-                        )
+                        ),
+                        mainSettingsURL: ClaudeSettingsFile.standard().url
                     )
                 }
             ),
@@ -47,7 +48,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 hooksConnector: SessionHooksConnector.standard(),
                 activator: WindowActivator(workspace: SystemWorkspace()),
                 sleepPreventer: PowerAssertionSleepPreventer(),
-                makeHooksConnector: { SessionHooksConnector.forInstance($0) }
+                makeHooksConnector: { SessionHooksConnector.forInstance($0) },
+                mainSettingsURL: ClaudeSettingsFile.standard().url
             ),
             presenter: NotchPresenter()
         )

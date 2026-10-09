@@ -13,6 +13,7 @@ struct AccountsCompositionTests {
     let extraConnector = FakeConnector()
     let mainHooks = FakeHooksConnector()
     let extraHooks = FakeHooksConnector()
+    let extraPoller = FakePoller()
 
     var personal: ClaudeInstance { .extra(named: "personal", home: root) }
     var support: URL { root.appending(path: "support") }
@@ -31,13 +32,13 @@ struct AccountsCompositionTests {
             connector: mainConnector,
             poller: FakePoller(),
             activity: FakeActivity(),
-            makeAccount: { [extraConnector, support] instance in
+            makeAccount: { [extraConnector, extraPoller, support] instance in
                 AccountLimits(
                     name: instance.name,
                     directory: instance.directory,
                     store: ClaudeUsageStore(fileURL: support.appending(path: "claude-usage-\(instance.name).json")) { fixedNow },
                     connector: extraConnector,
-                    poller: FakePoller()
+                    poller: extraPoller
                 )
             }
         )
@@ -115,6 +116,16 @@ struct AccountsCompositionTests {
         presenter.chatsAction?("personal")
         presenter.chatsAction?("main")
         #expect(opened == ["p1", nil])
+    }
+
+    @Test func anExtraAccountsUsageAPIProblemIsShown() {
+        let controller = makeController()
+        controller.limits.setFetchFromAPI(true)
+        extraPoller.status = .noCredentials
+        controller.refresh()
+        let block = controller.state.accounts.first { $0.name == "personal" }
+        #expect(block?.problem != nil)
+        #expect(controller.connectionSummary(for: personal) == block?.problem)
     }
 
     @Test func instanceRowsSummarizeTheirConnections() {

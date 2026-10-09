@@ -38,6 +38,8 @@ final class ClaudeSessionsController {
     @ObservationIgnored private let makeHooksConnector: ((ClaudeInstance) -> any SessionHooksConnecting)?
     @ObservationIgnored private var extraConnectors: [String: (connector: any SessionHooksConnecting, directory: URL)] = [:]
     @ObservationIgnored private var isStarted = false
+    /// The main instance's `settings.json`; an extra instance whose file is the same one is left alone.
+    @ObservationIgnored private let mainSettingsURL: URL?
 
     init(
         settings: ClaudeCodeSettings,
@@ -46,7 +48,8 @@ final class ClaudeSessionsController {
         activator: any WindowActivating,
         sleepPreventer: any SleepPreventing,
         frontmostBundleID: @escaping @MainActor () -> String? = { NSWorkspace.shared.frontmostApplication?.bundleIdentifier },
-        makeHooksConnector: ((ClaudeInstance) -> any SessionHooksConnecting)? = nil
+        makeHooksConnector: ((ClaudeInstance) -> any SessionHooksConnecting)? = nil,
+        mainSettingsURL: URL? = nil
     ) {
         self.settings = settings
         self.store = store
@@ -55,6 +58,7 @@ final class ClaudeSessionsController {
         self.sleepPreventer = sleepPreventer
         self.frontmostBundleID = frontmostBundleID
         self.makeHooksConnector = makeHooksConnector
+        self.mainSettingsURL = mainSettingsURL
     }
 
     var isHooksConnected: Bool {
@@ -87,7 +91,7 @@ final class ClaudeSessionsController {
         hooksConnector.repairPathIfNeeded(addingMissingEvents: settings.hookEventsVersion < SessionHooksConnector.events.count)
         hooksStatus = hooksConnector.status
         let addingEvents = settings.hookEventsVersion < SessionHooksConnector.events.count
-        for (name, entry) in extraConnectors {
+        for (name, entry) in extraConnectors where !sharesMainSettings(entry.directory) {
             entry.connector.repairPathIfNeeded(addingMissingEvents: addingEvents)
             instanceHooks[name] = InstanceHooks(status: entry.connector.status, error: nil)
         }
@@ -129,7 +133,7 @@ final class ClaudeSessionsController {
             hooksError = error.localizedDescription
             WorkdeckLog.sessions.error("Session hooks: \(error.localizedDescription, privacy: .public)")
         }
-        for (name, entry) in extraConnectors {
+        for (name, entry) in extraConnectors where !sharesMainSettings(entry.directory) {
             try? entry.connector.disconnect()
             instanceHooks[name] = InstanceHooks(status: entry.connector.status, error: nil)
         }
@@ -155,7 +159,9 @@ final class ClaudeSessionsController {
 
     func removeInstance(named name: String) {
         guard let entry = extraConnectors.removeValue(forKey: name) else { return }
-        try? entry.connector.disconnect()
+        if !sharesMainSettings(entry.directory) {
+            try? entry.connector.disconnect()
+        }
         instanceHooks[name] = nil
         onChange?()
     }
@@ -171,11 +177,22 @@ final class ClaudeSessionsController {
     private func addConnector(for instance: ClaudeInstance) {
         guard extraConnectors[instance.name] == nil, let connector = makeHooksConnector?(instance) else { return }
         extraConnectors[instance.name] = (connector, instance.directory)
-        instanceHooks[instance.name] = InstanceHooks(status: connector.status, error: nil)
+        instanceHooks[instance.name] = sharesMainSettings(instance.directory)
+            ? InstanceHooks(status: .notConnected, error: ClaudeSettingsFile.sharedSettingsMessage)
+            : InstanceHooks(status: connector.status, error: nil)
+    }
+
+    /// Writing `--instance` into the main file would tag every main session with this instance.
+    private func sharesMainSettings(_ directory: URL) -> Bool {
+        ClaudeSettingsFile.isSameFile(directory.appending(path: "settings.json"), as: mainSettingsURL)
     }
 
     private func connectExtra(_ name: String) {
         guard let entry = extraConnectors[name] else { return }
+        guard !sharesMainSettings(entry.directory) else {
+            instanceHooks[name] = InstanceHooks(status: .notConnected, error: ClaudeSettingsFile.sharedSettingsMessage)
+            return
+        }
         guard FileManager.default.fileExists(atPath: entry.directory.path) else {
             instanceHooks[name] = InstanceHooks(status: .notConnected, error: "Folder missing")
             return

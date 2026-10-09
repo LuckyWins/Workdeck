@@ -44,6 +44,13 @@ struct InstanceConnectorTests {
         #expect(ClaudeCodeConnector.executablePath(of: "/a/c --x") == "/a/c")
     }
 
+    @Test func recognizesAPathWithAnApostrophe() {
+        let path = "/Users/x/My App's/Workdeck.app/Contents/Helpers/workdeck-statusline"
+        let command = ClaudeCodeConnector.command(for: path, instance: "personal")
+        #expect(ClaudeCodeConnector.executablePath(of: command) == path)
+        #expect(ClaudeCodeConnector.isWorkdeckCommand(command))
+    }
+
     @Test func repairAddsAMissingInstanceArgument() throws {
         let path = try binary("workdeck-statusline")
         try FileManager.default.createDirectory(at: settingsURL.deletingLastPathComponent(), withIntermediateDirectories: true)

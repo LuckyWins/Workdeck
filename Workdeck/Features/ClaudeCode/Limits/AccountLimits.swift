@@ -16,12 +16,22 @@ final class AccountLimits {
     @ObservationIgnored let poller: any UsagePolling
     /// The instance folder, which connecting must never create; `nil` for the main account.
     @ObservationIgnored let directory: URL?
+    /// The main instance's `settings.json`; an extra instance whose file is the same one (a symlink) is left alone.
+    @ObservationIgnored let mainSettingsURL: URL?
     /// The windows at the previous alert check.
     @ObservationIgnored var previousWindows: [UsageWindow] = []
     @ObservationIgnored private var lastLoggedPollerStatus: UsagePollerStatus?
 
-    init(name: String?, directory: URL? = nil, store: ClaudeUsageStore, connector: any ClaudeCodeConnecting, poller: any UsagePolling) {
+    init(
+        name: String?,
+        directory: URL? = nil,
+        store: ClaudeUsageStore,
+        connector: any ClaudeCodeConnecting,
+        poller: any UsagePolling,
+        mainSettingsURL: URL? = nil
+    ) {
         self.name = name
+        self.mainSettingsURL = mainSettingsURL
         self.directory = directory
         self.store = store
         self.connector = connector
@@ -41,9 +51,19 @@ final class AccountLimits {
         store.age != nil
     }
 
+    /// Writing `--instance` into the main file would make main's usage this account's (review finding).
+    var sharesMainSettings: Bool {
+        guard let directory else { return false }
+        return ClaudeSettingsFile.isSameFile(directory.appending(path: "settings.json"), as: mainSettingsURL)
+    }
+
     func start(onChange: @escaping () -> Void) {
-        connector.repairPathIfNeeded()
-        connectionStatus = connector.status
+        if sharesMainSettings {
+            connectError = ClaudeSettingsFile.sharedSettingsMessage
+        } else {
+            connector.repairPathIfNeeded()
+            connectionStatus = connector.status
+        }
         store.onChange = onChange
         poller.onChange = { [weak self] in
             guard let self else { return }
@@ -60,6 +80,10 @@ final class AccountLimits {
     /// Returns whether it connected; a failure stays on this account and does not stop the others.
     @discardableResult
     func connect() -> Bool {
+        if sharesMainSettings {
+            connectError = ClaudeSettingsFile.sharedSettingsMessage
+            return false
+        }
         if let directory, !FileManager.default.fileExists(atPath: directory.path) {
             connectError = "Folder missing"
             return false
@@ -77,6 +101,8 @@ final class AccountLimits {
     }
 
     func disconnect() {
+        // The shared file is main's: its entries are main's to remove.
+        guard !sharesMainSettings else { return }
         do {
             try connector.disconnect()
             connectError = nil

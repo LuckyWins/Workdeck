@@ -139,11 +139,23 @@ struct ClaudeCodeConnector: ClaudeCodeConnecting {
     /// The program at the start of a command line, without its arguments; a quoted path may hold spaces.
     static func executablePath(of command: String) -> String {
         let trimmed = command.trimmingCharacters(in: .whitespaces)
-        if let quote = trimmed.first, quote == "'" || quote == "\"" {
-            let rest = trimmed.dropFirst()
-            if let end = rest.firstIndex(of: quote) {
-                return String(rest[..<end])
+        if trimmed.first == "'" {
+            // `command(for:)` writes an apostrophe in the path as '\'' (close, escaped quote, reopen).
+            var path = ""
+            var rest = Substring(trimmed)
+            while rest.first == "'" {
+                rest = rest.dropFirst()
+                guard let end = rest.firstIndex(of: "'") else { return path + rest }
+                path += rest[..<end]
+                rest = rest[rest.index(after: end)...]
+                guard rest.hasPrefix("\\'") else { break }
+                path += "'"
+                rest = rest.dropFirst(2)
             }
+            return path
+        }
+        if trimmed.first == "\"", let end = trimmed.dropFirst().firstIndex(of: "\"") {
+            return String(trimmed[trimmed.index(after: trimmed.startIndex)..<end])
         }
         return trimmed.components(separatedBy: " ").first ?? trimmed
     }

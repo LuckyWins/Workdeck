@@ -33,7 +33,8 @@ struct AccountLimitsTests {
                     directory: instance.directory,
                     store: ClaudeUsageStore(fileURL: support.appending(path: "claude-usage-\(instance.name).json")) { fixedNow },
                     connector: extraConnector,
-                    poller: extraPoller
+                    poller: extraPoller,
+                    mainSettingsURL: root.appending(path: ".claude/settings.json")
                 )
             }
         )
@@ -69,6 +70,21 @@ struct AccountLimitsTests {
         #expect(controller.account(named: "personal")?.connectError == "Folder missing")
         #expect(extraConnector.status == .notConnected)
         #expect(!FileManager.default.fileExists(atPath: personal.directory.path))
+    }
+
+    @Test func anInstanceSharingMainsSettingsIsLeftAlone() throws {
+        // A dotfiles setup can link both settings files to one; writing --instance there would mislabel main.
+        let mainSettings = root.appending(path: ".claude/settings.json")
+        try FileManager.default.createDirectory(at: mainSettings.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: mainSettings)
+        try FileManager.default.createDirectory(at: personal.directory, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: personal.directory.appending(path: "settings.json"), withDestinationURL: mainSettings)
+        mainConnector.status = .connected
+        let (controller, _) = makeController()
+        controller.start()
+        #expect(controller.account(named: "personal")?.connectError == "Shares settings.json with main")
+        #expect(extraConnector.status == .notConnected)
+        #expect(extraConnector.repairCount == 0)
     }
 
     @Test func oneInvalidSettingsFileDoesNotStopTheOthers() {

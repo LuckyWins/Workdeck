@@ -231,6 +231,11 @@ struct LimitsExpandedView: View {
                     ForEach(UsageWindowKind.allCases, id: \.self) { kind in
                         windowRow(kind, in: account)
                     }
+                    if let problem = account.problem {
+                        Text(problem)
+                            .foregroundStyle(.orange)
+                            .lineLimit(2)
+                    }
                     if account.age != nil || account.refresh != .hidden {
                         ageRow(account)
                     }

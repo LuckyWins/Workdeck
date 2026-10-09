@@ -44,6 +44,8 @@ nonisolated struct AccountLimitsViewState: Equatable, Sendable, Identifiable {
     var age: TimeInterval?
     var forecasts: [UsageWindowKind: Date] = [:]
     var refresh = LimitsRefreshState.hidden
+    /// Why the usage API brings no data for this account, e.g. its Keychain item is missing.
+    var problem: String?
 
     var id: String { name }
 

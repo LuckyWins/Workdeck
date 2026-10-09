@@ -8,6 +8,14 @@ struct ClaudeSettingsFile {
         ClaudeSettingsFile(url: FileManager.default.homeDirectoryForCurrentUser.appending(path: ".claude/settings.json"))
     }
 
+    /// Whether an instance's settings file is the main one, e.g. both are symlinks to one dotfile.
+    static func isSameFile(_ url: URL, as other: URL?) -> Bool {
+        guard let other else { return false }
+        return url.resolvingSymlinksInPath().standardizedFileURL.path == other.resolvingSymlinksInPath().standardizedFileURL.path
+    }
+
+    static let sharedSettingsMessage = "Shares settings.json with main"
+
     var backupURL: URL {
         url.deletingLastPathComponent().appending(path: url.lastPathComponent + ".workdeck-backup")
     }

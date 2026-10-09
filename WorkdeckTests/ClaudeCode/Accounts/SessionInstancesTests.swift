@@ -24,7 +24,8 @@ struct SessionInstancesTests {
             activator: FakeActivator(),
             sleepPreventer: FakeSleepPreventer(),
             frontmostBundleID: { nil },
-            makeHooksConnector: { [extraHooks] _ in extraHooks }
+            makeHooksConnector: { [extraHooks] _ in extraHooks },
+            mainSettingsURL: root.appending(path: ".claude/settings.json")
         )
         controller.setInstances([.main(home: root), personal])
         return controller
@@ -58,6 +59,20 @@ struct SessionInstancesTests {
         controller.start()
         #expect(controller.instanceHooks["personal"]?.error == "Folder missing")
         #expect(extraHooks.status == .notConnected)
+    }
+
+    @Test func anInstanceSharingMainsSettingsIsLeftAlone() throws {
+        let mainSettings = root.appending(path: ".claude/settings.json")
+        try FileManager.default.createDirectory(at: mainSettings.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: mainSettings)
+        try FileManager.default.createDirectory(at: personal.directory, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: personal.directory.appending(path: "settings.json"), withDestinationURL: mainSettings)
+        mainHooks.status = .connected
+        let controller = makeController()
+        controller.start()
+        #expect(controller.instanceHooks["personal"]?.error == "Shares settings.json with main")
+        #expect(extraHooks.status == .notConnected)
+        #expect(extraHooks.repairs.isEmpty)
     }
 
     @Test func removeInstanceDisconnectsIt() {
