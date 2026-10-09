@@ -70,8 +70,10 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
     var sessions = SessionsViewState.none
     /// One block per account with data; the main account alone when none has data.
     var accounts: [AccountLimitsViewState] = []
-    /// The compact account's first letter, shown before its percent when several accounts have data.
+    /// The compact account's first letter before its percent; `nil` for the main account.
     var compactLabel: String?
+    /// The short view: one line per account instead of full blocks.
+    var collapsesOtherAccounts = false
 
     /// The blocks to draw; states built without accounts (tests, the hidden state) draw their own windows as main.
     var limitBlocks: [AccountLimitsViewState] {
@@ -96,6 +98,16 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
 }
 
 nonisolated enum LimitsPresentation {
+    /// A collapsed account's line: its running windows, the most used first.
+    static func summaryWindows(_ account: AccountLimitsViewState, now: Date) -> [UsageWindow] {
+        account.windows.filter { $0.resetsAt > now }.sorted { $0.usedPercent > $1.usedPercent }
+    }
+
+    /// "runs out …" is a warning, and as urgent as the bar once the window passes the last threshold.
+    static func forecastLevel(of window: UsageWindow, thresholds: [Int]) -> LimitsLevel {
+        level(of: window, thresholds: thresholds) == .critical ? .critical : .warning
+    }
+
     static func level(of window: UsageWindow?, thresholds: [Int]) -> LimitsLevel {
         guard let window else { return .noData }
         let sorted = thresholds.sorted()

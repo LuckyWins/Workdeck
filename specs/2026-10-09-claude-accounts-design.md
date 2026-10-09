@@ -66,10 +66,12 @@ Fired alert keys are kept per account: the main account keeps `claudeLimits.fire
 
 - One block per account with data: header `— limits · main —`, `— limits · personal —`, then the 5h and 7d bars, reset times and forecasts, and its own `updated … ↻` line. Order: main, then extra instances in the order they were added.
 - With one account with data the header stays `— limits —`.
+- The compact account's block comes first. With two or more accounts, a `▾`/`▸` control at the right of the first header switches between the full view and a short view: `— limits — ▸` and one line per account, names aligned (`main      7d 96% · 5h 41%`, each percent in its level's color, `!` for a usage API problem). The choice is remembered (`claudeLimits.collapsesOtherAccounts`); the full view is the default.
+- `runs out …` is orange, and red once its window passes the second threshold.
 
 ### 4.3 Limits, Compact and Menu Bar
 
-- The ring and percent show the active account. With two or more accounts with data, the percent is prefixed with the account's first letter (`p 26%`).
+- The ring and percent show the active account. An extra account's percent is prefixed with its first letter (`p 26%`); the main account has no letter.
 - "Only near limits": the notch shows when any account is near a limit, and then shows that account.
 - The menu bar text on a screen without a notch shows what the compact notch shows.
 

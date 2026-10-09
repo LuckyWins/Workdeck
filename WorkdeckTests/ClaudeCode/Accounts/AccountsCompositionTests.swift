@@ -95,6 +95,26 @@ struct AccountsCompositionTests {
         reload(controller)
         #expect(controller.state.compactLabel == "p")
         #expect(controller.state.pressing?.usedPercent == 60)
+        // The compact account's block comes first; the collapse control keeps it.
+        #expect(controller.state.accounts.map(\.name) == ["personal", "main"])
+    }
+
+    @Test func anotherAccountIsMarkedEvenWhenItIsTheOnlyOneWithData() throws {
+        let controller = makeController()
+        try usage(60, account: "personal")
+        reload(controller)
+        #expect(controller.state.compactLabel == "p")
+    }
+
+    @Test func theCollapseControlTogglesAndIsRemembered() throws {
+        let controller = makeController()
+        try usage(20, account: nil)
+        try usage(60, account: "personal")
+        reload(controller)
+        #expect(controller.state.collapsesOtherAccounts == false)
+        presenter.toggleAccountsAction?()
+        #expect(controller.state.collapsesOtherAccounts)
+        #expect(ClaudeCodeSettings(defaults: defaults).collapsesOtherAccounts)
     }
 
     @Test func nearLimitsShowsTheAccountClosestToItsLimit() throws {
@@ -103,7 +123,8 @@ struct AccountsCompositionTests {
         try usage(30, account: "personal")
         session("p1", instance: "personal", pid: 2, at: 20)
         reload(controller)
-        #expect(controller.state.compactLabel == "m")
+        // Main needs no letter; only other accounts are marked.
+        #expect(controller.state.compactLabel == nil)
         #expect(controller.state.showsLimits)
     }
 

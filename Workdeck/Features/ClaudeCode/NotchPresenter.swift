@@ -16,6 +16,8 @@ protocol LimitsPresenting: AnyObject {
     func setProjectAction(_ action: @escaping (String) -> Void)
     /// What clicking a limit alert does, by account label: open the Chats window (spec §4.4).
     func setChatsAction(_ action: @escaping (String) -> Void)
+    /// What the control that hides or shows the other accounts' limits does.
+    func setToggleAccountsAction(_ action: @escaping () -> Void)
 }
 
 /// The notch operations the presenter needs; DynamicNotchKit in the app, a fake in tests.
@@ -153,6 +155,10 @@ final class NotchPresenter: LimitsPresenting {
 
     func setChatsAction(_ action: @escaping (String) -> Void) {
         model.onOpenChats = action
+    }
+
+    func setToggleAccountsAction(_ action: @escaping () -> Void) {
+        model.onToggleAccounts = action
     }
 
     /// DynamicNotchKit rebuilds its window on `NSScreen.screens.first` after a screen change, in any

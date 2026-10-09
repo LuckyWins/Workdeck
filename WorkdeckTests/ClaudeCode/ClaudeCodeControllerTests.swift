@@ -52,6 +52,11 @@ final class FakePresenter: LimitsPresenting {
         projectAction = action
     }
 
+    private(set) var toggleAccountsAction: (() -> Void)?
+    func setToggleAccountsAction(_ action: @escaping () -> Void) {
+        toggleAccountsAction = action
+    }
+
     private(set) var chatsAction: ((String) -> Void)?
     func setChatsAction(_ action: @escaping (String) -> Void) {
         chatsAction = action

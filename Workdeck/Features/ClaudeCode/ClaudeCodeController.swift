@@ -62,6 +62,11 @@ final class ClaudeCodeController {
         presenter.setSessionAction { [weak self] id in self?.sessions.activateSession(id: id) }
         presenter.setProjectAction { [weak self] name in self?.sessions.activateProject(named: name) }
         presenter.setRefreshAction { [weak self] in self?.limits.refreshNow() }
+        presenter.setToggleAccountsAction { [weak self] in
+            guard let self else { return }
+            settings.collapsesOtherAccounts.toggle()
+            refresh()
+        }
         presenter.setChatsAction { [weak self] account in
             guard let self else { return }
             onOpenChats?(sessions.latestSessionID(ofAccount: account))
@@ -149,11 +154,14 @@ final class ClaudeCodeController {
         let withData = limits.accounts.filter { $0.hasData || usageProblem(of: $0) != nil }
         let shown = withData.isEmpty ? [limits.main] : withData
         let compact = compactAccount(among: shown)
+        // The compact account's block comes first, so collapsing keeps what the compact notch shows.
+        let blocks = [compact] + shown.filter { $0 !== compact }
         let store = compact.store
         let pressing = UsageFormatting.mostPressing(store.currentWindows)
         let hasData = store.age != nil
         let sessionsView = sessions.viewState
-        let label = shown.count > 1 ? String(compact.label.prefix(1)) : nil
+        // Main needs no letter; another account is always marked, even when it is the only one with data.
+        let label = compact.name.map { String($0.prefix(1)) }
         let display = LimitsPresentation.display(
             isEnabled: settings.isEnabled,
             isConnected: limits.hasDataSource,
@@ -176,7 +184,7 @@ final class ClaudeCodeController {
             refresh: limits.refreshState(for: compact),
             showsLimits: LimitsPresentation.showsLimits(isConnected: limits.hasDataSource, mode: settings.mode, level: level),
             sessions: sessionsView,
-            accounts: shown.map { account in
+            accounts: blocks.map { account in
                 AccountLimitsViewState(
                     name: account.label,
                     windows: account.store.allWindows,
@@ -186,7 +194,8 @@ final class ClaudeCodeController {
                     problem: usageProblem(of: account)
                 )
             },
-            compactLabel: label
+            compactLabel: label,
+            collapsesOtherAccounts: settings.collapsesOtherAccounts
         )
         presenter.show(state)
         for alert in limits.takeAlerts() {

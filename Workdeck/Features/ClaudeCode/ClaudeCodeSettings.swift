@@ -20,6 +20,7 @@ final class ClaudeCodeSettings {
         static let firedAlertKeys = "claudeLimits.firedAlertKeys"
         static let fetchFromAPI = "claudeLimits.fetchFromAPI"
         static let showForecast = "claudeLimits.showForecast"
+        static let collapsesOtherAccounts = "claudeLimits.collapsesOtherAccounts"
         static let keepAwake = "claudeSessions.keepAwake"
         static let notifyFinished = "claudeSessions.notifyFinished"
         static let finishedAfterMinutes = "claudeSessions.finishedAfterMinutes"
@@ -104,6 +105,11 @@ final class ClaudeCodeSettings {
         didSet { defaults.set(showForecast, forKey: Keys.showForecast) }
     }
 
+    /// The expanded notch shows every account's limits as one line (the short view).
+    var collapsesOtherAccounts: Bool {
+        didSet { defaults.set(collapsesOtherAccounts, forKey: Keys.collapsesOtherAccounts) }
+    }
+
     /// Hold a power assertion while any session works (spec §10.6).
     var keepAwakeWhileWorking: Bool {
         didSet { defaults.set(keepAwakeWhileWorking, forKey: Keys.keepAwake) }
@@ -143,6 +149,7 @@ final class ClaudeCodeSettings {
         firedAlertKeys = Set(defaults.stringArray(forKey: Keys.firedAlertKeys) ?? [])
         fetchFromAPI = defaults.bool(forKey: Keys.fetchFromAPI)
         showForecast = defaults.object(forKey: Keys.showForecast) as? Bool ?? true
+        collapsesOtherAccounts = defaults.bool(forKey: Keys.collapsesOtherAccounts)
         keepAwakeWhileWorking = defaults.bool(forKey: Keys.keepAwake)
         notifyWhenFinished = defaults.bool(forKey: Keys.notifyFinished)
         let minutes = defaults.object(forKey: Keys.finishedAfterMinutes) as? Int ?? 10

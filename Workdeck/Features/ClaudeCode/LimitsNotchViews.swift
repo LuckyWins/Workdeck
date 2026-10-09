@@ -13,6 +13,7 @@ final class LimitsNotchModel {
     @ObservationIgnored var onActivateSession: ((String) -> Void)?
     @ObservationIgnored var onActivateProject: ((String) -> Void)?
     @ObservationIgnored var onOpenChats: ((String) -> Void)?
+    @ObservationIgnored var onToggleAccounts: (() -> Void)?
 }
 
 extension LimitsLevel {
@@ -97,6 +98,7 @@ struct LimitsExpandedView: View {
     let model: LimitsNotchModel
 
     @State private var hoveredRefresh: String?
+    @State private var isToggleHovered = false
     /// Which alert line the pointer is over, for the clickable session alerts.
     @State private var hoveredAlert: String?
 
@@ -225,19 +227,33 @@ struct LimitsExpandedView: View {
         VStack(alignment: .leading, spacing: 4) {
             if model.state.showsLimits {
                 let blocks = model.state.limitBlocks
-                ForEach(blocks) { account in
-                    TerminalHeader(title: blocks.count > 1 ? "limits · \(account.name)" : "limits")
-                        .padding(.top, account.id == blocks.first?.id ? 0 : 4)
-                    ForEach(UsageWindowKind.allCases, id: \.self) { kind in
-                        windowRow(kind, in: account)
+                if model.state.collapsesOtherAccounts, blocks.count > 1 {
+                    // The short view: one line per account, the compact account first.
+                    accountsHeader(title: "limits", collapsed: true)
+                    let width = blocks.map(\.name.count).max() ?? 0
+                    ForEach(blocks) { account in
+                        summaryRow(account, nameWidth: width)
                     }
-                    if let problem = account.problem {
-                        Text(problem)
-                            .foregroundStyle(.orange)
-                            .lineLimit(2)
-                    }
-                    if account.age != nil || account.refresh != .hidden {
-                        ageRow(account)
+                } else {
+                    ForEach(blocks) { account in
+                        let isFirst = account.id == blocks.first?.id
+                        if blocks.count > 1, isFirst {
+                            accountsHeader(title: "limits · \(account.name)", collapsed: false)
+                        } else {
+                            TerminalHeader(title: blocks.count > 1 ? "limits · \(account.name)" : "limits")
+                                .padding(.top, isFirst ? 0 : 4)
+                        }
+                        ForEach(UsageWindowKind.allCases, id: \.self) { kind in
+                            windowRow(kind, in: account)
+                        }
+                        if let problem = account.problem {
+                            Text(problem)
+                                .foregroundStyle(.orange)
+                                .lineLimit(2)
+                        }
+                        if account.age != nil || account.refresh != .hidden {
+                            ageRow(account)
+                        }
                     }
                 }
             }
@@ -248,6 +264,64 @@ struct LimitsExpandedView: View {
                     model.onActivateSession?(id)
                 }
             }
+        }
+    }
+
+    /// The limits header with the control that switches between the short view and the full one.
+    private func accountsHeader(title: String, collapsed: Bool) -> some View {
+        HStack(spacing: 4) {
+            Text("─ \(title)")
+            Rectangle()
+                .fill(Terminal.faint)
+                .frame(height: 1)
+            Button {
+                model.onToggleAccounts?()
+            } label: {
+                Text(collapsed ? "▸" : "▾")
+                    .font(Terminal.font(11, weight: .semibold))
+                    .foregroundStyle(isToggleHovered ? Terminal.text : Terminal.dim)
+                    .padding(.horizontal, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(.white.opacity(isToggleHovered ? 0.1 : 0))
+                    )
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .pointerStyle(.link)
+            .onHover { isToggleHovered = $0 }
+            .animation(.easeOut(duration: 0.12), value: isToggleHovered)
+            .help(collapsed ? "Show full limits" : "Show short limits")
+            Text("─")
+        }
+        .font(Terminal.font(10))
+        .foregroundStyle(Terminal.dim)
+    }
+
+    /// An account in the short view: "main      7d 96% · 5h 41%", each percent in its level's color.
+    private func summaryRow(_ account: AccountLimitsViewState, nameWidth: Int) -> some View {
+        let windows = LimitsPresentation.summaryWindows(account, now: model.state.now)
+        return HStack(spacing: 6) {
+            Text(account.name.padding(toLength: nameWidth, withPad: " ", startingAt: 0))
+            if windows.isEmpty {
+                Text(account.hasData ? "5h 0%" : "—")
+                    .foregroundStyle(Terminal.dim)
+            }
+            ForEach(Array(windows.enumerated()), id: \.offset) { index, window in
+                if index > 0 {
+                    Text("·")
+                        .foregroundStyle(Terminal.dim)
+                }
+                Text(UsageFormatting.compactText(window))
+                    .foregroundStyle(LimitsPresentation.level(of: window, thresholds: model.state.thresholds).notchColor)
+            }
+            if account.problem != nil {
+                Text("!")
+                    .fontWeight(.bold)
+                    .foregroundStyle(.orange)
+                    .help(account.problem ?? "")
+            }
+            Spacer(minLength: 0)
         }
     }
 
@@ -342,9 +416,9 @@ struct LimitsExpandedView: View {
                 Text(reset)
                     .foregroundStyle(Terminal.dim)
             }
-            if isCurrent, let forecast = account.forecasts[kind] {
+            if isCurrent, let window, let forecast = account.forecasts[kind] {
                 Text("   " + LimitsText.forecastText(forecast, now: model.state.now))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(LimitsPresentation.forecastLevel(of: window, thresholds: model.state.thresholds).notchColor)
             }
         }
     }
