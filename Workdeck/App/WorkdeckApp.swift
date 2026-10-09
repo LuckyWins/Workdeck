@@ -13,7 +13,14 @@ struct WorkdeckApp: App {
         .menuBarExtraStyle(.window)
 
         Settings {
-            SettingsView(settings: appDelegate.settings, controller: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode)
+            SettingsView(settings: appDelegate.settings, controller: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode, instances: appDelegate.instances)
         }
+
+        Window("Claude Code Chats", id: ChatsWindow.id) {
+            ChatsWindow()
+        }
+        .defaultSize(width: 640, height: 520)
+        .defaultLaunchBehavior(.suppressed)
+        .restorationBehavior(.disabled)
     }
 }

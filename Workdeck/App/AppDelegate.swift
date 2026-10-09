@@ -36,6 +36,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }()
 
+    private(set) lazy var instances = ClaudeInstancesController(
+        store: ClaudeInstanceStore(),
+        aliasFile: .standard(),
+        launcher: TerminalAppLauncher.standard()
+    )
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Unit tests are hosted in this app; keep them away from the real privileged helper.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }

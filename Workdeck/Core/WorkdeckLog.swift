@@ -7,4 +7,5 @@ nonisolated enum WorkdeckLog {
     static let alerts = Logger(subsystem: subsystem, category: "alerts")
     static let keepAwake = Logger(subsystem: subsystem, category: "keepAwake")
     static let limits = Logger(subsystem: subsystem, category: "limits")
+    static let chats = Logger(subsystem: subsystem, category: "chats")
 }

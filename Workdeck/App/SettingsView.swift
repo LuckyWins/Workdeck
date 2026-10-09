@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Bindable var settings: AppSettings
     let controller: LidSleepController
     let claudeCode: ClaudeCodeController
+    let instances: ClaudeInstancesController
 
     @State private var diagnosticsState = DiagnosticsCopyState.idle
 
@@ -35,6 +36,7 @@ struct SettingsView: View {
 
             ClaudeLimitsSettingsSection(controller: claudeCode.limits)
             ClaudeSessionsSettingsSection(controller: claudeCode.sessions)
+            InstancesSettingsSection(controller: instances)
 
             Section {
                 LabeledContent("Version", value: HelperConstants.version(of: .main))
