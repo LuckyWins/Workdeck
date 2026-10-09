@@ -18,6 +18,13 @@ struct ChatLinkerTests {
         }
     }
 
+    /// The same file on disk (a hard link) as the owner's.
+    private func isHardLinked(_ name: String) -> Bool {
+        ChatLinker.fileIdentity(target.appending(path: name)) != nil
+            && ChatLinker.fileIdentity(target.appending(path: name)) == ChatLinker.fileIdentity(source.appending(path: name))
+            && linkTarget(name) == nil
+    }
+
     private func linkTarget(_ name: String) -> String? {
         try? FileManager.default.destinationOfSymbolicLink(atPath: target.appending(path: name).path)
     }
@@ -25,7 +32,8 @@ struct ChatLinkerTests {
     @Test func linksTheFileAndFolder() throws {
         try makeSource(withFolder: true)
         try ChatLinker.link(chat, from: main, into: work)
-        #expect(linkTarget("c1.jsonl") == source.appending(path: "c1.jsonl").path)
+        // Claude Code lists only regular files, so the transcript is a hard link; a folder cannot be one.
+        #expect(isHardLinked("c1.jsonl"))
         #expect(linkTarget("c1") == source.appending(path: "c1").path)
         #expect(try FileManager.default.attributesOfItem(atPath: target.path)[.posixPermissions] as? Int == 0o700)
         try ChatLinker.link(chat, from: main, into: work)
@@ -34,7 +42,7 @@ struct ChatLinkerTests {
     @Test func linksWithoutAFolder() throws {
         try makeSource(withFolder: false)
         try ChatLinker.link(chat, from: main, into: work)
-        #expect(linkTarget("c1.jsonl") != nil)
+        #expect(isHardLinked("c1.jsonl"))
         #expect((try? FileManager.default.attributesOfItem(atPath: target.appending(path: "c1").path)) == nil)
     }
 
@@ -52,7 +60,7 @@ struct ChatLinkerTests {
         try makeSource(withFolder: true)
         try FileManager.default.createDirectory(at: target.appending(path: "c1"), withIntermediateDirectories: true)
         try ChatLinker.link(chat, from: main, into: work)
-        #expect(linkTarget("c1.jsonl") != nil)
+        #expect(isHardLinked("c1.jsonl"))
         #expect(linkTarget("c1") == nil)
     }
 
@@ -61,14 +69,22 @@ struct ChatLinkerTests {
         try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
         try FileManager.default.createSymbolicLink(at: target.appending(path: "c1.jsonl"), withDestinationURL: home.appending(path: "moved/c1.jsonl"))
         try ChatLinker.link(chat, from: main, into: work)
-        #expect(linkTarget("c1.jsonl") == source.appending(path: "c1.jsonl").path)
+        #expect(isHardLinked("c1.jsonl"))
+    }
+
+    @Test func anOldSymbolicLinkBecomesAHardLink() throws {
+        try makeSource(withFolder: false)
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: target.appending(path: "c1.jsonl"), withDestinationURL: source.appending(path: "c1.jsonl"))
+        try ChatLinker.link(chat, from: main, into: work)
+        #expect(isHardLinked("c1.jsonl"))
     }
 
     @Test func unlinkRemovesOnlyLinks() throws {
         try makeSource(withFolder: true)
         try ChatLinker.link(chat, from: main, into: work)
         ChatLinker.unlink(chat, from: main, in: work)
-        #expect(linkTarget("c1.jsonl") == nil)
+        #expect(!FileManager.default.fileExists(atPath: target.appending(path: "c1.jsonl").path))
         #expect(linkTarget("c1") == nil)
         try Data("own\n".utf8).write(to: target.appending(path: "c1.jsonl"))
         ChatLinker.unlink(chat, from: main, in: work)

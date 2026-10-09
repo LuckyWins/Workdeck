@@ -65,7 +65,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         instances: instances,
         index: ChatIndex(),
         launcher: TerminalAppLauncher.standard(),
-        liveSessions: { [unowned self] in self.claudeCode.sessions.store.sessions }
+        liveSessions: { [unowned self] in self.claudeCode.sessions.store.sessions },
+        vscode: SystemVSCodeLauncher.standard(),
     )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -78,6 +79,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { await chats.focus(onChat: sessionID) }
             WindowOpener.shared.open(ChatsWindow.id)
         }
+        claudeCode.planLabels = { [unowned self] in instances.plans }
+        instances.onAccountsRefreshed = { [unowned self] in claudeCode.refresh() }
+        Task { await instances.refreshAccounts() }
         claudeCode.setInstances(instances.instances)
         claudeCode.start()
 

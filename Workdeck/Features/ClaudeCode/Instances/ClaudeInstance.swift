@@ -15,6 +15,8 @@ nonisolated struct ClaudeInstance: Equatable, Hashable, Sendable, Identifiable {
     /// The command that starts it; an extra instance's is the alias Workdeck adds.
     var command: String { isMain ? "claude" : "claude-\(name)" }
     var projectsDirectory: URL { directory.appending(path: "projects") }
+    /// The VS Code profile whose Claude Code extension runs on this instance; the main one uses the default profile.
+    var vscodeProfile: String? { isMain ? nil : "Claude \(name)" }
 
     static func main(home: URL) -> ClaudeInstance {
         ClaudeInstance(name: mainName, directory: home.appending(path: ".claude"), accountFile: home.appending(path: ".claude.json"))

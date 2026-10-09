@@ -39,6 +39,7 @@ struct ChatsTextTests {
 
 @MainActor
 struct ChatsControllerTests {
+    let vscode = FakeVSCode()
     let home = makeTemporaryDirectory()
     let defaults = UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!
     var project: URL { home.appending(path: "project") }
@@ -62,7 +63,7 @@ struct ChatsControllerTests {
             launcher: FakeTerminalLauncher()
         )
         await instances.add(named: "work")
-        let controller = ChatsController(instances: instances, index: ChatIndex(), launcher: launcher, liveSessions: { live }, defaults: defaults, now: { fixedNow })
+        let controller = ChatsController(instances: instances, index: ChatIndex(), launcher: launcher, liveSessions: { live }, vscode: vscode, vscodeWorkspaces: home.appending(path: "vscode"), defaults: defaults, now: { fixedNow })
         await controller.reload()
         return controller
     }
@@ -139,6 +140,36 @@ struct ChatsControllerTests {
         let chat = try #require(controller.chats.first)
         await controller.continueChat(chat, in: try #require(controller.instances.instances.last))
         #expect(controller.failedCommand?.hasSuffix("--resume c1") == true)
+    }
+
+    @Test func linkWithoutOpeningAnything() async throws {
+        try makeChat()
+        let launcher = FakeTerminalLauncher()
+        let controller = await makeController(launcher: launcher)
+        let chat = try #require(controller.chats.first)
+        let work = try #require(controller.instances.instances.last)
+        #expect(controller.linkTargets(for: chat) == [work])
+        await controller.link(chat, into: work)
+        #expect(controller.chats.first?.linkedInto == ["work"])
+        #expect(controller.linkTargets(for: try #require(controller.chats.first)).isEmpty)
+        #expect(launcher.commands.isEmpty)
+        #expect(vscode.opened.isEmpty)
+    }
+
+    @Test func reloadTurnsOldSymbolicLinksIntoHardLinks() async throws {
+        try makeChat()
+        let work = ClaudeInstance.extra(named: "work", home: home)
+        let folder = work.projectsDirectory.appending(path: "-project")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let original = home.appending(path: ".claude/projects/-project/c1.jsonl")
+        try FileManager.default.createSymbolicLink(at: folder.appending(path: "c1.jsonl"), withDestinationURL: original)
+        let controller = await makeController(launcher: FakeTerminalLauncher())
+        #expect(controller.chats.first?.linkedInto == ["work"])
+        #expect((try? FileManager.default.destinationOfSymbolicLink(atPath: folder.appending(path: "c1.jsonl").path)) == nil)
+        #expect(ChatLinker.fileIdentity(folder.appending(path: "c1.jsonl")) == ChatLinker.fileIdentity(original))
+        await controller.reload()
+        #expect(controller.chats.map(\.id) == ["c1"])
+        #expect(controller.chats.first?.owner == "main")
     }
 
     @Test func unlinkRemovesTheLink() async throws {
@@ -221,6 +252,55 @@ struct ChatsControllerTests {
         #expect(controller.selectedProject == "-beta")
         await controller.focus(onChat: nil)
         #expect(controller.selectedProject == nil)
+    }
+
+    @Test func openInVSCodeLinksAndOpensTheInstancesProfile() async throws {
+        try makeChat()
+        let controller = await makeController(launcher: FakeTerminalLauncher())
+        let chat = try #require(controller.chats.first)
+        let work = try #require(controller.instances.instances.last)
+        await controller.openInVSCode(chat, in: work)
+        #expect(FileManager.default.fileExists(atPath: work.projectsDirectory.appending(path: "-project/c1.jsonl").path))
+        let opened = try #require(vscode.opened.first)
+        #expect(opened.hasSuffix("/project (work).code-workspace|Claude work"))
+    }
+
+    @Test func openInVSCodeInTheMainInstanceUsesNoProfile() async throws {
+        try makeChat()
+        let controller = await makeController(launcher: FakeTerminalLauncher())
+        let chat = try #require(controller.chats.first)
+        await controller.openInVSCode(chat, in: try #require(controller.owner(of: chat)))
+        #expect(vscode.opened == ["\(project.path)|-"])
+        #expect(controller.chats.first?.linkedInto == [])
+    }
+
+    @Test func aLiveChatAsksBeforeVSCodeToo() async throws {
+        try makeChat()
+        let launcher = FakeTerminalLauncher()
+        let controller = await makeController(launcher: launcher, live: [ClaudeSession(id: "c1", status: .idle, since: fixedNow, lastEventAt: fixedNow)])
+        let chat = try #require(controller.chats.first)
+        await controller.openInVSCode(chat, in: try #require(controller.instances.instances.last))
+        let pending = try #require(controller.pendingContinue)
+        #expect(pending.destination == .vscode)
+        #expect(vscode.opened.isEmpty)
+        controller.pendingContinue = nil
+        await controller.confirm(pending)
+        #expect(vscode.opened.count == 1)
+        #expect(launcher.commands.isEmpty)
+    }
+
+    @Test func aVSCodeFailureIsReported() async throws {
+        try makeChat()
+        let failing = FakeVSCode(fails: true)
+        let instances = ClaudeInstancesController(
+            store: ClaudeInstanceStore(defaults: defaults, home: home),
+            aliasFile: ShellAliasFile(url: home.appending(path: ".zshrc")),
+            launcher: FakeTerminalLauncher()
+        )
+        let controller = ChatsController(instances: instances, index: ChatIndex(), launcher: FakeTerminalLauncher(), liveSessions: { [] }, vscode: failing, defaults: defaults, now: { fixedNow })
+        await controller.reload()
+        await controller.openInVSCode(try #require(controller.chats.first), in: try #require(controller.instances.instances.first))
+        #expect(controller.actionError == "Couldn’t open VS Code.")
     }
 
     @Test func aMissingProjectFolderCannotBeOpened() async throws {

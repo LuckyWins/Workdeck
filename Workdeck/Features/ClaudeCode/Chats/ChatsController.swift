@@ -26,10 +26,18 @@ final class ChatsController {
         var count: Int
     }
 
+    /// Where a continued chat opens.
+    enum Destination: Equatable {
+        case terminal
+        /// The project in a VS Code window of the target's profile; the chat is picked in Claude's history there.
+        case vscode
+    }
+
     struct PendingContinue: Equatable {
         var chat: ChatSummary
         var target: ClaudeInstance
         var hostName: String
+        var destination = Destination.terminal
     }
 
     static let recentPeriod: TimeInterval = 30 * 24 * 60 * 60
@@ -52,8 +60,12 @@ final class ChatsController {
     @ObservationIgnored let instances: ClaudeInstancesController
     @ObservationIgnored private let index: ChatIndex
     @ObservationIgnored private let launcher: any TerminalLaunching
+    @ObservationIgnored private let vscode: any VSCodeLaunching
+    /// Where the workspace files for other accounts' VS Code windows go.
+    @ObservationIgnored private let vscodeWorkspaces: URL
     @ObservationIgnored private let liveSessions: () -> [ClaudeSession]
     @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let linkStore: ChatLinkStore
     @ObservationIgnored private let now: () -> Date
 
     init(
@@ -61,6 +73,8 @@ final class ChatsController {
         index: ChatIndex,
         launcher: any TerminalLaunching,
         liveSessions: @escaping () -> [ClaudeSession],
+        vscode: any VSCodeLaunching = SystemVSCodeLauncher(appURL: nil, runner: SystemProcessRunner()),
+        vscodeWorkspaces: URL = WorkdeckPaths.standard().supportDirectory.appending(path: "vscode"),
         defaults: UserDefaults = .standard,
         now: @escaping () -> Date = { Date() }
     ) {
@@ -68,7 +82,10 @@ final class ChatsController {
         self.index = index
         self.launcher = launcher
         self.liveSessions = liveSessions
+        self.vscode = vscode
+        self.vscodeWorkspaces = vscodeWorkspaces
         self.defaults = defaults
+        linkStore = ChatLinkStore(defaults: defaults)
         self.now = now
         selectedProject = defaults.string(forKey: Self.selectedProjectKey)
     }
@@ -81,8 +98,20 @@ final class ChatsController {
 
     func reload() async {
         isLoading = true
-        chats = await index.scan(instances.instances)
+        chats = await index.scan(instances.instances, links: linkStore.links)
         isLoading = false
+        migrateLinks()
+    }
+
+    /// Older symbolic links become hard links, and links made outside Workdeck are recorded, so the owner stays put.
+    private func migrateLinks() {
+        for chat in chats {
+            guard let owner = owner(of: chat) else { continue }
+            for target in linkedInstances(of: chat) {
+                try? ChatLinker.link(chat, from: owner, into: target)
+                linkStore.add(target.name, chat.id)
+            }
+        }
     }
 
     /// Projects with chats in the period, newest first, with how many chats each has there.
@@ -179,32 +208,62 @@ final class ChatsController {
 
     /// Continues the chat in `target`: links it when `target` is not the owner, then opens Terminal. A chat that is
     /// open now waits for `confirm(_:)`.
-    func continueChat(_ chat: ChatSummary, in target: ClaudeInstance) async {
+    func continueChat(_ chat: ChatSummary, in target: ClaudeInstance, destination: Destination = .terminal) async {
         if let session = liveSession(of: chat) {
-            pendingContinue = PendingContinue(chat: chat, target: target, hostName: ChatsText.hostName(of: session))
+            pendingContinue = PendingContinue(chat: chat, target: target, hostName: ChatsText.hostName(of: session), destination: destination)
             return
         }
-        await perform(chat, in: target)
+        await perform(chat, in: target, destination: destination)
+    }
+
+    /// Opens the chat's project in VS Code on `target`'s account, linking the chat there first.
+    func openInVSCode(_ chat: ChatSummary, in target: ClaudeInstance) async {
+        await continueChat(chat, in: target, destination: .vscode)
+    }
+
+    var canOpenVSCode: Bool {
+        vscode.isInstalled
     }
 
     /// Continues a chat the user confirmed. It takes the alert's presented value: dismissing the alert has already
     /// cleared `pendingContinue` by the time the button's action runs.
     func confirm(_ pending: PendingContinue) async {
         pendingContinue = nil
-        await perform(pending.chat, in: pending.target)
+        await perform(pending.chat, in: pending.target, destination: pending.destination)
+    }
+
+    /// Instances the chat can be linked into without opening it: every instance but its owner and existing links.
+    func linkTargets(for chat: ChatSummary) -> [ClaudeInstance] {
+        targets(for: chat).filter { !chat.linkedInto.contains($0.name) }
+    }
+
+    /// Links the chat into `target` so its account lists it (e.g. in VS Code's history), without opening anything.
+    func link(_ chat: ChatSummary, into target: ClaudeInstance) async {
+        actionError = nil
+        guard let owner = owner(of: chat) else { return }
+        do {
+            try ChatLinker.link(chat, from: owner, into: target)
+            linkStore.add(target.name, chat.id)
+            WorkdeckLog.chats.notice("Linked chat \(chat.id.prefix(8), privacy: .public) (\(chat.projectName, privacy: .public)) into \(target.name, privacy: .public)")
+        } catch .conflict {
+            actionError = "\(target.name) already has its own chat with this ID."
+        } catch {
+            actionError = "Could not link the chat into \(target.name)."
+        }
+        await reload()
     }
 
     func unlink(_ chat: ChatSummary, from target: ClaudeInstance) async {
         guard let owner = owner(of: chat) else { return }
         ChatLinker.unlink(chat, from: owner, in: target)
+        linkStore.remove(target.name, chat.id)
         WorkdeckLog.chats.notice("Unlinked chat \(chat.id.prefix(8), privacy: .public) (\(chat.projectName, privacy: .public)) from \(target.name, privacy: .public)")
         await reload()
     }
 
-    private func perform(_ chat: ChatSummary, in target: ClaudeInstance) async {
+    private func perform(_ chat: ChatSummary, in target: ClaudeInstance, destination: Destination) async {
         actionError = nil
-        guard let owner = owner(of: chat), let cwd = chat.cwd,
-              let command = ShellCommand.claude(target, in: URL(filePath: cwd), resuming: chat.id) else { return }
+        guard let owner = owner(of: chat), let cwd = chat.cwd else { return }
         if target != owner {
             do {
                 try ChatLinker.link(chat, from: owner, into: target)
@@ -215,14 +274,35 @@ final class ChatsController {
                 actionError = "Could not link the chat into \(target.name)."
                 return
             }
+            linkStore.add(target.name, chat.id)
             WorkdeckLog.chats.notice("Linked chat \(chat.id.prefix(8), privacy: .public) (\(chat.projectName, privacy: .public)) into \(target.name, privacy: .public)")
         }
-        if await launcher.open(command) {
-            WorkdeckLog.chats.notice("Opened Terminal for chat \(chat.id.prefix(8), privacy: .public) in \(target.name, privacy: .public)")
-        } else {
-            failedCommand = command
-            WorkdeckLog.chats.error("Could not open Terminal for chat \(chat.id.prefix(8), privacy: .public)")
+        switch destination {
+        case .terminal:
+            guard let command = ShellCommand.claude(target, in: URL(filePath: cwd), resuming: chat.id) else { return }
+            if await launcher.open(command) {
+                WorkdeckLog.chats.notice("Opened Terminal for chat \(chat.id.prefix(8), privacy: .public) in \(target.name, privacy: .public)")
+            } else {
+                failedCommand = command
+                WorkdeckLog.chats.error("Could not open Terminal for chat \(chat.id.prefix(8), privacy: .public)")
+            }
+        case .vscode:
+            let vscode = self.vscode
+            let profile = target.vscodeProfile
+            do {
+                // Another account opens a workspace file: the folder may already be open in a main window, and
+                // VS Code would only bring that window forward, whatever `--profile` says.
+                let folder = profile == nil
+                    ? URL(filePath: cwd)
+                    : try VSCodeSetup.workspaceFile(for: URL(filePath: cwd), instance: target, in: vscodeWorkspaces)
+                try await Task.detached { try vscode.open(folder: folder, profile: profile) }.value
+                WorkdeckLog.chats.notice("Opened VS Code for chat \(chat.id.prefix(8), privacy: .public) in \(target.name, privacy: .public)")
+            } catch {
+                actionError = "Couldn’t open VS Code."
+                WorkdeckLog.chats.error("Could not open VS Code for chat \(chat.id.prefix(8), privacy: .public)")
+            }
         }
         await reload()
     }
+
 }

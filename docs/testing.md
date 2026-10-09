@@ -95,10 +95,11 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 |---|---|---|---|
 | C1 | Add an instance | Settings → Claude Code · Instances → Add Instance… → `work` → Add. | `~/.claude-work` exists (`drwx------`), `~/.zshrc` ends with the `claude-work` alias marked `# Workdeck`, `~/.zshrc.workdeck-backup` holds the old file, and Terminal opens `claude` for the new folder. After `/login` and returning to Workdeck, the row says "Signed in as …". |
 | C2 | Alias | Open a new Terminal window and run `claude-work`. | Claude Code starts signed in to the second account (`/status`). |
-| C3 | Continue a chat | Popover → Chats… → hover a chat of `main` → Continue in work. | Terminal opens in the project folder with `claude --resume <id>` on the second account and shows the chat's history; the row gets `→ work`. Messages sent there appear in the chat when it is resumed with `claude`. |
+| C3 | Continue a chat | Popover → Chats… → hover a chat of `main` → Terminal → work. | Terminal opens in the project folder with `claude --resume <id>` on the second account and shows the chat's history; the row gets `→ work`. Messages sent there appear in the chat when it is resumed with `claude`. |
 | C4 | Live warning | Continue a chat that is open in VS Code. | An alert names VS Code; Cancel does nothing; Continue Anyway continues. |
 | C5 | Unlink and remove | Unlink the chat from work (confirm the alert); then Settings → Remove… work. | The link is gone from `~/.claude-work/projects/…` and the original transcript is untouched; the alias line is gone from `~/.zshrc`; `~/.claude-work` stays. |
 | C6 | Unusual paths | Continue a chat whose project folder name has spaces or quotes; add an instance while `~/.zshrc` is a symbolic link (dotfiles). | Terminal opens in the right folder; the alias is written into the linked file and the link stays. |
+| C7 | Open in VS Code | Follow Settings → Instances → personal → VS Code…; then in Chats use VS Code → personal on a main chat. | The project opens in a window of the `Claude personal` profile; the Claude panel's history lists the chat and `/status` shows the second account; other VS Code windows stay on the main account. |
 
 ## Claude Code Accounts Checklist
 

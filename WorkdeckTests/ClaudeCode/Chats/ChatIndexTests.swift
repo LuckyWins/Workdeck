@@ -51,6 +51,31 @@ struct ChatIndexTests {
         #expect(chats[0].linkedInto == ["work"])
     }
 
+    @Test func aHardLinkedPairIsOneChatOwnedByTheUnrecordedSide() async throws {
+        let url = try chat("c1", in: main)
+        let folder = work.projectsDirectory.appending(path: "-p-A")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try FileManager.default.linkItem(at: url, to: folder.appending(path: "c1.jsonl"))
+        let chats = await ChatIndex().scan([main, work], links: ["work/c1"])
+        #expect(chats.map(\.id) == ["c1"])
+        #expect(chats[0].owner == "main")
+        #expect(chats[0].linkedInto == ["work"])
+        // A chat started in work and linked into main is owned by work.
+        let reversed = await ChatIndex().scan([main, work], links: ["main/c1"])
+        #expect(reversed[0].owner == "work")
+        #expect(reversed[0].linkedInto == ["main"])
+    }
+
+    @Test func aSplitLinkShowsBothCopies() async throws {
+        // Claude Code rewrote one copy as a new file: the recorded link no longer shares the owner's file.
+        try chat("c1", in: main)
+        try chat("c1", in: work, modified: fixedNow.addingTimeInterval(60))
+        let chats = await ChatIndex().scan([main, work], links: ["work/c1"])
+        #expect(chats.map(\.owner) == ["work", "main"])
+        #expect(chats.map(\.isSplit) == [true, false])
+        #expect(chats.allSatisfy { $0.linkedInto.isEmpty })
+    }
+
     @Test func ignoresUnsafeNamesAndOtherFiles() async throws {
         try chat("ok", in: main)
         let folder = main.projectsDirectory.appending(path: "-p-A")

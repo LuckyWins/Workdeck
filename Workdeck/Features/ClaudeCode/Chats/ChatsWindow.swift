@@ -118,6 +118,8 @@ private struct ChatRow: View {
     let controller: ChatsController
     @State private var isHovering = false
     @State private var unlinking: ClaudeInstance?
+    /// The account chooser that a Terminal or VS Code button opened.
+    @State private var choosing: ChatsController.Destination?
 
     var body: some View {
         let canOpen = controller.projectExists(chat)
@@ -133,32 +135,43 @@ private struct ChatRow: View {
                     if controller.liveSession(of: chat) != nil {
                         ChatTag(text: "live", tint: .green)
                     }
+                    if chat.isSplit {
+                        ChatTag(text: "split", tint: .orange)
+                            .help("This linked copy split from its chat: a program rewrote one of the two files, so new messages in one no longer show in the other.")
+                    }
                     Text("\(ChatsText.age(chat.modifiedAt, now: Date())) · \(ChatsText.size(chat.size))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             Spacer(minLength: 8)
-            if isHovering {
-                if let target = controller.targets(for: chat).first {
-                    Button("Continue in \(target.name)") {
-                        Task { await controller.continueChat(chat, in: target) }
-                    }
+            if isHovering || choosing != nil {
+                Button("Terminal") { choosing = .terminal }
                     .disabled(!canOpen)
+                    .help("Open in Terminal as…")
+                    .popover(isPresented: chooserBinding(.terminal), arrowEdge: .bottom) { chooser(.terminal) }
+                if controller.canOpenVSCode {
+                    Button("VS Code") { choosing = .vscode }
+                        .disabled(!canOpen)
+                        .help("Open in VS Code as…")
+                        .popover(isPresented: chooserBinding(.vscode), arrowEdge: .bottom) { chooser(.vscode) }
                 }
-                Menu {
-                    actions(canOpen: canOpen)
-                } label: {
-                    Image(systemName: "ellipsis.circle")
+                if hasLinkActions {
+                    Menu {
+                        linkActions
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help("Links")
                 }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
             }
         }
         .padding(.vertical, 2)
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
-        .contextMenu { actions(canOpen: canOpen) }
+        .contextMenu { linkActions }
         .help(canOpen ? "" : "The project folder is gone.")
         .alert(
             "Unlink from \(unlinking?.name ?? "")?",
@@ -172,29 +185,91 @@ private struct ChatRow: View {
         }
     }
 
-    @ViewBuilder
-    private func actions(canOpen: Bool) -> some View {
-        ForEach(controller.targets(for: chat)) { target in
-            Button("Continue in \(target.name)") {
-                Task { await controller.continueChat(chat, in: target) }
-            }
-            .disabled(!canOpen)
+    /// Each button anchors its own chooser, so it opens right under the button.
+    private func chooserBinding(_ destination: ChatsController.Destination) -> Binding<Bool> {
+        Binding(get: { choosing == destination }, set: { if !$0, choosing == destination { choosing = nil } })
+    }
+
+    private func chooser(_ destination: ChatsController.Destination) -> some View {
+        AccountChooser(
+            title: destination == .vscode ? "Open in VS Code as…" : "Open in Terminal as…",
+            instances: controller.instances.instances,
+            plans: controller.instances.plans
+        ) { instance in
+            choosing = nil
+            Task { await controller.continueChat(chat, in: instance, destination: destination) }
         }
-        if let owner = controller.owner(of: chat) {
-            Button("Resume in Terminal") {
-                Task { await controller.continueChat(chat, in: owner) }
+    }
+
+    /// The `…` and context menus manage links; opening is on the Terminal and VS Code buttons.
+    @ViewBuilder
+    private var linkActions: some View {
+        ForEach(controller.linkTargets(for: chat)) { target in
+            Button("Link to \(target.name)") {
+                Task { await controller.link(chat, into: target) }
             }
-            .disabled(!canOpen)
         }
         let linked = controller.linkedInstances(of: chat)
         if !linked.isEmpty {
-            Divider()
+            if !controller.linkTargets(for: chat).isEmpty {
+                Divider()
+            }
             ForEach(linked) { target in
                 Button("Unlink from \(target.name)…") {
                     unlinking = target
                 }
             }
         }
+    }
+
+    private var hasLinkActions: Bool {
+        !controller.linkTargets(for: chat).isEmpty || !controller.linkedInstances(of: chat).isEmpty
+    }
+
+}
+
+/// "Open in … as…": the accounts to open a chat with, colored like their tags (main neutral, others purple).
+private struct AccountChooser: View {
+    let title: String
+    let instances: [ClaudeInstance]
+    let plans: [String: String]
+    let choose: (ClaudeInstance) -> Void
+    @State private var hovered: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.bottom, 4)
+            ForEach(instances) { instance in
+                Button {
+                    choose(instance)
+                } label: {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(instance.isMain ? Color.secondary : Color.purple)
+                            .frame(width: 8, height: 8)
+                        Text(instance.name)
+                        Spacer(minLength: 16)
+                        Text(plans[instance.name] ?? "")
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(hovered == instance.name ? Color.accentColor.opacity(0.15) : .clear)
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { hovered = $0 ? instance.name : nil }
+            }
+        }
+        .padding(8)
+        .frame(minWidth: 220)
     }
 }
 

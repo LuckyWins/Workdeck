@@ -7,6 +7,7 @@ struct InstancesSettingsSection: View {
     @Environment(\.openWindow) private var openWindow
     @State private var isAdding = false
     @State private var removing: ClaudeInstance?
+    @State private var settingUpVSCode: ClaudeInstance?
 
     var body: some View {
         Section {
@@ -29,6 +30,9 @@ struct InstancesSettingsSection: View {
         }
         .sheet(isPresented: $isAdding) {
             AddInstanceSheet(controller: controller)
+        }
+        .sheet(item: $settingUpVSCode) { instance in
+            VSCodeSetupSheet(instance: instance, account: controller.accounts[instance.name])
         }
         .alert("Remove \(removing?.name ?? "")?", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }), presenting: removing) { instance in
             Button("Remove", role: .destructive) { controller.remove(instance) }
@@ -66,6 +70,8 @@ struct InstancesSettingsSection: View {
                     NSWorkspace.shared.activateFileViewerSelecting([instance.directory])
                 }
                 if !instance.isMain {
+                    Button("VS Code…") { settingUpVSCode = instance }
+                        .help("Set up a VS Code profile that uses this account")
                     Button("Remove…", role: .destructive) { removing = instance }
                 }
             }
@@ -75,7 +81,9 @@ struct InstancesSettingsSection: View {
                 Text("\(instance.displayPath(home: controller.home)) · \(instance.command)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(controller.accounts[instance.name].map { "Signed in as \($0)" } ?? "Not signed in")
+                Text(controller.accounts[instance.name].map { email in
+                    "Signed in as \(email)" + (controller.plans[instance.name].map { " · \($0)" } ?? "")
+                } ?? "Not signed in")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if let summary = claudeCode.connectionSummary(for: instance) {

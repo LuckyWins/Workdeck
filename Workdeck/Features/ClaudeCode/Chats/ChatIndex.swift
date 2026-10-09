@@ -15,6 +15,8 @@ nonisolated struct ChatSummary: Equatable, Sendable, Identifiable {
     var linkedInto: [String] = []
     /// Whether `cwd` is a folder, checked during the scan so the window does not touch the disk while drawing.
     var projectExists = false
+    /// Recorded as linked here, but no longer the same file as the owner's: a program rewrote one copy (spec §13).
+    var isSplit = false
 
     /// The list row's identity: one chat can exist in two instances when transcripts were copied by hand.
     var rowID: String { "\(owner)/\(id)" }
@@ -41,13 +43,24 @@ actor ChatIndex {
         self.peek = peek
     }
 
-    /// Newest first. A link is not listed again: it adds its instance to the chat it points to.
-    func scan(_ instances: [ClaudeInstance]) -> [ChatSummary] {
+    /// Newest first. Names of one file in several instances (hard links, or older symbolic links) are one chat. Its
+    /// owner is the first instance not recorded in `links` ("<instance>/<id>" of the linked sides); the others are
+    /// `linkedInto`. A recorded link that is no longer the owner's file is listed on its own as split (spec §13).
+    func scan(_ instances: [ClaudeInstance], links recorded: Set<String> = []) -> [ChatSummary] {
+        struct Entry {
+            var instance: String
+            var order: Int
+            var project: String
+            var id: String
+            var url: URL
+            var identity: String
+            var size: Int64
+            var modifiedAt: Date
+        }
         let fileManager = FileManager.default
-        var chats: [String: ChatSummary] = [:]
-        var links: [(target: String, instance: String)] = []
-        var seen = Set<CacheKey>()
-        for instance in instances {
+        var entries: [Entry] = []
+        var symbolicLinks: [(identity: String, instance: String)] = []
+        for (order, instance) in instances.enumerated() {
             let projects = (try? fileManager.contentsOfDirectory(at: instance.projectsDirectory, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
             for project in projects where (try? project.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
                 let files = (try? fileManager.contentsOfDirectory(at: project, includingPropertiesForKeys: [.isSymbolicLinkKey])) ?? []
@@ -55,35 +68,55 @@ actor ChatIndex {
                     let id = file.deletingPathExtension().lastPathComponent
                     guard HookPayloadFilter.isSafeIdentifier(id) else { continue }
                     if (try? file.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
-                        let target = file.resolvingSymlinksInPath()
-                        if fileManager.fileExists(atPath: target.path) {
-                            links.append((target.path, instance.name))
+                        if let identity = ChatLinker.fileIdentity(file.resolvingSymlinksInPath()) {
+                            symbolicLinks.append((identity, instance.name))
                         }
                         continue
                     }
                     guard let attributes = try? fileManager.attributesOfItem(atPath: file.path),
                           let size = (attributes[.size] as? NSNumber)?.int64Value,
                           let modifiedAt = attributes[.modificationDate] as? Date else { continue }
-                    let key = CacheKey(path: file.path, size: size, modifiedAt: modifiedAt)
-                    let peeked = cache[key] ?? peek(file)
-                    cache[key] = peeked
-                    seen.insert(key)
-                    chats[file.resolvingSymlinksInPath().path] = ChatSummary(
+                    entries.append(Entry(
+                        instance: instance.name,
+                        order: order,
+                        project: project.lastPathComponent,
                         id: id,
-                        owner: instance.name,
-                        projectDirectoryName: project.lastPathComponent,
-                        cwd: peeked.cwd,
-                        title: peeked.title,
-                        modifiedAt: modifiedAt,
+                        url: file,
+                        identity: ChatLinker.fileIdentity(file) ?? file.path,
                         size: size,
-                        projectExists: peeked.cwd.map(Self.isFolder) ?? false
-                    )
+                        modifiedAt: modifiedAt
+                    ))
                 }
             }
         }
+        var chats: [String: ChatSummary] = [:]
+        var seen = Set<CacheKey>()
+        for (identity, group) in Dictionary(grouping: entries, by: \.identity) {
+            let names = group.sorted { $0.order < $1.order }
+            let owner = names.first { !recorded.contains("\($0.instance)/\($0.id)") } ?? names[0]
+            let key = CacheKey(path: owner.url.path, size: owner.size, modifiedAt: owner.modifiedAt)
+            let peeked = cache[key] ?? peek(owner.url)
+            cache[key] = peeked
+            seen.insert(key)
+            let isSplit = names.count == 1
+                && recorded.contains("\(owner.instance)/\(owner.id)")
+                && entries.contains { $0.id == owner.id && $0.project == owner.project && $0.identity != identity }
+            chats[identity] = ChatSummary(
+                id: owner.id,
+                owner: owner.instance,
+                projectDirectoryName: owner.project,
+                cwd: peeked.cwd,
+                title: peeked.title,
+                modifiedAt: owner.modifiedAt,
+                size: owner.size,
+                linkedInto: names.filter { $0.instance != owner.instance }.map(\.instance),
+                projectExists: peeked.cwd.map(Self.isFolder) ?? false,
+                isSplit: isSplit
+            )
+        }
         cache = cache.filter { seen.contains($0.key) }
-        for link in links {
-            chats[link.target]?.linkedInto.append(link.instance)
+        for link in symbolicLinks {
+            chats[link.identity]?.linkedInto.append(link.instance)
         }
         return chats.values.sorted { $0.modifiedAt > $1.modifiedAt }
     }

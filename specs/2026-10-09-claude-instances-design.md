@@ -167,3 +167,27 @@ Probed on 2026-10-09 with Claude Code 2.1.289, a second instance at `~/.claude-p
 - `~/.claude-personal/.claude.json` has `oauthAccount.emailAddress` after `/login`.
 - A chat started in the main instance (`claude -p`) and linked into the second instance with a symbolic link resumed there with `CLAUDE_CONFIG_DIR=~/.claude-personal claude -p --resume <id>`: same session ID, the main instance's transcript grew, and the link stayed a link. `/compact` through the link worked the same way (compact summary written to the shared transcript, link kept). Claude Code also created `projects/<dir>/memory/` in the second instance.
 - A `.command` script opened with `open -a Terminal` that runs `/bin/zsh -il -c 'command -v claude'` found `/Users/andreu/.local/bin/claude`, and `rm -f -- "$0"` deleted the script.
+
+## 11. Amendment: Open in VS Code (2026-10-09)
+
+Probed with the Claude Code extension 2.1.295: in a VS Code profile whose user settings set `claudeCode.environmentVariables` → `CLAUDE_CONFIG_DIR` to an absolute path, the extension runs Claude Code on that folder (its `/status` shows the second account) and lists that instance's chats. The setting has `machine` scope, so VS Code ignores it in project and workspace settings. `vscode://anthropic.claude-code/open?session=<id>` always opens a chat as an editor tab in the last focused window, whatever its profile, so Workdeck does not use it.
+
+- Each extra instance has a VS Code profile named `Claude <name>`; the main instance uses the default profile. Workdeck does not create profiles (VS Code keeps them in undocumented files): **VS Code…** in the instance row opens step-by-step instructions (create the profile with Copy from: Default, paste the setting into its User Settings (JSON), check `/status`) with **Copy Setting**.
+- Chats offers **Open in VS Code** (main) and **Open in VS Code (<name>)** for every instance when VS Code is installed (found by bundle ID `com.microsoft.VSCode`). It asks first for a live chat, links the chat into the target like Continue, then runs the app's `Contents/Resources/app/bin/code`: the main instance opens the project folder in the default profile; another instance opens `--profile "Claude <name>"` with a workspace file `~/Library/Application Support/Workdeck/vscode/<hash>/<folder> (<name>).code-workspace` holding just the project folder. VS Code keeps a folder in one window and only focuses it, ignoring `--profile`, when the folder is already open; a workspace file opens a window of the profile, titled "<folder> (<name>)". The user picks the chat in the Claude panel's history. A failure shows "Couldn’t open VS Code."
+
+## 12. Amendment: Opening a Chat (2026-10-09)
+
+- On hover, a chat row shows **Terminal** and **VS Code** (when installed). Each opens a chooser, "Open in Terminal as…" / "Open in VS Code as…", listing every instance with a colored dot (main neutral, extra instances purple, as their tags) and its plan. Choosing the owner opens the chat as it is; another instance links it first (§5.3); a live chat asks first (§3.3).
+- The `…` and context menus manage links only: **Link to <name>** for every other instance the chat is not linked into yet (links without opening anything, e.g. so VS Code lists the chat), and **Unlink from <name>…**. Without either, the `…` button is hidden. Opening is only on the Terminal and VS Code buttons.
+
+## 13. Amendment: Hard Links (2026-10-09)
+
+Observed: Claude Code lists only regular files. A chat linked with a symbolic link resumed by ID (`claude --resume <id>`, the Terminal button) but was missing from `/resume` and from the VS Code extension's history. A hard link, a second name for the same file, appeared in both.
+
+- **Link** makes the transcript `<id>.jsonl` a hard link to the owner's file (same file, both names regular files); the subagent folder `<id>/`, which cannot be hard-linked, stays a symbolic link. Claude Code appends to transcripts, also on `/compact` (probe §10), so both names keep showing one chat.
+- A hard link has no original, so Workdeck records each link it makes as "<instance>/<session ID>" of the linked side (`claudeChats.links`). The index treats names of one file (same device and inode) as one chat whose owner is the first instance not recorded; the others are `linkedInto`.
+- On reload, older symbolic links to a chat become hard links, and links found without a record are recorded.
+- **Unlink** removes the target's name only when it is the owner's file (or an older symbolic link to it).
+- **Split:** if a program ever rewrites one name as a new file, the two names stop sharing data. A recorded link whose file is no longer the owner's is listed on its own with an orange `split` tag; restoring the link is in `TODO.md`.
+- With links visible to VS Code, opening another account's VS Code window uses the workspace file again (§11).
+
