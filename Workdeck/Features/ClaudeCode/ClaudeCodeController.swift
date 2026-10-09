@@ -85,6 +85,11 @@ final class ClaudeCodeController {
             statusLineConnected: limits.isConnected,
             hooksConnected: sessions.isHooksConnected,
             sessions: sessions.store.sessions,
+            accounts: limits.extras.map { account in
+                let age = account.store.age.map { "\(Int($0 / 60))m old" } ?? "none"
+                let hooks = sessions.instanceHooks[account.label]?.status == .connected ? "connected" : "not connected"
+                return "Account \(account.label): status line \(account.isConnected ? "connected" : "not connected"); data \(age); usage API \(String(describing: account.poller.status)); hooks \(hooks)"
+            },
             logLines: logLines
         )
     }

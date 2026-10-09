@@ -36,4 +36,17 @@ struct DiagnosticsLogReadingTests {
         let lines = DiagnosticsReport.recentLogLines(since: Date().addingTimeInterval(-60))
         #expect(lines.allSatisfy { !$0.isEmpty })
     }
+    @Test @MainActor func listsEveryAccount() {
+        let text = DiagnosticsReport.text(
+            appVersion: "1.0",
+            now: fixedNow,
+            settings: ClaudeCodeSettings(defaults: UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!),
+            statusLineConnected: true,
+            hooksConnected: true,
+            sessions: [],
+            accounts: ["Account personal: status line connected; data 3m old; usage API idle; hooks connected"],
+            logLines: []
+        )
+        #expect(text.contains("Account personal: status line connected; data 3m old; usage API idle; hooks connected"))
+    }
 }

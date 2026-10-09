@@ -10,12 +10,14 @@ enum DiagnosticsReport {
         statusLineConnected: Bool,
         hooksConnected: Bool,
         sessions: [ClaudeSession],
+        accounts: [String] = [],
         logLines: [String]
     ) -> String {
         var lines = [
             "Workdeck \(appVersion) — \(ISO8601DateFormatter().string(from: now))",
             "Status line: \(statusLineConnected ? "connected" : "not connected"); usage API: \(settings.fetchFromAPI ? "on" : "off")",
             "Session hooks: \(hooksConnected ? "connected" : "not connected")",
+        ] + accounts + [
             "Indicator: \(settings.isEnabled ? "on" : "off"); mode: \(settings.mode.title); thresholds: \(settings.thresholds.map { "\($0)%" }.joined(separator: ", "))",
             "Keep awake: \(settings.keepAwakeWhileWorking ? "on" : "off"); finished alerts: \(settings.notifyWhenFinished ? "after \(settings.finishedAfterMinutes)m" : "off"); needs-you alerts: \(settings.notifyWhenNeedsYou ? "on" : "off")",
             "",

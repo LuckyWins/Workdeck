@@ -1,7 +1,7 @@
 # Workdeck — Claude Code Accounts Design
 
 **Date:** 2026-10-09
-**Status:** Draft for review
+**Status:** Implemented
 
 ## 1. Overview
 

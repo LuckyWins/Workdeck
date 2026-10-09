@@ -100,6 +100,16 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | C5 | Unlink and remove | Unlink the chat from work (confirm the alert); then Settings → Remove… work. | The link is gone from `~/.claude-work/projects/…` and the original transcript is untouched; the alias line is gone from `~/.zshrc`; `~/.claude-work` stays. |
 | C6 | Unusual paths | Continue a chat whose project folder name has spaces or quotes; add an instance while `~/.zshrc` is a symbolic link (dotfiles). | Terminal opens in the right folder; the alias is written into the linked file and the link stays. |
 
+## Claude Code Accounts Checklist
+
+| # | Scenario | Steps | Expected |
+|---|---|---|---|
+| A1 | Existing instance connects | With Limits and Sessions connected and `personal` added before this build, `make install` and launch. | `~/.claude-personal/settings.json` gets `workdeck-statusline --instance personal` and `workdeck-hook --instance personal` entries and a `.workdeck-backup`; the Instances row says `Limits ✓ · Sessions ✓`. |
+| A2 | Two limits blocks | Use `claude-personal` until its status line has run, or turn on Fetch usage from Anthropic. | The expanded notch shows `— limits · main —` and `— limits · personal —`; the compact notch shows `m` or `p` before the percent, following the latest session. |
+| A3 | Session tag | Start a session with `claude-personal`. | Its row in the notch has a purple `personal` tag; main sessions have none. |
+| A4 | Limit alert | Lower the first threshold below an account's usage. | `5-hour limit at N% · personal` appears; clicking it opens Chats on that account's latest session's project. |
+| A5 | Remove | Settings → Remove… personal. | Its entries leave `~/.claude-personal/settings.json` (previous status line restored), `claude-usage-personal.json` is deleted, and its block and tag disappear. |
+
 ## Results
 
 Mark each run with the date, build commit, and macOS version. Record only scenarios that were actually executed.

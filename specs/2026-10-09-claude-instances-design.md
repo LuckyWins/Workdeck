@@ -156,9 +156,9 @@ Manual checklist rows in `docs/testing.md`: add an instance and sign in; the ali
 
 README: an "Instances and Chats" part under Claude Code. `docs/testing.md`: the rows above. `CLAUDE.md`: the two new folders.
 
-## 9. Second Spec (later)
+## 9. Second Spec
 
-Status line and hooks in every instance, limits and sessions per account in the notch, the usage API per account (its Keychain entry name is undocumented), and "Continue on <instance>" on a limit alert.
+Done in `2026-10-09-claude-accounts-design.md`.
 
 ## 10. Probe Results
 

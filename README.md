@@ -46,6 +46,8 @@ Run a second Claude Code account side by side. In Settings → Claude Code · In
 
 **Chats…** in the popover lists the chats of every instance by project, with their titles (read from the transcripts, shown only in the window, never stored or logged). **Continue in <instance>** links the chat's transcript into that instance with a symbolic link and opens Terminal with `claude --resume`, so a chat goes on with the other account when a plan limit runs out; both instances then share one transcript. Workdeck warns before continuing a chat that is open somewhere else: writing to it from two places corrupts it. **Unlink** removes only the link.
 
+With more than one instance, every instance gets Workdeck's status line and session hooks (`workdeck-statusline --instance <name>`, `workdeck-hook --instance <name>` in its own `settings.json`, with a backup), connected and disconnected together with the main one; instances added earlier are connected on the next launch. The expanded notch shows one limits block per account, the compact notch shows the account of your latest session with its first letter (`p 26%`), and sessions of an extra account carry a purple account tag. Limit alerts name their account (`Weekly limit at 95% · main`); clicking one opens Chats on that account's latest session. With "Fetch usage from Anthropic" on, each account is polled with its own Keychain item.
+
 ## Requirements
 
 - macOS 26 or later
