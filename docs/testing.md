@@ -87,12 +87,18 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | S17 | Agent names and alert clicks | Start a general-purpose agent with a task, and a custom agent; switch away until a session finishes or needs you, then click the alert line. | Agents are named by their task; only the custom one shows its type. Clicking a session alert opens that project's window; in a batch each line opens its own. |
 | S18 | Blank sessions | In VS Code, with a session already open in a project, open a new Claude Code tab in the same project and do not type anything; then send a prompt in it. | The empty tab does not add a second row with the same project name; it appears once the prompt is sent. After `/clear` in a terminal session, its row disappears until the next prompt. |
 | S19 | Event file size | Keep a session busy until its file in `~/Library/Application Support/Workdeck/sessions` passes 1 MB (or relaunch Workdeck with a larger file from an older build). | The file drops to about 500 KB and Diagnostics shows "trimmed its event file from … KB to … KB"; the session keeps its status and agents, and after quitting and reopening Workdeck it shows the same status, agents and actions. |
+| S8 | Disconnect | Disconnect in Settings. | Only Workdeck's hook entries are removed; your own hooks stay; the sessions disappear from the notch. |
+
+## Claude Code Instances and Chats Checklist
+
+| # | Scenario | Steps | Expected |
+|---|---|---|---|
 | C1 | Add an instance | Settings → Claude Code · Instances → Add Instance… → `work` → Add. | `~/.claude-work` exists (`drwx------`), `~/.zshrc` ends with the `claude-work` alias marked `# Workdeck`, `~/.zshrc.workdeck-backup` holds the old file, and Terminal opens `claude` for the new folder. After `/login` and returning to Workdeck, the row says "Signed in as …". |
 | C2 | Alias | Open a new Terminal window and run `claude-work`. | Claude Code starts signed in to the second account (`/status`). |
 | C3 | Continue a chat | Popover → Chats… → hover a chat of `main` → Continue in work. | Terminal opens in the project folder with `claude --resume <id>` on the second account and shows the chat's history; the row gets `→ work`. Messages sent there appear in the chat when it is resumed with `claude`. |
 | C4 | Live warning | Continue a chat that is open in VS Code. | An alert names VS Code; Cancel does nothing; Continue Anyway continues. |
-| C5 | Unlink and remove | Unlink the chat from work; then Settings → Remove… work. | The link is gone from `~/.claude-work/projects/…` and the original transcript is untouched; the alias line is gone from `~/.zshrc`; `~/.claude-work` stays. |
-| S8 | Disconnect | Disconnect in Settings. | Only Workdeck's hook entries are removed; your own hooks stay; the sessions disappear from the notch. |
+| C5 | Unlink and remove | Unlink the chat from work (confirm the alert); then Settings → Remove… work. | The link is gone from `~/.claude-work/projects/…` and the original transcript is untouched; the alias line is gone from `~/.zshrc`; `~/.claude-work` stays. |
+| C6 | Unusual paths | Continue a chat whose project folder name has spaces or quotes; add an instance while `~/.zshrc` is a symbolic link (dotfiles). | Terminal opens in the right folder; the alias is written into the linked file and the link stays. |
 
 ## Results
 

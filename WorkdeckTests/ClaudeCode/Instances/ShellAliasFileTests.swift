@@ -69,6 +69,12 @@ struct ShellAliasFileTests {
         #expect(try text(zshrc) == "export A=1\n")
     }
 
+    @Test func refusesABrokenLink() throws {
+        try FileManager.default.createSymbolicLink(at: zshrc, withDestinationURL: root.appending(path: "dotfiles/missing"))
+        #expect(throws: ShellAliasFile.AliasError.brokenLink) { try ShellAliasFile(url: zshrc).add(work) }
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: zshrc.path) == root.appending(path: "dotfiles/missing").path)
+    }
+
     @Test func refusesAFileThatIsNotText() throws {
         try Data([0xFF, 0xFE, 0x00]).write(to: zshrc)
         #expect(throws: ShellAliasFile.AliasError.notText) { try ShellAliasFile(url: zshrc).add(work) }

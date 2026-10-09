@@ -36,6 +36,19 @@ struct InstancesSettingsSection: View {
             Text("Workdeck removes the \(instance.command) alias and forgets this instance. The folder \(instance.displayPath(home: controller.home)) and its login stay; to remove them, run \(instance.command) /logout and delete the folder.")
         }
         .terminalFailureAlert($controller.failedCommand)
+        .alert(
+            "Remove the alias yourself",
+            isPresented: Binding(get: { controller.aliasLeftBehind != nil }, set: { if !$0 { controller.aliasLeftBehind = nil } }),
+            presenting: controller.aliasLeftBehind
+        ) { line in
+            Button("Copy Line") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(line, forType: .string)
+            }
+            Button("OK", role: .cancel) {}
+        } message: { line in
+            Text("Workdeck could not edit ~/.zshrc. Delete this line from it:\n\(line)")
+        }
         .task { await controller.refreshAccounts() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await controller.refreshAccounts() }
@@ -118,5 +131,6 @@ private struct AddInstanceSheet: View {
             .padding()
         }
         .frame(width: 420)
+        .onAppear { controller.error = nil }
     }
 }

@@ -13,16 +13,17 @@ final class ChatsController {
     }
 
     struct Group: Identifiable, Equatable {
-        /// The project name.
+        /// The project directory name.
         var id: String
+        var title: String
         var chats: [ChatSummary]
     }
 
     struct ProjectChip: Equatable, Identifiable {
-        var name: String
+        /// The project directory name.
+        var id: String
+        var title: String
         var count: Int
-
-        var id: String { name }
     }
 
     struct PendingContinue: Equatable {
@@ -36,7 +37,7 @@ final class ChatsController {
 
     var search = ""
     var period = Period.lastMonth
-    /// The project chip the user picked; `nil` is All. Remembered between launches.
+    /// The project directory name of the chip the user picked; `nil` is All. Remembered between launches.
     var selectedProject: String? {
         didSet { defaults.set(selectedProject, forKey: Self.selectedProjectKey) }
     }
@@ -80,12 +81,13 @@ final class ChatsController {
 
     /// Projects with chats in the period, newest first, with how many chats each has there.
     var projectChips: [ProjectChip] {
+        let titles = projectTitles
         var chips: [ProjectChip] = []
         for chat in periodChats {
-            if let index = chips.firstIndex(where: { $0.name == chat.projectName }) {
+            if let index = chips.firstIndex(where: { $0.id == chat.projectDirectoryName }) {
                 chips[index].count += 1
             } else {
-                chips.append(ProjectChip(name: chat.projectName, count: 1))
+                chips.append(ProjectChip(id: chat.projectDirectoryName, title: titles[chat.projectDirectoryName] ?? chat.projectName, count: 1))
             }
         }
         return chips
@@ -93,7 +95,7 @@ final class ChatsController {
 
     /// The selected project while it has chats in the period; otherwise All (`nil`).
     var visibleProject: String? {
-        guard let selectedProject, projectChips.contains(where: { $0.name == selectedProject }) else { return nil }
+        guard let selectedProject, projectChips.contains(where: { $0.id == selectedProject }) else { return nil }
         return selectedProject
     }
 
@@ -101,19 +103,45 @@ final class ChatsController {
     var groups: [Group] {
         let query = search.trimmingCharacters(in: .whitespaces)
         let project = visibleProject
+        let titles = projectTitles
         var order: [String] = []
         var grouped: [String: [ChatSummary]] = [:]
-        for chat in periodChats where project == nil || chat.projectName == project {
+        for chat in periodChats where project == nil || chat.projectDirectoryName == project {
+            let projectTitle = titles[chat.projectDirectoryName] ?? chat.projectName
             let matches = query.isEmpty
-                || chat.projectName.localizedCaseInsensitiveContains(query)
+                || projectTitle.localizedCaseInsensitiveContains(query)
                 || (chat.title?.localizedCaseInsensitiveContains(query) ?? false)
             guard matches else { continue }
-            if grouped[chat.projectName] == nil {
-                order.append(chat.projectName)
+            if grouped[chat.projectDirectoryName] == nil {
+                order.append(chat.projectDirectoryName)
             }
-            grouped[chat.projectName, default: []].append(chat)
+            grouped[chat.projectDirectoryName, default: []].append(chat)
         }
-        return order.map { Group(id: $0, chats: grouped[$0] ?? []) }
+        return order.map { Group(id: $0, title: titles[$0] ?? $0, chats: grouped[$0] ?? []) }
+    }
+
+    /// Each project's label: its folder name, or "parent/folder" when two projects share a folder name.
+    private var projectTitles: [String: String] {
+        var paths: [String: String?] = [:]
+        for chat in chats where paths[chat.projectDirectoryName] == nil {
+            paths[chat.projectDirectoryName] = chat.cwd
+        }
+        let short = paths.mapValues { $0.map { URL(filePath: $0).lastPathComponent } }
+        var uses: [String: Int] = [:]
+        for (directory, name) in short {
+            uses[name ?? directory, default: 0] += 1
+        }
+        var titles: [String: String] = [:]
+        for (directory, path) in paths {
+            let name = short[directory].flatMap { $0 } ?? directory
+            if let path, uses[name, default: 0] > 1 {
+                let url = URL(filePath: path)
+                titles[directory] = url.deletingLastPathComponent().lastPathComponent + "/" + url.lastPathComponent
+            } else {
+                titles[directory] = name
+            }
+        }
+        return titles
     }
 
     private var periodChats: [ChatSummary] {
@@ -140,9 +168,7 @@ final class ChatsController {
     }
 
     func projectExists(_ chat: ChatSummary) -> Bool {
-        guard let cwd = chat.cwd else { return false }
-        var isDirectory: ObjCBool = false
-        return FileManager.default.fileExists(atPath: cwd, isDirectory: &isDirectory) && isDirectory.boolValue
+        chat.projectExists
     }
 
     /// Continues the chat in `target`: links it when `target` is not the owner, then opens Terminal. A chat that is

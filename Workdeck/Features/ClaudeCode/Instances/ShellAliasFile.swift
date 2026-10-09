@@ -14,6 +14,8 @@ nonisolated struct ShellAliasFile: Sendable {
     enum AliasError: Error, Equatable {
         /// The file exists but cannot be read; writing would replace it without a backup.
         case unreadable
+        /// `~/.zshrc` is a symbolic link to a file that does not exist; writing would replace the link.
+        case brokenLink
         case notText
         case writeFailed
     }
@@ -35,7 +37,7 @@ nonisolated struct ShellAliasFile: Sendable {
     /// Appends the alias on its own line; the file as it was is backed up once. A symbolic link (a dotfiles
     /// manager) is followed, so the link stays.
     func add(_ instance: ClaudeInstance) throws(AliasError) -> Outcome {
-        let target = url.resolvingSymlinksInPath()
+        let target = try resolvedTarget()
         let existing = try read(target)
         let lines = (existing ?? "").components(separatedBy: "\n")
         let line = Self.line(for: instance)
@@ -56,13 +58,22 @@ nonisolated struct ShellAliasFile: Sendable {
 
     /// Removes only Workdeck's line for this instance.
     func remove(_ instance: ClaudeInstance) throws(AliasError) {
-        let target = url.resolvingSymlinksInPath()
+        let target = try resolvedTarget()
         guard let text = try read(target) else { return }
         let prefix = "alias \(instance.command)="
         let kept = text.components(separatedBy: "\n").filter { !($0.hasPrefix(prefix) && $0.hasSuffix(Self.marker)) }
         let result = kept.joined(separator: "\n")
         guard result != text else { return }
         try write(result, to: target)
+    }
+
+    /// The file behind a symbolic link (a dotfiles manager), so the link stays; a link to nothing is refused.
+    private func resolvedTarget() throws(AliasError) -> URL {
+        let target = url.resolvingSymlinksInPath()
+        if (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil, !FileManager.default.fileExists(atPath: target.path) {
+            throw .brokenLink
+        }
+        return target
     }
 
     private func read(_ target: URL) throws(AliasError) -> String? {

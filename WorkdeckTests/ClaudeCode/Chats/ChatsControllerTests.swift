@@ -45,6 +45,7 @@ struct ChatsControllerTests {
 
     private func makeChat(_ id: String = "c1", title: String = "Fix login", modified: Date = fixedNow, in projectName: String = "project") throws {
         let project = home.appending(path: projectName)
+        let projectName = projectName.replacingOccurrences(of: "/", with: "-")
         try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
         let folder = home.appending(path: ".claude/projects/-\(projectName)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -155,7 +156,8 @@ struct ChatsControllerTests {
         let controller = await makeController(launcher: FakeTerminalLauncher())
         #expect(controller.groups.map { $0.chats.map(\.id) } == [["c1"]])
         controller.period = .all
-        #expect(controller.groups.map(\.id) == ["project"])
+        #expect(controller.groups.map(\.id) == ["-project"])
+        #expect(controller.groups.map(\.title) == ["project"])
         #expect(controller.groups.first?.chats.map(\.id) == ["c1", "c2"])
         controller.search = "login"
         #expect(controller.groups.first?.chats.map(\.id) == ["c1"])
@@ -169,33 +171,46 @@ struct ChatsControllerTests {
         try makeChat("b2", modified: fixedNow.addingTimeInterval(-600), in: "beta")
         try makeChat("old", modified: fixedNow.addingTimeInterval(-40 * 86_400), in: "gamma")
         let controller = await makeController(launcher: FakeTerminalLauncher())
-        #expect(controller.projectChips == [.init(name: "beta", count: 2), .init(name: "alpha", count: 1)])
+        #expect(controller.projectChips == [.init(id: "-beta", title: "beta", count: 2), .init(id: "-alpha", title: "alpha", count: 1)])
         controller.period = .all
-        #expect(controller.projectChips.map(\.name) == ["beta", "alpha", "gamma"])
+        #expect(controller.projectChips.map(\.title) == ["beta", "alpha", "gamma"])
     }
 
     @Test func selectingAProjectShowsOnlyItsChatsAndIsRemembered() async throws {
         try makeChat("a1", in: "alpha")
         try makeChat("b1", in: "beta")
         let controller = await makeController(launcher: FakeTerminalLauncher())
-        #expect(controller.groups.map(\.id).sorted() == ["alpha", "beta"])
-        controller.selectedProject = "alpha"
-        #expect(controller.groups.map(\.id) == ["alpha"])
+        #expect(controller.groups.map(\.id).sorted() == ["-alpha", "-beta"])
+        controller.selectedProject = "-alpha"
+        #expect(controller.groups.map(\.id) == ["-alpha"])
         let reopened = await makeController(launcher: FakeTerminalLauncher())
-        #expect(reopened.selectedProject == "alpha")
-        #expect(reopened.groups.map(\.id) == ["alpha"])
+        #expect(reopened.selectedProject == "-alpha")
+        #expect(reopened.groups.map(\.id) == ["-alpha"])
     }
 
     @Test func aSelectedProjectOutsideThePeriodShowsAll() async throws {
         try makeChat("a1", in: "alpha")
         try makeChat("old", modified: fixedNow.addingTimeInterval(-40 * 86_400), in: "gamma")
         let controller = await makeController(launcher: FakeTerminalLauncher())
-        controller.selectedProject = "gamma"
+        controller.selectedProject = "-gamma"
         #expect(controller.visibleProject == nil)
-        #expect(controller.groups.map(\.id) == ["alpha"])
+        #expect(controller.groups.map(\.id) == ["-alpha"])
         controller.period = .all
-        #expect(controller.visibleProject == "gamma")
-        #expect(controller.groups.map(\.id) == ["gamma"])
+        #expect(controller.visibleProject == "-gamma")
+        #expect(controller.groups.map(\.id) == ["-gamma"])
+    }
+
+    @Test func projectsWithTheSameFolderNameStaySeparate() async throws {
+        try makeChat("a1", in: "a/app")
+        try makeChat("b1", modified: fixedNow.addingTimeInterval(-60), in: "b/app")
+        try makeChat("w1", modified: fixedNow.addingTimeInterval(-120), in: "web")
+        let controller = await makeController(launcher: FakeTerminalLauncher())
+        #expect(controller.projectChips.map(\.title) == ["a/app", "b/app", "web"])
+        #expect(controller.groups.map(\.title) == ["a/app", "b/app", "web"])
+        controller.selectedProject = "-b-app"
+        #expect(controller.groups.flatMap(\.chats).map(\.id) == ["b1"])
+        controller.search = "a/app"
+        #expect(controller.groups.isEmpty)
     }
 
     @Test func aMissingProjectFolderCannotBeOpened() async throws {
@@ -204,6 +219,7 @@ struct ChatsControllerTests {
         let chat = try #require(controller.chats.first)
         #expect(controller.projectExists(chat))
         try FileManager.default.removeItem(at: project)
-        #expect(!controller.projectExists(chat))
+        await controller.reload()
+        #expect(!controller.projectExists(try #require(controller.chats.first)))
     }
 }

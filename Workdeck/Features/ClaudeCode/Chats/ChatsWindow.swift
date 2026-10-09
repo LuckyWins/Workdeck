@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The Claude Code Chats window (spec §3.2).
@@ -41,6 +42,9 @@ struct ChatsWindow: View {
             }
             .frame(minWidth: 520, minHeight: 360)
             .task { await controller.reload() }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                Task { await controller.reload() }
+            }
             .alert(
                 "This chat is open",
                 isPresented: Binding(get: { controller.pendingContinue != nil }, set: { if !$0 { controller.pendingContinue = nil } }),
@@ -72,8 +76,8 @@ struct ChatsWindow: View {
                     controller.selectedProject = nil
                 }
                 ForEach(chips) { chip in
-                    ProjectChipButton(name: chip.name, count: chip.count, isSelected: selected == chip.name) {
-                        controller.selectedProject = chip.name
+                    ProjectChipButton(name: chip.title, count: chip.count, isSelected: selected == chip.id) {
+                        controller.selectedProject = chip.id
                     }
                 }
             }
@@ -85,18 +89,21 @@ struct ChatsWindow: View {
     @ViewBuilder
     private var content: some View {
         let groups = controller.groups
-        if groups.isEmpty, !controller.isLoading {
+        if groups.isEmpty, controller.isLoading {
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if groups.isEmpty {
             ContentUnavailableView("No chats yet.", systemImage: "bubble.left.and.bubble.right")
         } else if controller.visibleProject != nil {
             // One project: its name is on the selected chip, so no section header.
-            List(groups.flatMap(\.chats)) { chat in
+            List(groups.flatMap(\.chats), id: \.rowID) { chat in
                 ChatRow(chat: chat, controller: controller)
             }
         } else {
             List {
                 ForEach(groups) { group in
-                    Section(group.id) {
-                        ForEach(group.chats) { chat in
+                    Section(group.title) {
+                        ForEach(group.chats, id: \.rowID) { chat in
                             ChatRow(chat: chat, controller: controller)
                         }
                     }
@@ -110,6 +117,7 @@ private struct ChatRow: View {
     let chat: ChatSummary
     let controller: ChatsController
     @State private var isHovering = false
+    @State private var unlinking: ClaudeInstance?
 
     var body: some View {
         let canOpen = controller.projectExists(chat)
@@ -152,6 +160,16 @@ private struct ChatRow: View {
         .onHover { isHovering = $0 }
         .contextMenu { actions(canOpen: canOpen) }
         .help(canOpen ? "" : "The project folder is gone.")
+        .alert(
+            "Unlink from \(unlinking?.name ?? "")?",
+            isPresented: Binding(get: { unlinking != nil }, set: { if !$0 { unlinking = nil } }),
+            presenting: unlinking
+        ) { target in
+            Button("Unlink", role: .destructive) { Task { await controller.unlink(chat, from: target) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { target in
+            Text("Close this chat in \(target.name) first, or it continues there as a separate copy. The chat itself is not changed.")
+        }
     }
 
     @ViewBuilder
@@ -172,8 +190,8 @@ private struct ChatRow: View {
         if !linked.isEmpty {
             Divider()
             ForEach(linked) { target in
-                Button("Unlink from \(target.name)") {
-                    Task { await controller.unlink(chat, from: target) }
+                Button("Unlink from \(target.name)…") {
+                    unlinking = target
                 }
             }
         }

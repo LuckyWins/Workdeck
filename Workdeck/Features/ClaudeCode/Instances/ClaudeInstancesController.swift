@@ -13,6 +13,8 @@ final class ClaudeInstancesController {
     var error: String?
     /// A command Terminal could not run, offered for copying.
     var failedCommand: String?
+    /// The alias line Workdeck could not remove from `~/.zshrc`, for the user to delete.
+    var aliasLeftBehind: String?
 
     @ObservationIgnored let home: URL
     @ObservationIgnored private let store: ClaudeInstanceStore
@@ -75,7 +77,11 @@ final class ClaudeInstancesController {
     /// Removes Workdeck's alias and forgets the instance; its folder and login stay.
     func remove(_ instance: ClaudeInstance) {
         guard !instance.isMain else { return }
-        try? aliasFile.remove(instance)
+        do {
+            try aliasFile.remove(instance)
+        } catch {
+            aliasLeftBehind = ShellAliasFile.line(for: instance)
+        }
         store.remove(instance.name)
         instances = store.instances
         accounts[instance.name] = nil

@@ -56,6 +56,14 @@ struct ChatLinkerTests {
         #expect(linkTarget("c1") == nil)
     }
 
+    @Test func aDanglingLinkAtTheTargetIsReplaced() throws {
+        try makeSource(withFolder: false)
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: target.appending(path: "c1.jsonl"), withDestinationURL: home.appending(path: "moved/c1.jsonl"))
+        try ChatLinker.link(chat, from: main, into: work)
+        #expect(linkTarget("c1.jsonl") == source.appending(path: "c1.jsonl").path)
+    }
+
     @Test func unlinkRemovesOnlyLinks() throws {
         try makeSource(withFolder: true)
         try ChatLinker.link(chat, from: main, into: work)

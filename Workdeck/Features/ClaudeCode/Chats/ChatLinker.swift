@@ -13,6 +13,10 @@ nonisolated enum ChatLinker {
         let fileManager = FileManager.default
         let source = items(chat, in: owner)
         let destination = items(chat, in: target)
+        // A link left pointing nowhere (the owner's folder moved) is replaced, not a conflict.
+        if linkTarget(destination.file) != nil, !fileManager.fileExists(atPath: destination.file.path) {
+            try? fileManager.removeItem(at: destination.file)
+        }
         if exists(destination.file), linkTarget(destination.file) != source.file.path {
             throw .conflict
         }

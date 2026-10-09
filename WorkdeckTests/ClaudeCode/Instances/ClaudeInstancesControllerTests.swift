@@ -72,6 +72,18 @@ struct ClaudeInstancesControllerTests {
         #expect(FileManager.default.fileExists(atPath: work.directory.path))
     }
 
+    @Test func aFailedAliasRemovalOffersTheLine() async throws {
+        let controller = makeController(launcher: FakeTerminalLauncher())
+        await controller.add(named: "work")
+        let work = try #require(controller.instances.last)
+        let zshrcURL = home.appending(path: ".zshrc")
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: zshrcURL.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: zshrcURL.path) }
+        controller.remove(work)
+        #expect(controller.aliasLeftBehind == ShellAliasFile.line(for: work))
+        #expect(controller.instances.map(\.name) == ["main"])
+    }
+
     @Test func terminalFailureOffersTheCommand() async {
         let controller = makeController(launcher: FakeTerminalLauncher(fails: true))
         #expect(await controller.add(named: "work"))

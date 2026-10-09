@@ -58,12 +58,12 @@ A section below the existing Claude Code sections, always shown.
 Opened by **Chats…** in the Claude Code row of the popover and **Open Chats…** in Settings. Title "Claude Code Chats".
 
 - A search field (matches title and project name) and a **Last 30 days / All** picker (30 days by default).
-- A row of project chips under the toolbar: **All**, then each project with chats in the period, newest first, with its chat count ("Workdeck 12"). All lists chats grouped by project (the last path component of `cwd`, or the project directory name when `cwd` is unknown); a project chip lists only that project's chats, without a header. The chosen chip is remembered (`claudeChats.selectedProject`); a remembered project with no chats in the period shows All. Search applies within the chosen chip.
+- A row of project chips under the toolbar: **All**, then each project with chats in the period, newest first, with its chat count ("Workdeck 12"). Projects are told apart by their project directory name and labeled with the last path component of `cwd` ("parent/folder" when two projects share a folder name; the project directory name when `cwd` is unknown). All lists chats grouped by project; a project chip lists only that project's chats, without a header. The chosen chip is remembered (`claudeChats.selectedProject`); a remembered project with no chats in the period shows All. Search applies within the chosen chip.
 - A row: title ("Untitled chat" without one), age ("2h ago", "yesterday", "Sep 28"), size ("43 MB"), and tags: the owner instance (`main`, `work`), `→ work` (purple) for each instance it is linked into, and `live` while the session is open (from session hooks, main instance only).
 - Row actions (buttons on hover and a context menu):
   - **Continue in <instance>** for every other instance;
   - **Resume in Terminal** in the owner instance;
-  - **Unlink from <instance>** for each link.
+  - **Unlink from <instance>…** for each link, after a confirmation: "Close this chat in <instance> first, or it continues there as a separate copy."
 - A chat whose project folder no longer exists shows the actions disabled with the help text "The project folder is gone."
 - An empty state: "No chats yet." With only one instance, a hint: "Add an instance in Settings to continue chats with another account."
 
@@ -109,11 +109,12 @@ New folders `Workdeck/Features/ClaudeCode/Instances/` and `Workdeck/Features/Cla
 - Title: the last `ai-title` in the last 512 KB of the file; if none, the first in the first 512 KB; otherwise none. Titles are trimmed to 80 characters.
 - `cwd`: the first `cwd` in the first 512 KB.
 - `modifiedAt` and `size` come from the file (through links).
-- Titles live only in memory while the Chats window is open; they are never written to disk, logged, or included in Diagnostics.
+- Titles live only in Workdeck's memory (kept between openings of the window so it opens at once); they are never written to disk, logged, or included in Diagnostics.
+- Whether `cwd` is a folder is checked during the scan, off the main actor. A chat's row is identified by its owner and ID, since a transcript copied by hand can exist in two instances.
 
 ### 5.3 Linking
 
-- `link(chat, into: instance)`: in `<instance>/projects/<projectDirectoryName>/` (created `0700` if missing) create symbolic links `<id>.jsonl` → the owner's file and, if the owner has `<id>/` and the target has nothing named `<id>`, `<id>` → that folder. A link that already points to the same target is left alone. Any other existing `<id>.jsonl` is an error ("work already has its own chat with this ID") and nothing is changed. An existing `<id>/` in the target is kept: Claude Code makes it there for subagents once a chat continued in that instance, and it is not a conflict.
+- `link(chat, into: instance)`: in `<instance>/projects/<projectDirectoryName>/` (created `0700` if missing) create symbolic links `<id>.jsonl` → the owner's file and, if the owner has `<id>/` and the target has nothing named `<id>`, `<id>` → that folder. A link that already points to the same target is left alone, and a link that points nowhere (the owner's folder moved) is replaced. Any other existing `<id>.jsonl` is an error ("work already has its own chat with this ID") and nothing is changed. An existing `<id>/` in the target is kept: Claude Code makes it there for subagents once a chat continued in that instance, and it is not a conflict.
 - `unlink(chat, from: instance)`: remove the two links if they are symbolic links pointing into the owner's folder; never remove a regular file or folder.
 - Linking into the owner instance is not offered.
 
@@ -127,7 +128,8 @@ New folders `Workdeck/Features/ClaudeCode/Instances/` and `Workdeck/Features/Cla
 |---|---|
 | Invalid or taken name | The Add button stays disabled with the reason under the field. |
 | `~/.zshrc` missing | Created with the alias line. |
-| `~/.zshrc` is not UTF-8 text | Alias not written; the instance is added; the error shows the line to add by hand. |
+| `~/.zshrc` is not UTF-8 text, cannot be read, or is a symbolic link to nothing | Alias not written and the file or link left as is; the instance is added; the note shows the line to add by hand. |
+| The alias cannot be removed on Remove | The instance is forgotten; an alert shows the line to delete by hand, with Copy Line. |
 | An alias `claude-<name>` without Workdeck's marker exists | Left as is; the instance is added; Settings notes that the existing alias is used. |
 | Instance directory cannot be created | Nothing is saved; the error is shown in the sheet. |
 | Project folder gone | Continue and Resume disabled (§3.2). |

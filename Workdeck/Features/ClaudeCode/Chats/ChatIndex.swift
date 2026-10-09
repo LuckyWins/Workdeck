@@ -13,6 +13,11 @@ nonisolated struct ChatSummary: Equatable, Sendable, Identifiable {
     var size: Int64
     /// Instances that link to this chat.
     var linkedInto: [String] = []
+    /// Whether `cwd` is a folder, checked during the scan so the window does not touch the disk while drawing.
+    var projectExists = false
+
+    /// The list row's identity: one chat can exist in two instances when transcripts were copied by hand.
+    var rowID: String { "\(owner)/\(id)" }
 
     var projectName: String {
         guard let cwd, !cwd.isEmpty else { return projectDirectoryName }
@@ -70,7 +75,8 @@ actor ChatIndex {
                         cwd: peeked.cwd,
                         title: peeked.title,
                         modifiedAt: modifiedAt,
-                        size: size
+                        size: size,
+                        projectExists: peeked.cwd.map(Self.isFolder) ?? false
                     )
                 }
             }
@@ -80,5 +86,10 @@ actor ChatIndex {
             chats[link.target]?.linkedInto.append(link.instance)
         }
         return chats.values.sorted { $0.modifiedAt > $1.modifiedAt }
+    }
+
+    private static func isFolder(_ path: String) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
     }
 }

@@ -74,6 +74,24 @@ struct ChatIndexTests {
         #expect(counter.value.withLock { $0 } == 2)
     }
 
+    @Test func recordsWhetherTheProjectFolderExists() async throws {
+        try chat("gone", in: main)
+        let folder = main.projectsDirectory.appending(path: "-here")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let line = String(data: try JSONSerialization.data(withJSONObject: ["type": "user", "cwd": home.path]), encoding: .utf8)! + "\n"
+        try line.write(to: folder.appending(path: "here.jsonl"), atomically: true, encoding: .utf8)
+        let chats = await ChatIndex().scan([main])
+        #expect(chats.first { $0.id == "here" }?.projectExists == true)
+        #expect(chats.first { $0.id == "gone" }?.projectExists == false)
+    }
+
+    @Test func rowIDsTellOwnersApart() {
+        let main = ChatSummary(id: "c1", owner: "main", projectDirectoryName: "-p", modifiedAt: fixedNow, size: 1)
+        var copy = main
+        copy.owner = "work"
+        #expect(main.rowID != copy.rowID)
+    }
+
     @Test func missingProjectsFolderIsEmpty() async {
         #expect(await ChatIndex().scan([main, work]).isEmpty)
     }
