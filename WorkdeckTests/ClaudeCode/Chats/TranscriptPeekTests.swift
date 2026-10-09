@@ -47,6 +47,18 @@ struct TranscriptPeekTests {
         #expect(title.hasSuffix("…"))
     }
 
+    @Test func cwdIsFoundInAFirstLineLargerThanTheWindow() throws {
+        // A first message with a pasted screenshot: Claude Code writes `cwd` before `message`.
+        let first = #"{"parentUuid":null,"cwd":"/p/My \"App\"","type":"user","message":{"content":""# + String(repeating: "A", count: 3000) + #""}}"# + "\n"
+        let url = try write(first + title("Shot"))
+        #expect(TranscriptPeek.peek(url, window: 1024) == TranscriptPeek.Peek(title: "Shot", cwd: #"/p/My "App""#))
+    }
+
+    @Test func cwdFallsBackToTheEndOfTheFile() throws {
+        let url = try write(filler(3000) + user(cwd: "/p/Late") + filler(100))
+        #expect(TranscriptPeek.peek(url, window: 1024).cwd == "/p/Late")
+    }
+
     @Test func malformedLinesAndMissingFilesGiveNothing() throws {
         let url = try write("not json\n{\"type\":\"ai-title\"\n")
         #expect(TranscriptPeek.peek(url) == TranscriptPeek.Peek())

@@ -146,7 +146,7 @@ final class ChatsController {
     }
 
     /// Continues the chat in `target`: links it when `target` is not the owner, then opens Terminal. A chat that is
-    /// open now waits for `confirmPendingContinue()`.
+    /// open now waits for `confirm(_:)`.
     func continueChat(_ chat: ChatSummary, in target: ClaudeInstance) async {
         if let session = liveSession(of: chat) {
             pendingContinue = PendingContinue(chat: chat, target: target, hostName: ChatsText.hostName(of: session))
@@ -155,8 +155,9 @@ final class ChatsController {
         await perform(chat, in: target)
     }
 
-    func confirmPendingContinue() async {
-        guard let pending = pendingContinue else { return }
+    /// Continues a chat the user confirmed. It takes the alert's presented value: dismissing the alert has already
+    /// cleared `pendingContinue` by the time the button's action runs.
+    func confirm(_ pending: PendingContinue) async {
         pendingContinue = nil
         await perform(pending.chat, in: pending.target)
     }

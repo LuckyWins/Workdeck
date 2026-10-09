@@ -45,8 +45,8 @@ struct ChatsWindow: View {
                 "This chat is open",
                 isPresented: Binding(get: { controller.pendingContinue != nil }, set: { if !$0 { controller.pendingContinue = nil } }),
                 presenting: controller.pendingContinue
-            ) { _ in
-                Button("Continue Anyway") { Task { await controller.confirmPendingContinue() } }
+            ) { pending in
+                Button("Continue Anyway") { Task { await controller.confirm(pending) } }
                 Button("Cancel", role: .cancel) { controller.pendingContinue = nil }
             } message: { pending in
                 Text("This chat is open in \(pending.hostName). Writing to it from two places corrupts it; close it there first.")

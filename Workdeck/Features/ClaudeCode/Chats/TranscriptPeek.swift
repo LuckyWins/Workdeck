@@ -14,14 +14,14 @@ nonisolated enum TranscriptPeek {
     private static let cwdMarker = Data("\"cwd\"".utf8)
 
     /// The last title in the file's last `window` bytes, else the first in its first `window` bytes; the first `cwd`
-    /// in its first `window` bytes. A file that fits in the window is read once.
+    /// in its first `window` bytes, else in its last. A file that fits in the window is read once.
     static func peek(_ url: URL, window: Int = window) -> Peek {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return Peek() }
         defer { try? handle.close() }
         guard let size = try? handle.seekToEnd() else { return Peek() }
         try? handle.seek(toOffset: 0)
         let headLines = lines((try? handle.read(upToCount: window)) ?? Data())
-        let cwd = headLines.lazy.compactMap(cwd(in:)).first
+        var cwd = headLines.lazy.compactMap(cwd(in:)).first
         guard size > UInt64(window) else {
             return Peek(title: headLines.reversed().lazy.compactMap(title(in:)).first, cwd: cwd)
         }
@@ -33,8 +33,10 @@ nonisolated enum TranscriptPeek {
         } else {
             tail = Data()
         }
-        let title = lines(tail).reversed().lazy.compactMap(title(in:)).first
+        let tailLines = lines(tail)
+        let title = tailLines.reversed().lazy.compactMap(title(in:)).first
             ?? headLines.lazy.compactMap(title(in:)).first
+        cwd = cwd ?? tailLines.lazy.compactMap(cwd(in:)).first
         return Peek(title: title, cwd: cwd)
     }
 
@@ -53,10 +55,36 @@ nonisolated enum TranscriptPeek {
     }
 
     private static func cwd(in line: Data) -> String? {
-        guard line.range(of: cwdMarker) != nil,
-              let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
-              let cwd = object["cwd"] as? String,
-              !cwd.isEmpty else { return nil }
-        return cwd
+        guard line.range(of: cwdMarker) != nil else { return nil }
+        if let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any] {
+            guard let cwd = object["cwd"] as? String, !cwd.isEmpty else { return nil }
+            return cwd
+        }
+        return rawCWD(in: line)
+    }
+
+    private static let rawCWDMarker = Data(#""cwd":""#.utf8)
+
+    /// The `cwd` string of a line the window cut, e.g. a first message with a pasted screenshot: Claude Code writes
+    /// `cwd` before `message`, so the value is usually complete even when the line is not.
+    private static func rawCWD(in line: Data) -> String? {
+        guard let marker = line.range(of: rawCWDMarker) else { return nil }
+        var index = marker.upperBound
+        var escaped = false
+        while index < line.endIndex {
+            let byte = line[index]
+            if escaped {
+                escaped = false
+            } else if byte == UInt8(ascii: "\\") {
+                escaped = true
+            } else if byte == UInt8(ascii: "\"") {
+                let quoted = Data("\"".utf8) + line[marker.upperBound..<index] + Data("\"".utf8)
+                guard let cwd = try? JSONSerialization.jsonObject(with: quoted, options: .fragmentsAllowed) as? String,
+                      !cwd.isEmpty else { return nil }
+                return cwd
+            }
+            index = line.index(after: index)
+        }
+        return nil
     }
 }

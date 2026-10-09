@@ -90,8 +90,10 @@ struct ChatsControllerTests {
         await controller.continueChat(chat, in: try #require(controller.instances.instances.last))
         #expect(controller.pendingContinue?.hostName == "VS Code")
         #expect(launcher.commands.isEmpty)
-        await controller.confirmPendingContinue()
-        #expect(controller.pendingContinue == nil)
+        // Tapping an alert button dismisses the alert, which clears the pending value before the action runs.
+        let pending = try #require(controller.pendingContinue)
+        controller.pendingContinue = nil
+        await controller.confirm(pending)
         #expect(launcher.commands.count == 1)
     }
 

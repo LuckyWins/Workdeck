@@ -60,6 +60,15 @@ struct ShellAliasFileTests {
         #expect(try text(real).contains("alias claude-work="))
     }
 
+    @Test func refusesAFileItCannotRead() throws {
+        try "export A=1\n".write(to: zshrc, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: zshrc.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: zshrc.path) }
+        #expect(throws: ShellAliasFile.AliasError.unreadable) { try ShellAliasFile(url: zshrc).add(work) }
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: zshrc.path)
+        #expect(try text(zshrc) == "export A=1\n")
+    }
+
     @Test func refusesAFileThatIsNotText() throws {
         try Data([0xFF, 0xFE, 0x00]).write(to: zshrc)
         #expect(throws: ShellAliasFile.AliasError.notText) { try ShellAliasFile(url: zshrc).add(work) }

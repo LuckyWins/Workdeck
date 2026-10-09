@@ -12,6 +12,8 @@ nonisolated struct ShellAliasFile: Sendable {
     }
 
     enum AliasError: Error, Equatable {
+        /// The file exists but cannot be read; writing would replace it without a backup.
+        case unreadable
         case notText
         case writeFailed
     }
@@ -64,7 +66,12 @@ nonisolated struct ShellAliasFile: Sendable {
     }
 
     private func read(_ target: URL) throws(AliasError) -> String? {
-        guard let data = FileManager.default.contents(atPath: target.path) else { return nil }
+        guard let data = FileManager.default.contents(atPath: target.path) else {
+            if FileManager.default.fileExists(atPath: target.path) {
+                throw .unreadable
+            }
+            return nil
+        }
         guard let text = String(data: data, encoding: .utf8) else { throw .notText }
         return text
     }
