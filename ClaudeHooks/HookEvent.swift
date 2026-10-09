@@ -45,4 +45,6 @@ nonisolated struct HookEvent: Codable, Equatable, Sendable {
     var backgroundAgentIDs: [String]?
     /// `PreToolUse` only: the tool and a short target, e.g. "Read NotchPresenter.swift".
     var action: String?
+    /// The extra instance whose hook wrote this event (`--instance <name>`); `nil` for the main one.
+    var instance: String?
 }
