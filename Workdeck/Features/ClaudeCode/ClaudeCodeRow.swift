@@ -1,7 +1,9 @@
+import AppKit
 import SwiftUI
 
 struct ClaudeCodeRow: View {
     @Bindable var controller: ClaudeCodeController
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -16,6 +18,12 @@ struct ClaudeCodeRow: View {
                     .font(.caption)
                     .foregroundStyle(controller.limits.connectError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
                     .fixedSize(horizontal: false, vertical: true)
+                Button("Chats…") {
+                    openWindow(id: ChatsWindow.id)
+                    NSApp.activate()
+                }
+                .buttonStyle(.link)
+                .font(.caption)
             }
 
             Spacer(minLength: 8)

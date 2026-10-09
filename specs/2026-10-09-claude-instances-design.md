@@ -49,7 +49,7 @@ A section below the existing Claude Code sections, always shown.
 
 - One row per instance: name, directory (`~/.claude-work`), and "Signed in as name@example.com", or "Not signed in" when no account email is found. The main instance (`~/.claude`) is first, cannot be removed, and has no alias.
 - **Add Instance…** opens a sheet with a name field (`work`), a preview of the directory (`~/.claude-work`) and the command (`claude-work`), and **Add**. Names: lowercase letters, digits and `-`, 1–20 characters, not `main`, unique.
-- Each extra instance has **Sign In…** (opens Terminal with `claude` in that instance; the user runs `/login`), **Show in Finder**, and **Remove…**.
+- Each extra instance has **Sign In…** while it is not signed in (opens Terminal with `claude` in that instance; the user runs `/login`), **Show in Finder**, and **Remove…**.
 - **Remove…** confirms: "Workdeck removes the `claude-work` alias and forgets this instance. The folder `~/.claude-work` and its login stay; to remove them, run `claude-work /logout` and delete the folder." Linked chats stay linked.
 - A note under the list: "Each instance has its own login, settings, skills and plugins. Workdeck does not copy them."
 
@@ -58,8 +58,8 @@ A section below the existing Claude Code sections, always shown.
 Opened by **Chats…** in the Claude Code row of the popover and **Open Chats…** in Settings. Title "Claude Code Chats".
 
 - A search field (matches title and project name) and a **Last 30 days / All** picker (30 days by default).
-- Chats grouped by project (the last path component of `cwd`, or the project directory name when `cwd` is unknown); groups and chats newest first.
-- A row: title ("Untitled chat" without one), age ("2h ago", "yesterday", "Sep 28"), size ("43 MB"), and tags: the owner instance (`main`, `work`), `→ work` for each instance it is linked into, and `live` while the session is open (from session hooks, main instance only).
+- A row of project chips under the toolbar: **All**, then each project with chats in the period, newest first, with its chat count ("Workdeck 12"). All lists chats grouped by project (the last path component of `cwd`, or the project directory name when `cwd` is unknown); a project chip lists only that project's chats, without a header. The chosen chip is remembered (`claudeChats.selectedProject`); a remembered project with no chats in the period shows All. Search applies within the chosen chip.
+- A row: title ("Untitled chat" without one), age ("2h ago", "yesterday", "Sep 28"), size ("43 MB"), and tags: the owner instance (`main`, `work`), `→ work` (purple) for each instance it is linked into, and `live` while the session is open (from session hooks, main instance only).
 - Row actions (buttons on hover and a context menu):
   - **Continue in <instance>** for every other instance;
   - **Resume in Terminal** in the owner instance;
@@ -97,7 +97,7 @@ New folders `Workdeck/Features/ClaudeCode/Instances/` and `Workdeck/Features/Cla
 
 ### 5.1 Adding, Signing In, Removing
 
-- **Add:** create `~/.claude-<name>` with mode `0700` (an existing directory is used as it is), add the alias, save the instance, then run Sign In. If the alias cannot be written, the instance is still added and the error says so; Workdeck's own actions never need the alias.
+- **Add:** create `~/.claude-<name>` with mode `0700` (an existing directory is used as it is), add the alias, save the instance, then run Sign In unless the folder is signed in already. If the alias cannot be written, the instance is still added and the error says so; Workdeck's own actions never need the alias.
 - **Sign In:** Terminal runs `CLAUDE_CONFIG_DIR='<dir>' claude` in the home folder. The account line refreshes when Settings appears and when Workdeck becomes active again (after signing in in Terminal).
 - **Remove:** remove Workdeck's alias line for that name and forget the instance. Nothing else changes.
 - Scripts run `exec /bin/zsh -il -c '<command>'`, so `PATH` and aliases match the user's terminal; Workdeck's commands set `CLAUDE_CONFIG_DIR` directly and do not depend on the alias.

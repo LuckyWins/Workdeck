@@ -45,14 +45,14 @@ struct InstancesSettingsSection: View {
     private func row(_ instance: ClaudeInstance) -> some View {
         LabeledContent {
             HStack {
-                if !instance.isMain {
+                if !instance.isMain, controller.accounts[instance.name] == nil {
                     Button("Sign In…") { Task { await controller.signIn(instance) } }
                 }
                 Button("Show in Finder") {
                     NSWorkspace.shared.activateFileViewerSelecting([instance.directory])
                 }
                 if !instance.isMain {
-                    Button("Remove…") { removing = instance }
+                    Button("Remove…", role: .destructive) { removing = instance }
                 }
             }
         } label: {

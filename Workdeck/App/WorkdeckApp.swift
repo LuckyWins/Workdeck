@@ -17,7 +17,7 @@ struct WorkdeckApp: App {
         }
 
         Window("Claude Code Chats", id: ChatsWindow.id) {
-            ChatsWindow()
+            ChatsWindow(controller: appDelegate.chats)
         }
         .defaultSize(width: 640, height: 520)
         .defaultLaunchBehavior(.suppressed)

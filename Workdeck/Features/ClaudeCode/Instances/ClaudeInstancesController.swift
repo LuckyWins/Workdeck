@@ -32,7 +32,7 @@ final class ClaudeInstancesController {
     }
 
     /// Creates the folder (an existing one is used as it is), adds the alias and the instance, then opens Terminal to
-    /// sign in. Returns whether the instance was added.
+    /// sign in unless the folder is signed in already. Returns whether the instance was added.
     @discardableResult
     func add(named name: String) async -> Bool {
         error = nil
@@ -57,7 +57,10 @@ final class ClaudeInstancesController {
         guard (try? store.add(name)) != nil else { return false }
         instances = store.instances
         WorkdeckLog.chats.notice("Added instance \(name, privacy: .public)")
-        await signIn(instance)
+        await refreshAccounts()
+        if accounts[name] == nil {
+            await signIn(instance)
+        }
         return true
     }
 

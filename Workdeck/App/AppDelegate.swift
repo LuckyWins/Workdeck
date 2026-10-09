@@ -42,6 +42,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         launcher: TerminalAppLauncher.standard()
     )
 
+    private(set) lazy var chats = ChatsController(
+        instances: instances,
+        index: ChatIndex(),
+        launcher: TerminalAppLauncher.standard(),
+        liveSessions: { [unowned self] in self.claudeCode.sessions.store.sessions }
+    )
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Unit tests are hosted in this app; keep them away from the real privileged helper.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }

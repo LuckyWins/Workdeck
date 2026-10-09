@@ -18,6 +18,13 @@ final class ChatsController {
         var chats: [ChatSummary]
     }
 
+    struct ProjectChip: Equatable, Identifiable {
+        var name: String
+        var count: Int
+
+        var id: String { name }
+    }
+
     struct PendingContinue: Equatable {
         var chat: ChatSummary
         var target: ClaudeInstance
@@ -25,9 +32,14 @@ final class ChatsController {
     }
 
     static let recentPeriod: TimeInterval = 30 * 24 * 60 * 60
+    static let selectedProjectKey = "claudeChats.selectedProject"
 
     var search = ""
     var period = Period.lastMonth
+    /// The project chip the user picked; `nil` is All. Remembered between launches.
+    var selectedProject: String? {
+        didSet { defaults.set(selectedProject, forKey: Self.selectedProjectKey) }
+    }
     private(set) var chats: [ChatSummary] = []
     private(set) var isLoading = false
     /// A chat that is open now; continuing it waits for the user's answer.
@@ -40,6 +52,7 @@ final class ChatsController {
     @ObservationIgnored private let index: ChatIndex
     @ObservationIgnored private let launcher: any TerminalLaunching
     @ObservationIgnored private let liveSessions: () -> [ClaudeSession]
+    @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let now: () -> Date
 
     init(
@@ -47,13 +60,16 @@ final class ChatsController {
         index: ChatIndex,
         launcher: any TerminalLaunching,
         liveSessions: @escaping () -> [ClaudeSession],
+        defaults: UserDefaults = .standard,
         now: @escaping () -> Date = { Date() }
     ) {
         self.instances = instances
         self.index = index
         self.launcher = launcher
         self.liveSessions = liveSessions
+        self.defaults = defaults
         self.now = now
+        selectedProject = defaults.string(forKey: Self.selectedProjectKey)
     }
 
     func reload() async {
@@ -62,13 +78,32 @@ final class ChatsController {
         isLoading = false
     }
 
-    /// Chats matching the period and search, grouped by project; groups and chats newest first.
+    /// Projects with chats in the period, newest first, with how many chats each has there.
+    var projectChips: [ProjectChip] {
+        var chips: [ProjectChip] = []
+        for chat in periodChats {
+            if let index = chips.firstIndex(where: { $0.name == chat.projectName }) {
+                chips[index].count += 1
+            } else {
+                chips.append(ProjectChip(name: chat.projectName, count: 1))
+            }
+        }
+        return chips
+    }
+
+    /// The selected project while it has chats in the period; otherwise All (`nil`).
+    var visibleProject: String? {
+        guard let selectedProject, projectChips.contains(where: { $0.name == selectedProject }) else { return nil }
+        return selectedProject
+    }
+
+    /// Chats matching the period, project and search, grouped by project; groups and chats newest first.
     var groups: [Group] {
-        let cutoff = now().addingTimeInterval(-Self.recentPeriod)
         let query = search.trimmingCharacters(in: .whitespaces)
+        let project = visibleProject
         var order: [String] = []
         var grouped: [String: [ChatSummary]] = [:]
-        for chat in chats where period == .all || chat.modifiedAt >= cutoff {
+        for chat in periodChats where project == nil || chat.projectName == project {
             let matches = query.isEmpty
                 || chat.projectName.localizedCaseInsensitiveContains(query)
                 || (chat.title?.localizedCaseInsensitiveContains(query) ?? false)
@@ -79,6 +114,12 @@ final class ChatsController {
             grouped[chat.projectName, default: []].append(chat)
         }
         return order.map { Group(id: $0, chats: grouped[$0] ?? []) }
+    }
+
+    private var periodChats: [ChatSummary] {
+        guard period == .lastMonth else { return chats }
+        let cutoff = now().addingTimeInterval(-Self.recentPeriod)
+        return chats.filter { $0.modifiedAt >= cutoff }
     }
 
     func liveSession(of chat: ChatSummary) -> ClaudeSession? {

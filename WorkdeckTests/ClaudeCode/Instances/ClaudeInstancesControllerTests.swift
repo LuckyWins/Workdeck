@@ -30,6 +30,17 @@ struct ClaudeInstancesControllerTests {
         #expect(launcher.commands == ["cd \(ShellCommand.quoted(home.path)) && CLAUDE_CONFIG_DIR=\(ShellCommand.quoted(directory.path)) claude"])
     }
 
+    @Test func addSkipsSignInForAFolderThatIsSignedIn() async throws {
+        let directory = home.appending(path: ".claude-work")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data(#"{"oauthAccount":{"emailAddress":"work@example.com"}}"#.utf8).write(to: directory.appending(path: ".claude.json"))
+        let launcher = FakeTerminalLauncher()
+        let controller = makeController(launcher: launcher)
+        #expect(await controller.add(named: "work"))
+        #expect(launcher.commands.isEmpty)
+        #expect(controller.accounts["work"] == "work@example.com")
+    }
+
     @Test func addRejectsAnInvalidName() async {
         let launcher = FakeTerminalLauncher()
         let controller = makeController(launcher: launcher)
