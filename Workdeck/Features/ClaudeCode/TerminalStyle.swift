@@ -52,6 +52,8 @@ struct TerminalHeader: View {
     var body: some View {
         HStack(spacing: 4) {
             Text("─ \(title)")
+                .lineLimit(1)
+                .fixedSize()
             Rectangle()
                 .fill(Terminal.faint)
                 .frame(height: 1)

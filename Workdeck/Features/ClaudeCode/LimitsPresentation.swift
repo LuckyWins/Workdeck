@@ -46,6 +46,8 @@ nonisolated struct AccountLimitsViewState: Equatable, Sendable, Identifiable {
     var refresh = LimitsRefreshState.hidden
     /// Why the usage API brings no data for this account, e.g. its Keychain item is missing.
     var problem: String?
+    /// "Pro", "Team 5x", from the account's `.claude.json`.
+    var plan: String?
 
     var id: String { name }
 
@@ -98,6 +100,11 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
 }
 
 nonisolated enum LimitsPresentation {
+    /// "personal" when several accounts have blocks; a lone block is just "limits". The plan goes at the right.
+    static func blockTitle(_ account: AccountLimitsViewState, isOnlyBlock: Bool) -> String {
+        isOnlyBlock ? "limits" : account.name
+    }
+
     /// A collapsed account's line: its running windows, the most used first.
     static func summaryWindows(_ account: AccountLimitsViewState, now: Date) -> [UsageWindow] {
         account.windows.filter { $0.resetsAt > now }.sorted { $0.usedPercent > $1.usedPercent }

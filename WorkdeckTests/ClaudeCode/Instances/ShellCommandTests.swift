@@ -61,6 +61,22 @@ struct InstanceAccountReaderTests {
         #expect(InstanceAccountReader.email(in: file) == "me@example.com")
     }
 
+    @Test func readsThePlan() throws {
+        let file = root.appending(path: "team.json")
+        try Data(#"{"oauthAccount":{"emailAddress":"me@example.com","organizationType":"claude_team","userRateLimitTier":"default_claude_max_5x","organizationRateLimitTier":"default_raven"}}"#.utf8).write(to: file)
+        #expect(InstanceAccountReader.account(in: file) == .init(email: "me@example.com", plan: "Team 5x"))
+    }
+
+    @Test func planLabels() {
+        #expect(InstanceAccountReader.planLabel(organizationType: "claude_pro", rateLimitTier: "default_claude_ai") == "Pro")
+        #expect(InstanceAccountReader.planLabel(organizationType: "claude_max", rateLimitTier: "default_claude_max_20x") == "Max 20x")
+        #expect(InstanceAccountReader.planLabel(organizationType: "claude_max", rateLimitTier: "default_claude_max_5x") == "Max 5x")
+        #expect(InstanceAccountReader.planLabel(organizationType: "claude_team", rateLimitTier: nil) == "Team")
+        #expect(InstanceAccountReader.planLabel(organizationType: "claude_enterprise", rateLimitTier: nil) == "Enterprise")
+        #expect(InstanceAccountReader.planLabel(organizationType: "something_new", rateLimitTier: "default_claude_max_5x") == nil)
+        #expect(InstanceAccountReader.planLabel(organizationType: nil, rateLimitTier: nil) == nil)
+    }
+
     @Test func missingOrMalformedMeansNone() throws {
         #expect(InstanceAccountReader.email(in: root.appending(path: "none.json")) == nil)
         let file = root.appending(path: "bad.json")

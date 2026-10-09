@@ -93,9 +93,10 @@ struct ClaudeInstancesControllerTests {
     @Test func readsAccounts() async throws {
         let controller = makeController(launcher: FakeTerminalLauncher())
         await controller.add(named: "work")
-        try Data(#"{"oauthAccount":{"emailAddress":"work@example.com"}}"#.utf8).write(to: home.appending(path: ".claude-work/.claude.json"))
+        try Data(#"{"oauthAccount":{"emailAddress":"work@example.com","organizationType":"claude_pro"}}"#.utf8).write(to: home.appending(path: ".claude-work/.claude.json"))
         await controller.refreshAccounts()
         #expect(controller.accounts["work"] == "work@example.com")
+        #expect(controller.plans["work"] == "Pro")
         #expect(controller.accounts["main"] == nil)
     }
 }

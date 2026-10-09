@@ -229,7 +229,7 @@ struct LimitsExpandedView: View {
                 let blocks = model.state.limitBlocks
                 if model.state.collapsesOtherAccounts, blocks.count > 1 {
                     // The short view: one line per account, the compact account first.
-                    accountsHeader(title: "limits", collapsed: true)
+                    accountsHeader(title: "limits", plan: nil, collapsed: true)
                     let width = blocks.map(\.name.count).max() ?? 0
                     ForEach(blocks) { account in
                         summaryRow(account, nameWidth: width)
@@ -238,9 +238,9 @@ struct LimitsExpandedView: View {
                     ForEach(blocks) { account in
                         let isFirst = account.id == blocks.first?.id
                         if blocks.count > 1, isFirst {
-                            accountsHeader(title: "limits · \(account.name)", collapsed: false)
+                            accountsHeader(title: LimitsPresentation.blockTitle(account, isOnlyBlock: false), plan: account.plan, collapsed: false)
                         } else {
-                            TerminalHeader(title: blocks.count > 1 ? "limits · \(account.name)" : "limits")
+                            TerminalHeader(title: LimitsPresentation.blockTitle(account, isOnlyBlock: blocks.count == 1), trailing: account.plan)
                                 .padding(.top, isFirst ? 0 : 4)
                         }
                         ForEach(UsageWindowKind.allCases, id: \.self) { kind in
@@ -268,12 +268,19 @@ struct LimitsExpandedView: View {
     }
 
     /// The limits header with the control that switches between the short view and the full one.
-    private func accountsHeader(title: String, collapsed: Bool) -> some View {
+    private func accountsHeader(title: String, plan: String?, collapsed: Bool) -> some View {
         HStack(spacing: 4) {
             Text("─ \(title)")
+                .lineLimit(1)
+                .fixedSize()
             Rectangle()
                 .fill(Terminal.faint)
                 .frame(height: 1)
+            if let plan {
+                Text(plan)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
             Button {
                 model.onToggleAccounts?()
             } label: {

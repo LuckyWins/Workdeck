@@ -16,6 +16,8 @@ final class ClaudeCodeController {
     @ObservationIgnored private var screenObserver: (any NSObjectProtocol)?
     /// Opens the Chats window on the latest session of the alert's account (`nil`: no session, All).
     @ObservationIgnored var onOpenChats: ((String?) -> Void)?
+    /// Plan labels by account label ("main", "personal"), from the instances' `.claude.json`.
+    @ObservationIgnored var planLabels: () -> [String: String] = { [:] }
 
     init(
         settings: ClaudeCodeSettings,
@@ -154,6 +156,7 @@ final class ClaudeCodeController {
         let withData = limits.accounts.filter { $0.hasData || usageProblem(of: $0) != nil }
         let shown = withData.isEmpty ? [limits.main] : withData
         let compact = compactAccount(among: shown)
+        let plans = planLabels()
         // The compact account's block comes first, so collapsing keeps what the compact notch shows.
         let blocks = [compact] + shown.filter { $0 !== compact }
         let store = compact.store
@@ -191,7 +194,8 @@ final class ClaudeCodeController {
                     age: account.store.age,
                     forecasts: limits.forecasts(for: account),
                     refresh: limits.refreshState(for: account),
-                    problem: usageProblem(of: account)
+                    problem: usageProblem(of: account),
+                    plan: plans[account.label]
                 )
             },
             compactLabel: label,

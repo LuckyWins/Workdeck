@@ -106,6 +106,15 @@ struct AccountsCompositionTests {
         #expect(controller.state.compactLabel == "p")
     }
 
+    @Test func blocksCarryTheirPlans() throws {
+        let controller = makeController()
+        controller.planLabels = { ["main": "Team 5x", "personal": "Pro"] }
+        try usage(20, account: nil)
+        try usage(60, account: "personal")
+        reload(controller)
+        #expect(controller.state.accounts.map(\.plan) == ["Team 5x", "Pro"])
+    }
+
     @Test func theCollapseControlTogglesAndIsRemembered() throws {
         let controller = makeController()
         try usage(20, account: nil)

@@ -8,6 +8,10 @@ final class ClaudeInstancesController {
     private(set) var instances: [ClaudeInstance]
     /// Signed-in account emails by instance name.
     private(set) var accounts: [String: String] = [:]
+    /// Plan labels ("Pro", "Team 5x") by instance name.
+    private(set) var plans: [String: String] = [:]
+    /// The Claude Code tool shows plans next to each account's limits.
+    @ObservationIgnored var onAccountsRefreshed: (() -> Void)?
     /// Notes about an instance's alias, e.g. an existing one that Workdeck left alone.
     private(set) var aliasNotes: [String: String] = [:]
     var error: String?
@@ -96,12 +100,16 @@ final class ClaudeInstancesController {
 
     func refreshAccounts() async {
         let instances = self.instances
-        accounts = await Task.detached {
-            var found: [String: String] = [:]
+        let found = await Task.detached {
+            var found: [String: InstanceAccountReader.Account] = [:]
             for instance in instances {
-                found[instance.name] = InstanceAccountReader.email(in: instance.accountFile)
+                found[instance.name] = InstanceAccountReader.account(in: instance.accountFile)
             }
             return found
         }.value
+        accounts = found.compactMapValues(\.email)
+        plans = found.compactMapValues(\.plan)
+        onAccountsRefreshed?()
     }
+
 }
