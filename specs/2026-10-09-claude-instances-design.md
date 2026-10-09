@@ -69,7 +69,7 @@ Opened by **Chats…** in the Claude Code row of the popover and **Open Chats…
 
 ### 3.3 Continue Flow
 
-1. If the chat is `live`: an alert "This chat is open in <app>. Writing to it from two places corrupts it; close it there first." with **Cancel** and **Continue Anyway**.
+1. If the chat is `live` (also for **Resume in Terminal**): an alert "This chat is open in <app>. Writing to it from two places corrupts it; close it there first." with **Cancel** and **Continue Anyway**.
 2. Workdeck links the chat into the target instance (§5.3).
 3. Workdeck opens Terminal in the project folder with `claude --resume <id>` for the target instance.
 4. If Terminal cannot be opened: an alert with the command and a **Copy** button.
@@ -84,7 +84,7 @@ New folders `Workdeck/Features/ClaudeCode/Instances/` and `Workdeck/Features/Cla
 | `ClaudeInstanceStore` | The extra instances in `UserDefaults` (`claudeInstances.list`, names and paths); the main instance is implicit. Validates names. |
 | `ShellAliasFile` | Adds and removes `alias claude-<name>='CLAUDE_CONFIG_DIR="$HOME/.claude-<name>" claude'  # Workdeck` in `~/.zshrc`; backup `~/.zshrc.workdeck-backup` before the first change; follows a symbolic link to the real file; reports an alias of the same name without the marker. |
 | `InstanceAccountReader` | Reads `oauthAccount.emailAddress` from `<dir>/.claude.json` (`~/.claude.json` for the main instance); nothing else. |
-| `TerminalLauncher` | Protocol; `TerminalAppLauncher` writes a `0700` `.command` script into Workdeck's private temporary folder and runs `open -a Terminal <script>`. Scripts older than a day are deleted. |
+| `TerminalLauncher` | Protocol; `TerminalAppLauncher` writes a `0700` `.command` script into Workdeck's private temporary folder (`0700`) and runs `open -a Terminal <script>`. The script deletes itself when it starts. |
 | `ShellCommand` | Builds the quoted command lines: single-quoted paths, validated IDs and names. |
 | `TranscriptPeek` | Reads a chat's title and `cwd` with bounded reads (§5.2). |
 | `ChatIndex` | Scans every instance's `projects/` off the main thread; returns `ChatSummary { id, owner, projectDirectoryName, cwd, title, modifiedAt, size, linkedInto: [String] }`; caches peeks by path, size and modification date. |
@@ -98,7 +98,7 @@ New folders `Workdeck/Features/ClaudeCode/Instances/` and `Workdeck/Features/Cla
 ### 5.1 Adding, Signing In, Removing
 
 - **Add:** create `~/.claude-<name>` with mode `0700` (an existing directory is used as it is), add the alias, save the instance, then run Sign In. If the alias cannot be written, the instance is still added and the error says so; Workdeck's own actions never need the alias.
-- **Sign In:** Terminal runs `CLAUDE_CONFIG_DIR='<dir>' claude` in the home folder. The account line refreshes when Settings appears and when the instance's `.claude.json` changes.
+- **Sign In:** Terminal runs `CLAUDE_CONFIG_DIR='<dir>' claude` in the home folder. The account line refreshes when Settings appears and when Workdeck becomes active again (after signing in in Terminal).
 - **Remove:** remove Workdeck's alias line for that name and forget the instance. Nothing else changes.
 - Scripts run `exec /bin/zsh -il -c '<command>'`, so `PATH` and aliases match the user's terminal; Workdeck's commands set `CLAUDE_CONFIG_DIR` directly and do not depend on the alias.
 
@@ -113,7 +113,7 @@ New folders `Workdeck/Features/ClaudeCode/Instances/` and `Workdeck/Features/Cla
 
 ### 5.3 Linking
 
-- `link(chat, into: instance)`: in `<instance>/projects/<projectDirectoryName>/` (created `0700` if missing) create symbolic links `<id>.jsonl` → the owner's file and, if the owner has `<id>/`, `<id>` → that folder. A link that already points to the same target is left alone; any other existing item with that name is an error ("work already has its own chat with this ID") and nothing is changed.
+- `link(chat, into: instance)`: in `<instance>/projects/<projectDirectoryName>/` (created `0700` if missing) create symbolic links `<id>.jsonl` → the owner's file and, if the owner has `<id>/` and the target has nothing named `<id>`, `<id>` → that folder. A link that already points to the same target is left alone. Any other existing `<id>.jsonl` is an error ("work already has its own chat with this ID") and nothing is changed. An existing `<id>/` in the target is kept: Claude Code makes it there for subagents once a chat continued in that instance, and it is not a conflict.
 - `unlink(chat, from: instance)`: remove the two links if they are symbolic links pointing into the owner's folder; never remove a regular file or folder.
 - Linking into the owner instance is not offered.
 
