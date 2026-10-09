@@ -19,6 +19,16 @@ struct SessionHooksConnector: SessionHooksConnecting {
 
     let file: ClaudeSettingsFile
     let binaryPath: String
+    /// The extra instance this connector belongs to; `nil` for the main one.
+    var instance: String?
+
+    static func forInstance(_ instance: ClaudeInstance) -> SessionHooksConnector {
+        SessionHooksConnector(
+            file: ClaudeSettingsFile(url: instance.directory.appending(path: "settings.json")),
+            binaryPath: Bundle.main.bundlePath + binarySuffix,
+            instance: instance.isMain ? nil : instance.name
+        )
+    }
 
     static func standard() -> SessionHooksConnector {
         SessionHooksConnector(file: .standard(), binaryPath: Bundle.main.bundlePath + binarySuffix)
@@ -57,7 +67,7 @@ struct SessionHooksConnector: SessionHooksConnecting {
         guard let hooks = (try? file.read())?["hooks"] as? [String: Any] else { return }
         let connected = Self.events.filter { !Self.workdeckCommands(in: hooks[$0]).isEmpty }
         let commands = connected.flatMap { Self.workdeckCommands(in: hooks[$0]) }
-        let needsPath = commands.contains { $0 != ClaudeCodeConnector.command(for: binaryPath) }
+        let needsPath = commands.contains { $0 != ClaudeCodeConnector.command(for: binaryPath, instance: instance) }
         let needsEvents = addingMissingEvents && connected.count < Self.events.count
         guard !commands.isEmpty,
               needsPath || needsEvents,
@@ -73,16 +83,16 @@ struct SessionHooksConnector: SessionHooksConnecting {
             try file.backUp()
         }
         let hooks = root["hooks"] as? [String: Any] ?? [:]
-        root["hooks"] = Self.adding(Self.hook(for: binaryPath), to: Self.removingWorkdeckHooks(from: hooks), events: events)
+        root["hooks"] = Self.adding(Self.hook(for: binaryPath, instance: instance), to: Self.removingWorkdeckHooks(from: hooks), events: events)
         try file.write(root)
     }
 
     static func isWorkdeckCommand(_ command: String) -> Bool {
-        command.trimmingCharacters(in: CharacterSet(charactersIn: "'\"")).hasSuffix(binarySuffix)
+        ClaudeCodeConnector.executablePath(of: command).hasSuffix(binarySuffix)
     }
 
-    static func hook(for binaryPath: String) -> [String: Any] {
-        ["type": "command", "command": ClaudeCodeConnector.command(for: binaryPath), "async": true, "timeout": 5]
+    static func hook(for binaryPath: String, instance: String? = nil) -> [String: Any] {
+        ["type": "command", "command": ClaudeCodeConnector.command(for: binaryPath, instance: instance), "async": true, "timeout": 5]
     }
 
     /// Workdeck's commands among one event's matcher groups.
