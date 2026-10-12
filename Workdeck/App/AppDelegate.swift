@@ -51,7 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 makeHooksConnector: { SessionHooksConnector.forInstance($0) },
                 mainSettingsURL: ClaudeSettingsFile.standard().url
             ),
-            presenter: NotchPresenter()
+            presenter: NotchPresenter(screen: { NotchPresenter.targetScreen(notchless: settings.notchlessDisplay) })
         )
     }()
 

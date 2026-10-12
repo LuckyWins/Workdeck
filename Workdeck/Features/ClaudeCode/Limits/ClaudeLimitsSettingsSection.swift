@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ClaudeLimitsSettingsSection: View {
     @Bindable var controller: ClaudeLimitsController
+    /// Follows screen changes while Settings is open, e.g. the lid opening.
+    @State private var hasCameraHousing = NotchPresenter.hasCameraHousingScreen()
 
     var body: some View {
         @Bindable var settings = controller.settings
@@ -23,6 +25,13 @@ struct ClaudeLimitsSettingsSection: View {
                 Text(status)
                     .font(.caption)
                     .foregroundStyle(controller.pollerStatus.isProblem ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+            }
+            if !hasCameraHousing {
+                Picker("Without a notch", selection: $settings.notchlessDisplay) {
+                    ForEach(NotchlessDisplay.allCases) { display in
+                        Text(display.title).tag(display)
+                    }
+                }
             }
             if controller.hasDataSource {
                 Picker("Show", selection: $settings.mode) {
@@ -57,6 +66,10 @@ struct ClaudeLimitsSettingsSection: View {
         .onChange(of: settings.firstThreshold) { controller.settingsChanged() }
         .onChange(of: settings.secondThreshold) { controller.settingsChanged() }
         .onChange(of: settings.showForecast) { controller.settingsChanged() }
+        .onChange(of: settings.notchlessDisplay) { controller.settingsChanged() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+            hasCameraHousing = NotchPresenter.hasCameraHousingScreen()
+        }
         .claudeConnectConfirmation(controller)
     }
 

@@ -51,7 +51,7 @@ struct AccountsCompositionTests {
             frontmostBundleID: { nil },
             makeHooksConnector: { [extraHooks] _ in extraHooks }
         )
-        let controller = ClaudeCodeController(settings: settings, limits: limits, sessions: sessions, presenter: presenter, hasNotchScreen: { true })
+        let controller = ClaudeCodeController(settings: settings, limits: limits, sessions: sessions, presenter: presenter, cameraHousings: { [true] })
         controller.setInstances([.main(home: root), personal])
         controller.start()
         return controller

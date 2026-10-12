@@ -113,6 +113,17 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | A4 | Limit alert | Lower the first threshold below an account's usage. | `5-hour limit at N% · personal` appears; clicking it opens Chats on that account's latest session's project. |
 | A5 | Remove | Settings → Remove… personal. | Its entries leave `~/.claude-personal/settings.json` (previous status line restored), `claude-usage-personal.json` is deleted, and its block and tag disappear. |
 
+## Virtual Notch Checklist
+
+| # | Case | Steps | Expected |
+|---|------|-------|----------|
+| V1 | Monitor only | Close the lid with an external monitor connected and Closed-Lid Mode on. | A black notch sits over the menu bar at the top center of the monitor with the ring, percent and session counters; hovering expands it; alerts expand it. |
+| V2 | Full screen | Put an app into full screen on the monitor, then two apps in Split View; trigger an alert (lower the first threshold below the usage). | The notch disappears in the full-screen and Split View Spaces; the alert still expands it and it hides again; leaving full screen brings the compact notch back. |
+| V3 | Monitor unplugged and back | Unplug the monitor (lid closed), plug it back. | No notch while there is no display; it returns on the monitor. |
+| V4 | Lid opened | Open the lid with the monitor connected. | The notch moves to the MacBook's camera housing; the monitor shows none. |
+| V5 | Menu bar text | Settings → Without a notch → Menu bar text; then back to Virtual notch. | The notch disappears and `5h 42%` shows next to the Workdeck icon; switching back restores the virtual notch at once. The picker is hidden while the lid is open. |
+| V6 | Auto-hidden menu bar | System Settings → Control Center → Automatically hide and show the menu bar → Always; look at the top center of the monitor; then set it back. | Note whether the compact virtual notch is visible. A known limitation: it may be invisible; Menu bar text is the workaround. |
+
 ## Results
 
 Mark each run with the date, build commit, and macOS version. Record only scenarios that were actually executed.

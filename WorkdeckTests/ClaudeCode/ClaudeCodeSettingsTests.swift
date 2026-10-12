@@ -18,6 +18,7 @@ struct ClaudeCodeSettingsTests {
         #expect(settings.firedAlertKeys.isEmpty)
         #expect(!settings.fetchFromAPI)
         #expect(settings.showForecast)
+        #expect(settings.notchlessDisplay == .virtualNotch)
         #expect(!settings.keepAwakeWhileWorking)
         #expect(!settings.notifyWhenFinished)
         #expect(settings.finishedAfterMinutes == 10)
@@ -36,6 +37,7 @@ struct ClaudeCodeSettingsTests {
         settings.firedAlertKeys = ["a", "b"]
         settings.fetchFromAPI = true
         settings.showForecast = false
+        settings.notchlessDisplay = .menuBarText
         settings.keepAwakeWhileWorking = true
         settings.notifyWhenFinished = true
         settings.finishedAfterMinutes = 2
@@ -48,6 +50,7 @@ struct ClaudeCodeSettingsTests {
         #expect(!reloaded.notifyOnReset)
         #expect(reloaded.connectedAt == fixedNow)
         #expect(reloaded.firedAlertKeys == ["a", "b"])
+        #expect(reloaded.notchlessDisplay == .menuBarText)
         #expect(reloaded.fetchFromAPI)
         #expect(!reloaded.showForecast)
         #expect(reloaded.keepAwakeWhileWorking)

@@ -21,6 +21,7 @@ final class ClaudeCodeSettings {
         static let fetchFromAPI = "claudeLimits.fetchFromAPI"
         static let showForecast = "claudeLimits.showForecast"
         static let collapsesOtherAccounts = "claudeLimits.collapsesOtherAccounts"
+        static let notchlessDisplay = "claudeLimits.notchlessDisplay"
         static let keepAwake = "claudeSessions.keepAwake"
         static let notifyFinished = "claudeSessions.notifyFinished"
         static let finishedAfterMinutes = "claudeSessions.finishedAfterMinutes"
@@ -110,6 +111,11 @@ final class ClaudeCodeSettings {
         didSet { defaults.set(collapsesOtherAccounts, forKey: Keys.collapsesOtherAccounts) }
     }
 
+    /// What shows the indicator on a display without a camera housing.
+    var notchlessDisplay: NotchlessDisplay {
+        didSet { defaults.set(notchlessDisplay.rawValue, forKey: Keys.notchlessDisplay) }
+    }
+
     /// Hold a power assertion while any session works (spec §10.6).
     var keepAwakeWhileWorking: Bool {
         didSet { defaults.set(keepAwakeWhileWorking, forKey: Keys.keepAwake) }
@@ -150,6 +156,7 @@ final class ClaudeCodeSettings {
         fetchFromAPI = defaults.bool(forKey: Keys.fetchFromAPI)
         showForecast = defaults.object(forKey: Keys.showForecast) as? Bool ?? true
         collapsesOtherAccounts = defaults.bool(forKey: Keys.collapsesOtherAccounts)
+        notchlessDisplay = defaults.string(forKey: Keys.notchlessDisplay).flatMap(NotchlessDisplay.init(rawValue:)) ?? .virtualNotch
         keepAwakeWhileWorking = defaults.bool(forKey: Keys.keepAwake)
         notifyWhenFinished = defaults.bool(forKey: Keys.notifyFinished)
         let minutes = defaults.object(forKey: Keys.finishedAfterMinutes) as? Int ?? 10

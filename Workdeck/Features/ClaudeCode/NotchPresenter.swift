@@ -36,7 +36,19 @@ enum NotchTarget: Equatable {
     case expanded
 }
 
-/// Drives the notch on the screen with a camera housing. All notch operations run one at a time
+/// The display the notch is drawn on; virtual when it has no camera housing.
+struct NotchScreen {
+    let screen: NSScreen
+    let isVirtual: Bool
+}
+
+nonisolated struct NotchTargetIndex: Equatable, Sendable {
+    var index: Int
+    var isVirtual: Bool
+}
+
+/// Drives the notch on the display with a camera housing, or the virtual notch on the main display (spec virtual
+/// notch §3). All notch operations run one at a time
 /// in a single loop that re-reads the desired state after each step, so quick hovers, alerts and
 /// screen changes cannot interleave inside DynamicNotchKit.
 final class NotchPresenter: LimitsPresenting {
@@ -44,9 +56,11 @@ final class NotchPresenter: LimitsPresenting {
 
     private(set) var appliedTarget: NotchTarget = .hidden
     private let makeSurface: @MainActor (LimitsNotchModel) -> any NotchSurface
-    private let screen: @MainActor () -> NSScreen?
+    private let screen: @MainActor () -> NotchScreen?
+    private let fullScreen: any FullScreenDetecting
     private let alertDuration: Duration
     private let rebuildDelay: Duration
+    private let workspaceSettleDelay: Duration
     private var surface: (any NotchSurface)?
     private var isHovering = false
     private var isShowingAlert = false
@@ -55,23 +69,29 @@ final class NotchPresenter: LimitsPresenting {
     private var alertTask: Task<Void, Never>?
     private var reconcileTask: Task<Void, Never>?
     private var rebuildTask: Task<Void, Never>?
+    private var workspaceTask: Task<Void, Never>?
     private var needsReconcile = false
     private var needsRebuild = false
     private var screenObserver: (any NSObjectProtocol)?
+    private var workspaceObservers: [any NSObjectProtocol] = []
 
     init(
         model: LimitsNotchModel = LimitsNotchModel(),
         makeSurface: @escaping @MainActor (LimitsNotchModel) -> any NotchSurface = { DynamicNotchSurface(model: $0) },
-        screen: @escaping @MainActor () -> NSScreen? = NotchPresenter.notchScreen,
+        screen: @escaping @MainActor () -> NotchScreen?,
+        fullScreen: any FullScreenDetecting = SystemFullScreenDetector(),
         alertDuration: Duration = .seconds(6),
         rebuildDelay: Duration = .milliseconds(500),
+        workspaceSettleDelay: Duration = .seconds(1),
         observeScreenChanges: Bool = true
     ) {
         self.model = model
         self.makeSurface = makeSurface
         self.screen = screen
+        self.fullScreen = fullScreen
         self.alertDuration = alertDuration
         self.rebuildDelay = rebuildDelay
+        self.workspaceSettleDelay = workspaceSettleDelay
         if observeScreenChanges {
             screenObserver = NotificationCenter.default.addObserver(
                 forName: NSApplication.didChangeScreenParametersNotification,
@@ -80,30 +100,50 @@ final class NotchPresenter: LimitsPresenting {
             ) { @Sendable [weak self] _ in
                 MainActor.assumeIsolated { self?.screenParametersChanged() }
             }
+            let workspace = NSWorkspace.shared.notificationCenter
+            workspaceObservers = [NSWorkspace.activeSpaceDidChangeNotification, NSWorkspace.didActivateApplicationNotification].map { name in
+                workspace.addObserver(forName: name, object: nil, queue: .main) { @Sendable [weak self] _ in
+                    MainActor.assumeIsolated { self?.workspaceChanged() }
+                }
+            }
         }
     }
 
-    /// The built-in display with a notch, if it is connected and on.
-    static func notchScreen() -> NSScreen? {
-        NSScreen.screens.first { $0.safeAreaInsets.top > 0 }
+    /// A display with a camera housing wins; without one, the virtual notch goes on the first screen (the one with
+    /// the menu bar), unless the menu bar text is chosen.
+    nonisolated static func targetIndex(cameraHousings: [Bool], notchless: NotchlessDisplay) -> NotchTargetIndex? {
+        if let index = cameraHousings.firstIndex(of: true) {
+            return NotchTargetIndex(index: index, isVirtual: false)
+        }
+        guard notchless == .virtualNotch, !cameraHousings.isEmpty else { return nil }
+        return NotchTargetIndex(index: 0, isVirtual: true)
     }
 
-    static func hasNotchScreen() -> Bool {
-        notchScreen() != nil
+    static func targetScreen(notchless: NotchlessDisplay) -> NotchScreen? {
+        let screens = NSScreen.screens
+        guard let target = targetIndex(cameraHousings: screens.map { $0.safeAreaInsets.top > 0 }, notchless: notchless) else {
+            return nil
+        }
+        return NotchScreen(screen: screens[target.index], isVirtual: target.isVirtual)
     }
 
-    static func target(display: LimitsDisplay, isHovering: Bool, isShowingAlert: Bool, hasScreen: Bool) -> NotchTarget {
+    static func hasCameraHousingScreen() -> Bool {
+        NSScreen.screens.contains { $0.safeAreaInsets.top > 0 }
+    }
+
+    /// `hidesResting`: the virtual notch's display shows a full-screen app, so only an alert may show the notch.
+    static func target(display: LimitsDisplay, isHovering: Bool, isShowingAlert: Bool, hasScreen: Bool, hidesResting: Bool = false) -> NotchTarget {
         guard hasScreen else { return .hidden }
         if isShowingAlert {
             return .expanded
         }
-        guard case .notch = display else { return .hidden }
+        guard case .notch = display, !hidesResting else { return .hidden }
         return isHovering ? .expanded : .compact
     }
 
     /// True while an alert, a rebuild, or notch operations are still pending.
     var isBusy: Bool {
-        reconcileTask != nil || alertTask != nil || rebuildTask != nil
+        reconcileTask != nil || alertTask != nil || rebuildTask != nil || workspaceTask != nil
     }
 
     func show(_ state: LimitsViewState) {
@@ -174,6 +214,19 @@ final class NotchPresenter: LimitsPresenting {
         }
     }
 
+    /// The active Space or app changed: a full-screen app may have appeared on or left the virtual notch's display.
+    /// Checks now and once more after the Space animation, when the window has its final size.
+    func workspaceChanged() {
+        requestReconcile()
+        workspaceTask?.cancel()
+        workspaceTask = Task {
+            try? await Task.sleep(for: workspaceSettleDelay)
+            guard !Task.isCancelled else { return }
+            workspaceTask = nil
+            requestReconcile()
+        }
+    }
+
     private func hoverChanged(_ hovering: Bool) {
         isHovering = hovering
         requestReconcile()
@@ -193,11 +246,14 @@ final class NotchPresenter: LimitsPresenting {
 
     private func reconcileOnce() async {
         let screen = screen()
+        // Reading the window list costs a window server round trip; only a resting notch needs it.
+        let mayRest: Bool = if case .notch = model.state.display, !isShowingAlert { true } else { false }
         let target = Self.target(
             display: model.state.display,
             isHovering: isHovering,
             isShowingAlert: isShowingAlert,
-            hasScreen: screen != nil
+            hasScreen: screen != nil,
+            hidesResting: mayRest && screen.map { $0.isVirtual && fullScreen.isFullScreen($0.screen) } ?? false
         )
         let rebuild = needsRebuild
         needsRebuild = false
@@ -211,7 +267,7 @@ final class NotchPresenter: LimitsPresenting {
                 surface.closeWindow()
             }
         case .compact, .expanded:
-            guard let screen else { break }
+            guard let screen = screen?.screen else { break }
             let surface = activeSurface()
             if rebuild {
                 await surface.hide()

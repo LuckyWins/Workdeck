@@ -21,6 +21,21 @@ nonisolated enum LimitsLevel: Equatable, Sendable {
     case critical
 }
 
+/// Where the indicator goes when no display has a camera housing (spec virtual notch §3.4).
+nonisolated enum NotchlessDisplay: String, CaseIterable, Identifiable, Sendable {
+    case virtualNotch
+    case menuBarText
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .virtualNotch: "Virtual notch"
+        case .menuBarText: "Menu bar text"
+        }
+    }
+}
+
 nonisolated enum LimitsDisplay: Equatable, Sendable {
     case hidden
     case notch(LimitsLevel)

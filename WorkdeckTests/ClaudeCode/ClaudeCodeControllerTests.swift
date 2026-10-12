@@ -162,7 +162,7 @@ struct ClaudeCodeControllerTests {
             sleepPreventer: sleepPreventer,
             frontmostBundleID: { nil }
         )
-        let controller = ClaudeCodeController(settings: settings, limits: limits, sessions: sessions, presenter: presenter, hasNotchScreen: { notch })
+        let controller = ClaudeCodeController(settings: settings, limits: limits, sessions: sessions, presenter: presenter, cameraHousings: { [notch] })
         return (controller, store)
     }
 
@@ -223,12 +223,38 @@ struct ClaudeCodeControllerTests {
     @Test func menuBarFallbackWithoutNotch() throws {
         connector.status = .connected
         settings.isEnabled = true
+        settings.notchlessDisplay = .menuBarText
         try writeUsage(fiveHour: 85)
         let (controller, store) = makeController(notch: false)
         controller.start()
         store.reload()
         #expect(controller.menuBarText == "5h 85%")
         #expect(controller.menuBarLevel == .warning)
+    }
+
+    @Test func withoutACameraHousingTheSettingPicksVirtualNotchOrText() throws {
+        connector.status = .connected
+        settings.isEnabled = true
+        try writeUsage(fiveHour: 85)
+        let (controller, store) = makeController(notch: false)
+        controller.start()
+        store.reload()
+        #expect(controller.menuBarText == nil)
+        #expect(controller.state.display == .notch(.warning))
+        settings.notchlessDisplay = .menuBarText
+        controller.refresh()
+        #expect(controller.menuBarText == "5h 85%")
+    }
+
+    @Test func aCameraHousingIgnoresTheTextSetting() throws {
+        connector.status = .connected
+        settings.isEnabled = true
+        settings.notchlessDisplay = .menuBarText
+        try writeUsage(fiveHour: 85)
+        let (controller, store) = makeController(notch: true)
+        controller.start()
+        store.reload()
+        #expect(controller.state.display == .notch(.warning))
     }
 
     @Test func thresholdAlertFiresOnceAndPersists() throws {

@@ -12,7 +12,9 @@ final class ClaudeCodeController {
     private(set) var state = LimitsViewState.hidden
 
     @ObservationIgnored private let presenter: any LimitsPresenting
-    @ObservationIgnored private let hasNotchScreen: @MainActor () -> Bool
+    /// Whether each connected display has a camera housing; with the setting it decides between a real or virtual
+    /// notch and the menu bar text.
+    @ObservationIgnored private let cameraHousings: @MainActor () -> [Bool]
     @ObservationIgnored private var screenObserver: (any NSObjectProtocol)?
     /// Opens the Chats window on the latest session of the alert's account (`nil`: no session, All).
     @ObservationIgnored var onOpenChats: ((String?) -> Void)?
@@ -24,13 +26,13 @@ final class ClaudeCodeController {
         limits: ClaudeLimitsController,
         sessions: ClaudeSessionsController,
         presenter: any LimitsPresenting,
-        hasNotchScreen: @escaping @MainActor () -> Bool = NotchPresenter.hasNotchScreen
+        cameraHousings: @escaping @MainActor () -> [Bool] = { NSScreen.screens.map { $0.safeAreaInsets.top > 0 } }
     ) {
         self.settings = settings
         self.limits = limits
         self.sessions = sessions
         self.presenter = presenter
-        self.hasNotchScreen = hasNotchScreen
+        self.cameraHousings = cameraHousings
     }
 
     /// The indicator has something to show: limits, sessions, or both.
@@ -169,7 +171,7 @@ final class ClaudeCodeController {
             isEnabled: settings.isEnabled,
             isConnected: limits.hasDataSource,
             mode: settings.mode,
-            hasNotchScreen: hasNotchScreen(),
+            hasNotchScreen: NotchPresenter.targetIndex(cameraHousings: cameraHousings(), notchless: settings.notchlessDisplay) != nil,
             pressing: pressing,
             hasData: hasData,
             thresholds: settings.thresholds,

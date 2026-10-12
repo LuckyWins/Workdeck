@@ -34,10 +34,23 @@ final class FakeNotchSurface: NotchSurface {
 }
 
 @MainActor
+final class FakeFullScreen: FullScreenDetecting {
+    var isOn = false
+    /// Answers for the next checks before `isOn` applies again, e.g. a window still animating to full size.
+    var nextAnswers: [Bool] = []
+    private(set) var checks = 0
+    func isFullScreen(_ screen: NSScreen) -> Bool {
+        checks += 1
+        return nextAnswers.isEmpty ? isOn : nextAnswers.removeFirst()
+    }
+}
+
+@MainActor
 struct NotchPresenterTests {
     let surface = FakeNotchSurface()
+    let fullScreen = FakeFullScreen()
 
-    private func makePresenter(screen: NSScreen? = NSScreen.screens.first, alertDuration: Duration = .milliseconds(100)) -> (NotchPresenter, () -> Int) {
+    private func makePresenter(screen: NSScreen? = NSScreen.screens.first, virtual: Bool = false, alertDuration: Duration = .milliseconds(100)) -> (NotchPresenter, () -> Int) {
         var created = 0
         let presenter = NotchPresenter(
             makeSurface: { model in
@@ -45,9 +58,11 @@ struct NotchPresenterTests {
                 surface.model = model
                 return surface
             },
-            screen: { screen },
+            screen: { screen.map { NotchScreen(screen: $0, isVirtual: virtual) } },
+            fullScreen: fullScreen,
             alertDuration: alertDuration,
             rebuildDelay: .zero,
+            workspaceSettleDelay: .milliseconds(50),
             observeScreenChanges: false
         )
         return (presenter, { created })
@@ -64,15 +79,122 @@ struct NotchPresenterTests {
     }
 
     @Test(arguments: [
-        (LimitsDisplay.notch(.normal), false, false, true, NotchTarget.compact),
-        (.notch(.normal), true, false, true, .expanded),
-        (.hidden, false, true, true, .expanded),
-        (.hidden, true, false, true, .hidden),
-        (.menuBar(text: "5h 1%", level: .normal), false, false, true, .hidden),
-        (.notch(.warning), true, true, false, .hidden),
+        (LimitsDisplay.notch(.normal), false, false, true, false, NotchTarget.compact),
+        (.notch(.normal), true, false, true, false, .expanded),
+        (.hidden, false, true, true, false, .expanded),
+        (.hidden, true, false, true, false, .hidden),
+        (.menuBar(text: "5h 1%", level: .normal), false, false, true, false, .hidden),
+        (.notch(.warning), true, true, false, false, .hidden),
+        (.notch(.normal), false, false, true, true, .hidden),
+        (.notch(.normal), true, false, true, true, .hidden),
+        (.notch(.normal), false, true, true, true, .expanded),
     ])
-    func target(display: LimitsDisplay, hovering: Bool, alert: Bool, screen: Bool, expected: NotchTarget) {
-        #expect(NotchPresenter.target(display: display, isHovering: hovering, isShowingAlert: alert, hasScreen: screen) == expected)
+    func target(display: LimitsDisplay, hovering: Bool, alert: Bool, screen: Bool, hidesResting: Bool, expected: NotchTarget) {
+        #expect(NotchPresenter.target(display: display, isHovering: hovering, isShowingAlert: alert, hasScreen: screen, hidesResting: hidesResting) == expected)
+    }
+
+    @Test func fullScreenHidesTheVirtualNotch() async {
+        fullScreen.isOn = true
+        let (presenter, created) = makePresenter(virtual: true)
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        #expect(presenter.appliedTarget == .hidden)
+        #expect(created() == 0)
+    }
+
+    @Test func fullScreenHidesEvenWhileHovering() async {
+        let (presenter, _) = makePresenter(virtual: true)
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        surface.onHoverChange?(true)
+        await settle(presenter)
+        #expect(presenter.appliedTarget == .expanded)
+        fullScreen.isOn = true
+        presenter.workspaceChanged()
+        await settle(presenter)
+        #expect(presenter.appliedTarget == .hidden)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func alertOverFullScreenExpandsThenHides() async {
+        fullScreen.isOn = true
+        let (presenter, _) = makePresenter(virtual: true)
+        presenter.show(state(.notch(.normal)))
+        presenter.present(.reset([.fiveHour]))
+        await settle(presenter)
+        #expect(surface.alertsAtExpand == [.reset([.fiveHour])])
+        #expect(presenter.appliedTarget == .hidden)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func fullScreenIsReadOnlyForARestingNotch() async {
+        let (presenter, _) = makePresenter(virtual: true)
+        presenter.show(state(.hidden))
+        presenter.present(.reset([.fiveHour]))
+        await settle(presenter)
+        #expect(fullScreen.checks == 0)
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        #expect(fullScreen.checks == 1)
+    }
+
+    @Test func theRealNotchIgnoresFullScreen() async {
+        fullScreen.isOn = true
+        let (presenter, _) = makePresenter(virtual: false)
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        #expect(presenter.appliedTarget == .compact)
+    }
+
+    @Test func fullScreenIsCheckedAgainOnceTheSpaceSettles() async {
+        let (presenter, _) = makePresenter(virtual: true)
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        // The notification arrives while the window is still animating to full size.
+        fullScreen.isOn = true
+        fullScreen.nextAnswers = [false]
+        presenter.workspaceChanged()
+        await settle(presenter)
+        #expect(presenter.appliedTarget == .hidden)
+    }
+
+    @Test func leavingFullScreenBringsTheVirtualNotchBack() async {
+        fullScreen.isOn = true
+        let (presenter, _) = makePresenter(virtual: true)
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        fullScreen.isOn = false
+        presenter.workspaceChanged()
+        await settle(presenter)
+        #expect(presenter.appliedTarget == .compact)
+    }
+
+    @Test(arguments: [
+        ([false, true], NotchlessDisplay.virtualNotch, NotchTargetIndex(index: 1, isVirtual: false)),
+        ([true], .menuBarText, NotchTargetIndex(index: 0, isVirtual: false)),
+        ([false, false], .virtualNotch, NotchTargetIndex(index: 0, isVirtual: true)),
+    ])
+    func targetScreenPrefersTheCameraHousing(housings: [Bool], notchless: NotchlessDisplay, expected: NotchTargetIndex) {
+        #expect(NotchPresenter.targetIndex(cameraHousings: housings, notchless: notchless) == expected)
+    }
+
+    @Test(arguments: [
+        ([false], NotchlessDisplay.menuBarText),
+        ([], .virtualNotch),
+        ([], .menuBarText),
+    ])
+    func noTargetWithoutAScreenOrInTheTextMode(housings: [Bool], notchless: NotchlessDisplay) {
+        #expect(NotchPresenter.targetIndex(cameraHousings: housings, notchless: notchless) == nil)
+    }
+
+    @Test func switchingToMenuBarTextHidesTheVirtualNotch() async {
+        let (presenter, _) = makePresenter(virtual: true)
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        #expect(presenter.appliedTarget == .compact)
+        presenter.show(state(.menuBar(text: "5h 1%", level: .normal)))
+        await settle(presenter)
+        #expect(presenter.appliedTarget == .hidden)
     }
 
     @Test func nothingIsCreatedWhileHidden() async {

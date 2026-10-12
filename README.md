@@ -24,7 +24,7 @@ Shows how much of your Claude Code plan limits you have used — the 5-hour wind
 - Two modes: always visible, or only near limits.
 - Alerts at two configurable thresholds (80 % and 95 % by default) and, optionally, when a limit you came close to resets (one alert when both windows reset together).
 - A forecast in the expanded view, e.g. `runs out ~16:40 · resets 18:00`, when a limit will run out before it resets at your current pace (can be turned off in Settings).
-- On a screen without a notch (an external display, or with the lid closed) the usage appears as text next to the Workdeck icon in the menu bar.
+- On a screen without a notch (an external display with the lid closed) the same notch is drawn at the top center of the main display as a virtual notch, and it hides while that display shows a full-screen app (alerts still appear). Settings → **Without a notch** switches to text next to the Workdeck icon in the menu bar instead.
 
 **Connecting to Claude Code.** Turn on Claude Code in the popover (or click **Connect…** in Settings). Workdeck adds its status line command to `~/.claude/settings.json` and saves a backup as `~/.claude/settings.json.workdeck-backup`. Only the `statusLine` key changes, but the file is re-written, so key order and formatting may change. If you already had a status line, Workdeck keeps running it and shows its output after the usage, e.g. `5h 42% · main`. **Disconnect** in Settings restores your previous status line.
 
