@@ -29,6 +29,18 @@ struct LimitsTextTests {
         #expect(LimitsText.notStartedText == "starts with your next message")
     }
 
+    @Test func windowRowResetLabels() {
+        let tomorrowish = fixedNow.addingTimeInterval(3 * 86_400)
+        let longest = LimitsText.windowResetLabel(resetsAt: tomorrowish, notStarted: false, now: fixedNow, calendar: utc)
+        #expect(longest == "↺ Thu 12:00")
+        #expect(LimitsText.windowResetLabel(resetsAt: fixedNow.addingTimeInterval(80 * 60), notStarted: false, now: fixedNow, calendar: utc) == "↺ 1h 20m")
+        #expect(LimitsText.windowResetLabel(resetsAt: nil, notStarted: false, now: fixedNow, calendar: utc) == "")
+        // The row has room for the longest reset time only; a longer label squeezes the bar onto two lines.
+        let notStarted = LimitsText.windowResetLabel(resetsAt: nil, notStarted: true, now: fixedNow, calendar: utc)
+        #expect(notStarted == "↺ next msg")
+        #expect(notStarted.count <= longest.count)
+    }
+
     @Test(arguments: [
         (10.0, "Updated just now"),
         (3 * 60.0, "Updated 3 min ago"),

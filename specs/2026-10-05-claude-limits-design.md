@@ -98,7 +98,7 @@ Performance target: well under 100 ms for the command itself (excluding the chai
 
 - Watches the snapshot's directory with a `DispatchSource` (atomic rename replaces the file, so the file itself cannot be watched) and reloads on change.
 - A 60-second timer recomputes age and window expiry.
-- Once any usage has been recorded, a window that is missing, has no reset time (the usage API returns `resets_at: null` before the first message), or whose `resetsAt` has passed is **not started**: shown as 0 % with "starts with your next message". A new window only begins with the next Claude Code message, so this is accurate. "—" is used only when nothing has ever been recorded.
+- Once any usage has been recorded, a window that is missing, has no reset time (the usage API returns `resets_at: null` before the first message), or whose `resetsAt` has passed is **not started**: shown as 0 % with "starts with your next message" (in the expanded notch's window row `↺ next msg`, with the full text as its tooltip, so the row keeps its width). A new window only begins with the next Claude Code message, so this is accurate. "—" is used only when nothing has ever been recorded.
 - A corrupt snapshot file keeps the last good snapshot in memory.
 
 ### 5.2 Compact Indicator

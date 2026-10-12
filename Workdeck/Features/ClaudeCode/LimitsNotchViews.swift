@@ -396,24 +396,26 @@ struct LimitsExpandedView: View {
         let color = percent == nil ? Terminal.dim : level.notchColor
         let bar = TerminalBar.bar(percent: percent, width: Self.barWidth)
         let percentText = percent.map(UsageFormatting.percentText) ?? "—"
-        let reset: String = if let window, isCurrent {
-            "↺ " + LimitsText.shortResetText(window.resetsAt, now: model.state.now)
-        } else if notStarted {
-            "↺ next message"
-        } else {
-            ""
-        }
+        let reset = LimitsText.windowResetLabel(
+            resetsAt: isCurrent ? window?.resetsAt : nil,
+            notStarted: notStarted,
+            now: model.state.now
+        )
         return VStack(alignment: .leading, spacing: 1) {
             HStack(spacing: 0) {
                 Text("\(kind.shortLabel) ")
-                Text("[")
-                    .foregroundStyle(Terminal.dim)
-                Text(bar.filled)
-                    .foregroundStyle(color)
-                Text(bar.empty)
-                    .foregroundStyle(Terminal.faint)
-                Text("]")
-                    .foregroundStyle(Terminal.dim)
+                // The bar keeps its width; a long label on the right never squeezes it onto two lines.
+                HStack(spacing: 0) {
+                    Text("[")
+                        .foregroundStyle(Terminal.dim)
+                    Text(bar.filled)
+                        .foregroundStyle(color)
+                    Text(bar.empty)
+                        .foregroundStyle(Terminal.faint)
+                    Text("]")
+                        .foregroundStyle(Terminal.dim)
+                }
+                .fixedSize()
                 Text(String(repeating: " ", count: max(1, 5 - percentText.count)) + percentText)
                     .fontWeight(.semibold)
                     .foregroundStyle(color)
@@ -422,6 +424,8 @@ struct LimitsExpandedView: View {
                 Spacer(minLength: 6)
                 Text(reset)
                     .foregroundStyle(Terminal.dim)
+                    .lineLimit(1)
+                    .help(notStarted ? LimitsText.notStartedText : "")
             }
             if isCurrent, let window, let forecast = account.forecasts[kind] {
                 Text("   " + LimitsText.forecastText(forecast, now: model.state.now))

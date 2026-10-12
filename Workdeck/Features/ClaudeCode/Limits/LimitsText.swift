@@ -26,6 +26,15 @@ nonisolated enum LimitsText {
     /// For a window that is not running: it begins with the next Claude Code message.
     static let notStartedText = "starts with your next message"
 
+    /// The right column of a window row in the expanded notch: "↺ 2h 52m", "↺ Sat 13:00", "↺ next msg" for a window
+    /// that starts with the next message, or nothing. No longer than "↺ Sat 13:00", or the bar runs out of room.
+    static func windowResetLabel(resetsAt: Date?, notStarted: Bool, now: Date, calendar: Calendar = .current) -> String {
+        if let resetsAt {
+            return "↺ " + shortResetText(resetsAt, now: now, calendar: calendar)
+        }
+        return notStarted ? "↺ next msg" : ""
+    }
+
     /// "runs out ~16:40" today, "runs out ~tomorrow 09:00", otherwise "runs out ~Wed 12:00".
     static func forecastText(_ date: Date, now: Date, calendar: Calendar = .current) -> String {
         "runs out ~\(clockText(date, now: now, calendar: calendar))"
