@@ -144,3 +144,7 @@ specs/             Design specs
 plans/             Implementation plans
 docs/              Other documentation, including the manual testing checklist
 ```
+
+## License
+
+[MIT](LICENSE). "Claude" and "Claude Code" are trademarks of Anthropic; Workdeck is an independent project that works with Claude Code.
