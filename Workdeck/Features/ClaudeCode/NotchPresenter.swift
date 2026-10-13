@@ -6,8 +6,9 @@ import SwiftUI
 protocol LimitsPresenting: AnyObject {
     /// The resting state: compact notch, hidden, or menu bar text (which the presenter ignores).
     func show(_ state: LimitsViewState)
-    /// Expands the notch with the alert for a few seconds, one alert at a time.
-    func present(_ alert: LimitsAlert)
+    /// Flashes the notch once for alerts that happened together; only "needs you" also expands it with its text
+    /// (flash spec §2.1).
+    func flash(_ alerts: [LimitsAlert])
     /// What the refresh button in the expanded notch does.
     func setRefreshAction(_ action: @escaping () -> Void)
     /// What clicking a session in the expanded notch does.
@@ -75,11 +76,16 @@ final class NotchPresenter: LimitsPresenting {
     /// The peek zone of the current target screen, kept until the state or the screens change (`.some(nil)`: no
     /// target screen).
     private var cachedZone: CGRect??
+    private let flashDuration: Duration
     private let alertDuration: Duration
     private let rebuildDelay: Duration
     private let workspaceSettleDelay: Duration
     private var surface: (any NotchSurface)?
     private var isHovering = false
+    private var flashTask: Task<Void, Never>?
+    private var flashCount = 0
+    /// A flash waiting for the notch to settle; a new one merges into it.
+    private var pendingFlash: NotchFlashEvent?
     private var isShowingAlert = false
     private var pendingAlerts: [LimitsAlert] = []
     private var isAlertExtended = false
@@ -99,6 +105,7 @@ final class NotchPresenter: LimitsPresenting {
         screen: @escaping @MainActor () -> NotchScreen?,
         fullScreen: any FullScreenDetecting = SystemFullScreenDetector(),
         pointer: any PointerMonitoring = GlobalPointerMonitor(),
+        flashDuration: Duration = NotchFlash.duration,
         alertDuration: Duration = .seconds(6),
         rebuildDelay: Duration = .milliseconds(500),
         workspaceSettleDelay: Duration = .seconds(1),
@@ -113,6 +120,7 @@ final class NotchPresenter: LimitsPresenting {
         self.pointer = pointer
         self.hoverEnterDelay = hoverEnterDelay
         self.hoverExitDelay = hoverExitDelay
+        self.flashDuration = flashDuration
         self.alertDuration = alertDuration
         self.rebuildDelay = rebuildDelay
         self.workspaceSettleDelay = workspaceSettleDelay
@@ -155,7 +163,8 @@ final class NotchPresenter: LimitsPresenting {
         NSScreen.screens.contains { $0.safeAreaInsets.top > 0 }
     }
 
-    /// `hidesResting`: the virtual notch's display shows a full-screen app, so only an alert may show the notch.
+    /// `hidesResting`: the virtual notch's display shows a full-screen app, so only a "needs you" alert may show the
+    /// notch.
     static func target(display: LimitsDisplay, isHovering: Bool, isShowingAlert: Bool, hasScreen: Bool, hidesResting: Bool = false) -> NotchTarget {
         guard hasScreen else { return .hidden }
         if isShowingAlert {
@@ -165,9 +174,9 @@ final class NotchPresenter: LimitsPresenting {
         return isHovering ? .expanded : .compact
     }
 
-    /// True while an alert, a rebuild, or notch operations are still pending.
+    /// True while a flash, a rebuild, or notch operations are still pending.
     var isBusy: Bool {
-        reconcileTask != nil || alertTask != nil || rebuildTask != nil || workspaceTask != nil || hoverTask != nil || peekTask != nil
+        reconcileTask != nil || flashTask != nil || alertTask != nil || rebuildTask != nil || workspaceTask != nil || hoverTask != nil || peekTask != nil
     }
 
     func show(_ state: LimitsViewState) {
@@ -187,15 +196,56 @@ final class NotchPresenter: LimitsPresenting {
         requestReconcile()
     }
 
-    func present(_ alert: LimitsAlert) {
+    func flash(_ alerts: [LimitsAlert]) {
+        let needsYou = alerts.filter { if case .sessionNeedsYou = $0 { true } else { false } }
+        if !needsYou.isEmpty {
+            present(needsYou)
+        }
+        flashCount += 1
+        guard var event = NotchFlash.event(for: alerts, thresholds: model.state.thresholds, id: flashCount) else {
+            return
+        }
+        // A flash waiting or playing absorbs this one, so no alert is lost (spec §2.2).
+        if let earlier = pendingFlash ?? model.flash {
+            event = NotchFlash.merge(earlier, event, id: flashCount)
+        }
+        pendingFlash = event
+        flashTask?.cancel()
+        flashTask = Task {
+            // Let the reconcile show a notch the alert just made visible, and a "needs you" alert close, then flash
+            // only what is on the compact notch.
+            while reconcileTask != nil || isShowingAlert, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+            guard !Task.isCancelled else { return }
+            pendingFlash = nil
+            guard appliedTarget != .hidden else {
+                flashTask = nil
+                return
+            }
+            var playing = event
+            playing.startedAt = Date()
+            model.flash = playing
+            try? await Task.sleep(for: flashDuration)
+            if model.flash?.id == event.id {
+                model.flash = nil
+            }
+            if !Task.isCancelled {
+                flashTask = nil
+            }
+        }
+    }
+
+    /// Expands the notch with "needs you" alerts for `alertDuration`; alerts arriving meanwhile join them and keep
+    /// them up a while longer.
+    private func present(_ alerts: [LimitsAlert]) {
         guard screen() != nil else { return }
-        // An alert arriving while others are on screen joins them and keeps them up a while longer.
         if isShowingAlert {
-            model.alerts.append(alert)
+            model.alerts.append(contentsOf: alerts)
             isAlertExtended = true
             return
         }
-        pendingAlerts.append(alert)
+        pendingAlerts.append(contentsOf: alerts)
         guard alertTask == nil else { return }
         alertTask = Task {
             // Alerts that arrive together are shown together.

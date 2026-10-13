@@ -66,3 +66,98 @@ struct TerminalHeader: View {
         .foregroundStyle(Terminal.dim)
     }
 }
+
+extension NotchFlashColor {
+    var color: Color {
+        switch self {
+        case .green: .green
+        case .orange: .orange
+        case .red: .red
+        }
+    }
+}
+
+/// Plays a flash on a view (flash spec §2.2): 0.25 s in, a short hold, 0.8 s out; a blinking flash lights up three
+/// times within the same 1.5 s. Driven by the flash event, so nothing runs between flashes. A view that appears after
+/// the flash started stays still; the color is kept after the event clears, so the fade ends in it; a newer flash
+/// cancels an older one without being faded by it.
+struct FlashLevel: ViewModifier {
+    let event: NotchFlashEvent?
+    let color: NotchFlashColor?
+    var blinks = false
+    @Binding var level: Double
+    @Binding var tint: Color
+
+    func body(content: Content) -> some View {
+        content.task(id: event?.id) {
+            guard let event, let color, NotchFlash.isFresh(event, now: Date()) else {
+                if level > 0 {
+                    withAnimation(.easeIn(duration: 0.3)) { level = 0 }
+                }
+                return
+            }
+            tint = color.color
+            if blinks {
+                for _ in 0..<3 {
+                    withAnimation(.easeOut(duration: 0.15)) { level = 1 }
+                    try? await Task.sleep(for: .milliseconds(250))
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.easeIn(duration: 0.2)) { level = 0 }
+                    try? await Task.sleep(for: .milliseconds(250))
+                    guard !Task.isCancelled else { return }
+                }
+                return
+            }
+            withAnimation(.easeOut(duration: 0.25)) { level = 1 }
+            try? await Task.sleep(for: .milliseconds(700))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeIn(duration: 0.8)) { level = 0 }
+        }
+    }
+}
+
+/// A soft glow in the flash color around the view while a flash plays.
+struct FlashGlow: ViewModifier {
+    let event: NotchFlashEvent?
+    let color: NotchFlashColor?
+    var blinks = false
+    var radius: CGFloat = 5
+    @State private var level = 0.0
+    @State private var tint = Color.clear
+
+    func body(content: Content) -> some View {
+        content
+            .shadow(color: tint.opacity(level), radius: radius)
+            .shadow(color: tint.opacity(level * 0.6), radius: radius / 2)
+            .modifier(FlashLevel(event: event, color: color, blinks: blinks, level: $level, tint: $tint))
+    }
+}
+
+/// A flash on a mark (the ring, a dot): the mark takes the flash color and glows.
+struct FlashMark<Mark: View>: ViewModifier {
+    let event: NotchFlashEvent?
+    let color: NotchFlashColor?
+    var blinks = false
+    var radius: CGFloat = 4
+    @ViewBuilder let mark: () -> Mark
+    @State private var level = 0.0
+    @State private var tint = Color.clear
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(mark().foregroundStyle(tint).opacity(level))
+            .shadow(color: tint.opacity(level), radius: radius)
+            .shadow(color: tint.opacity(level * 0.6), radius: radius / 2)
+            .modifier(FlashLevel(event: event, color: color, blinks: blinks, level: $level, tint: $tint))
+    }
+}
+
+extension View {
+    func flashGlow(_ event: NotchFlashEvent?, color: NotchFlashColor?, blinks: Bool = false, radius: CGFloat = 5) -> some View {
+        modifier(FlashGlow(event: event, color: color, blinks: blinks, radius: radius))
+    }
+
+    func flashMark(_ event: NotchFlashEvent?, color: NotchFlashColor?, blinks: Bool = false, @ViewBuilder mark: @escaping () -> some View) -> some View {
+        modifier(FlashMark(event: event, color: color, blinks: blinks, mark: mark))
+    }
+}

@@ -26,17 +26,29 @@ extension SessionsLevel {
 /// and running subagents when there are any. Numbers roll when they change.
 struct SessionsCounter: View {
     let state: SessionsViewState
+    /// An alert's flash; session alerts flash the dot, "needs you" blinking (flash spec §2.1).
+    var flash: NotchFlashEvent? = nil
 
     var body: some View {
+        let dotFlash = flash?.dot
+        let blinks = flash?.dotBlinks == true
         HStack(spacing: 6) {
-            if state.activeCount > 0, let color = state.level.notchColor {
+            // The dot also shows for its flash when no session is active, e.g. right after the last one finished.
+            if let color = state.activeCount > 0 ? state.level.notchColor : (dotFlash != nil ? Color.clear : nil) {
                 HStack(spacing: 1) {
                     Text("●")
                         .foregroundStyle(color)
-                    Text("\(state.activeCount)")
-                        .foregroundStyle(.white)
-                        .contentTransition(.numericText(value: Double(state.activeCount)))
+                        .flashMark(flash, color: dotFlash, blinks: blinks) {
+                            Text("●")
+                        }
+                    if state.activeCount > 0 {
+                        Text("\(state.activeCount)")
+                            .foregroundStyle(.white)
+                            .contentTransition(.numericText(value: Double(state.activeCount)))
+                    }
                 }
+                // A dot shown only for a flash fades in and out instead of popping (flash spec §2.1).
+                .transition(.opacity)
             }
             if state.agentCount > 0 {
                 HStack(spacing: 1) {
@@ -49,6 +61,7 @@ struct SessionsCounter: View {
             }
         }
         .animation(.snappy, value: state.activeCount)
+        .animation(.snappy, value: dotFlash != nil)
         .animation(.snappy, value: state.agentCount)
         .animation(.snappy, value: state.level)
     }
@@ -58,6 +71,8 @@ struct SessionsCounter: View {
 /// Shown only in the expanded notch, so its animations run only while someone is looking.
 struct SessionsList: View {
     let state: SessionsViewState
+    /// An alert's flash: the status dots of the sessions it is about glow (flash spec §2.3).
+    var flash: NotchFlashEvent? = nil
     let onActivate: (String) -> Void
 
     @State private var hoveredID: String?
@@ -81,12 +96,15 @@ struct SessionsList: View {
                         }
                     }
                     .help("Open \(row.projectName)")
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
                 if state.hiddenSessionCount > 0 {
                     Text(SessionsText.moreSessions(state.hiddenSessionCount))
                         .foregroundStyle(Terminal.dim)
                 }
             }
+            .animation(.snappy, value: state.rows.map(\.id))
+            .animation(.snappy, value: state.rows.flatMap { $0.agents.map(\.id) })
         }
     }
 
@@ -97,6 +115,12 @@ struct SessionsList: View {
                 Text(row.status == .idle ? "○" : "●")
                     .foregroundStyle(row.status.notchColor)
                     .opacity(dotOpacity(row.status, at: date))
+                    .flashGlow(
+                        flash,
+                        color: flash?.projects.contains(row.projectName) == true ? flash?.dot : nil,
+                        blinks: flash?.dotBlinks == true,
+                        radius: 4
+                    )
                 Text(row.projectName)
                     .fontWeight(.semibold)
                     .lineLimit(1)
@@ -119,6 +143,7 @@ struct SessionsList: View {
             }
             ForEach(Array(row.agents.enumerated()), id: \.element.id) { index, agent in
                 agentView(agent, isLast: index == row.agents.count - 1 && row.hiddenAgentCount == 0, at: date)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
             if row.hiddenAgentCount > 0 {
                 HStack(spacing: 6) {

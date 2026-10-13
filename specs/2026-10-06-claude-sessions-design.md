@@ -264,6 +264,8 @@ Stopped agents: an agent stopped by the main agent's `TaskStop` tool sends no `S
 
 ### 10.5 Alerts
 
+> Superseded in part by `specs/2026-10-13-notch-flash-design.md`: "finished" flashes the session dot green instead of expanding the notch; "needs you" still expands the notch and also blinks the dot.
+
 - New `LimitsAlert` cases: `sessionFinished(project:worked:)` → "✓ Workdeck finished" / "worked 14m" (green); `sessionNeedsYou(project:)` → "! vitastir needs you" / "permission prompt" (orange). They use the existing notch alert (6 seconds, one at a time) and require the indicator to be on.
 - `SessionAlertPolicy` (pure) compares the previous and current session lists:
   - finished: a session that was working or compacting is now idle because of `Stop` (`since == lastStopAt`) **with no running agents**, and `lastStopAt − workStartedAt` (or the previous `since` without a work start) is at least the threshold. An agent stopping alone never announces: Claude Code re-invokes the model after a background agent, and the `Stop` that follows is the finish;

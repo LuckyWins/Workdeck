@@ -33,8 +33,10 @@ final class FakePresenter: LimitsPresenting {
         shown.append(state)
     }
 
-    func present(_ alert: LimitsAlert) {
-        alerts.append(alert)
+    private(set) var flashes: [[LimitsAlert]] = []
+    func flash(_ alerts: [LimitsAlert]) {
+        flashes.append(alerts)
+        self.alerts += alerts
     }
 
     private(set) var refreshAction: (() -> Void)?
@@ -738,6 +740,57 @@ struct ClaudeCodeControllerTests {
         writeSessionEvent(hookEvent(.stop, at: 600, session: "s1"), to: sessionsDirectory)
         controller.sessions.store.reload()
         #expect(presenter.alerts == [.sessionFinished(project: "Workdeck", worked: 595)])
+    }
+
+    @Test func anAlertShowsAHiddenWhenActiveNotch() throws {
+        connector.status = .connected
+        settings.isEnabled = true
+        settings.mode = .whenActive
+        try writeUsage(fiveHour: 10)
+        let (controller, store) = makeController()
+        controller.start()
+        store.reload()
+        #expect(controller.state.display == .hidden)
+        try writeUsage(fiveHour: 82)
+        store.reload()
+        #expect(controller.state.display == .notch(.warning))
+        #expect(presenter.flashes.last == [.threshold(window(.fiveHour, 82), threshold: 80)])
+    }
+
+    @Test func aResetFlashesAndLingers() throws {
+        connector.status = .connected
+        settings.isEnabled = true
+        settings.mode = .whenActive
+        try writeUsage(fiveHour: 85)
+        var now = fixedNow
+        let (controller, store) = makeController(clock: { now })
+        controller.start()
+        store.reload()
+        // The window resets: below the threshold the notch would hide at once without the linger.
+        try UsageSnapshotFile.write(UsageSnapshot(capturedAt: fixedNow, fiveHour: window(.fiveHour, 2, resetsIn: 5 * 3600), sevenDay: nil), to: fileURL)
+        store.reload()
+        #expect(presenter.flashes.last == [.reset([.fiveHour])])
+        #expect(controller.state.display == .notch(.normal))
+        now = fixedNow.addingTimeInterval(61)
+        controller.refresh()
+        #expect(controller.state.display == .hidden)
+    }
+
+    @Test func aSessionAlertFlashesWithTheNotchShown() {
+        connector.status = .connected
+        hooksConnector.status = .connected
+        settings.isEnabled = true
+        settings.mode = .whenActive
+        settings.notifyWhenFinished = true
+        settings.finishedAfterMinutes = 1
+        addLiveSession()
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 5, session: "s1"), to: sessionsDirectory)
+        let (controller, _) = makeController()
+        controller.start()
+        writeSessionEvent(hookEvent(.stop, at: 600, session: "s1"), to: sessionsDirectory)
+        controller.sessions.store.reload()
+        #expect(presenter.flashes.last == [.sessionFinished(project: "Workdeck", worked: 595)])
+        #expect(presenter.shown.last?.display != .hidden)
     }
 
     @Test func noSessionAlertsWhileTheIndicatorIsOff() {

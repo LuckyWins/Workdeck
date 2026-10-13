@@ -70,9 +70,10 @@ final class ClaudeCodeController {
         limits.onChange = { [weak self] in self?.refresh() }
         sessions.onChange = { [weak self] in self?.refresh() }
         sessions.onAlerts = { [weak self] alerts in
-            for alert in alerts {
-                self?.presenter.present(alert)
-            }
+            guard let self, !alerts.isEmpty else { return }
+            noteAlerts()
+            refresh()
+            flash(alerts)
         }
         presenter.setSessionAction { [weak self] id in self?.sessions.activateSession(id: id) }
         presenter.setProjectAction { [weak self] name in self?.sessions.activateProject(named: name) }
@@ -171,6 +172,11 @@ final class ClaudeCodeController {
     /// Recomputes keep-awake, the notch state, and limit alerts from both parts.
     func refresh() {
         sessions.updateKeepAwake()
+        // Limit alerts come first: in "When active" an alert counts as activity, so a hidden notch shows (flash spec §2.3).
+        let limitAlerts = limits.takeAlerts()
+        if !limitAlerts.isEmpty {
+            noteAlerts()
+        }
         let withData = limits.accounts.filter { $0.hasData || usageProblem(of: $0) != nil || isWaiting($0) }
         let shown = withData.isEmpty ? [limits.main] : withData
         let compact = compactAccount(among: shown)
@@ -240,15 +246,28 @@ final class ClaudeCodeController {
             collapsesOtherAccounts: settings.collapsesOtherAccounts
         )
         presenter.show(state)
-        for alert in limits.takeAlerts() {
-            WorkdeckLog.alerts.notice("\(LimitsText.alertTitle(alert, showsAccount: true), privacy: .public), shown")
-            presenter.present(alert)
-        }
+        flash(limitAlerts)
     }
 
     /// The usage API waits for Claude Code to renew this account's login (spec §12); shown, but not as a problem.
     private func isWaiting(_ account: AccountLimits) -> Bool {
         settings.fetchFromAPI && account.poller.status == .waitingForClaudeCode
+    }
+
+    /// An alert restarts the "When active" linger, as if work had just ended (flash spec §2.3).
+    private func noteAlerts() {
+        workEndedAt = clock()
+        lingerTask?.cancel()
+        lingerTask = nil
+    }
+
+    private func flash(_ alerts: [LimitsAlert]) {
+        guard !alerts.isEmpty else { return }
+        // Session alerts are logged by their policy; the presenter decides whether anything shows.
+        for alert in alerts where LimitsText.alertProject(alert) == nil {
+            WorkdeckLog.alerts.notice("\(LimitsText.alertTitle(alert, showsAccount: true), privacy: .public), alert")
+        }
+        presenter.flash(alerts)
     }
 
     /// "When active" keeps the notch `linger` seconds after the last active session goes idle (spec §3).

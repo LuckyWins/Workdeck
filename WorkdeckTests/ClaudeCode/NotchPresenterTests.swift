@@ -8,10 +8,6 @@ final class FakeNotchSurface: NotchSurface {
     var onHoverChange: ((Bool) -> Void)?
     var model: LimitsNotchModel?
     private(set) var calls: [String] = []
-    /// The alert the model held at each expand, captured synchronously so timing cannot race it.
-    private(set) var alertsAtExpand: [LimitsAlert?] = []
-    /// Every alert on screen at each expand.
-    private(set) var batchesAtExpand: [[LimitsAlert]] = []
     private(set) var overlapped = false
     private var busy = false
 
@@ -23,9 +19,11 @@ final class FakeNotchSurface: NotchSurface {
         busy = false
     }
 
+    /// The alerts on screen at each expand, captured synchronously so timing cannot race it.
+    private(set) var alertsAtExpand: [[LimitsAlert]] = []
+
     func expand(on screen: NSScreen) async {
-        alertsAtExpand.append(model?.alert)
-        batchesAtExpand.append(model?.alerts ?? [])
+        alertsAtExpand.append(model?.alerts ?? [])
         await perform("expand")
     }
     func compact(on screen: NSScreen) async { await perform("compact") }
@@ -79,7 +77,7 @@ struct NotchPresenterTests {
     let pointer = FakePointer()
     let screenReads = ScreenReads()
 
-    private func makePresenter(screen: NSScreen? = NSScreen.screens.first, virtual: Bool = false, alertDuration: Duration = .milliseconds(100), hoverEnterDelay: Duration = .milliseconds(40), hoverExitDelay: Duration = .milliseconds(80)) -> (NotchPresenter, () -> Int) {
+    private func makePresenter(screen: NSScreen? = NSScreen.screens.first, virtual: Bool = false, flashDuration: Duration = .milliseconds(60), alertDuration: Duration = .milliseconds(100), hoverEnterDelay: Duration = .milliseconds(40), hoverExitDelay: Duration = .milliseconds(80)) -> (NotchPresenter, () -> Int) {
         var created = 0
         let presenter = NotchPresenter(
             makeSurface: { model in
@@ -93,6 +91,7 @@ struct NotchPresenterTests {
             },
             fullScreen: fullScreen,
             pointer: pointer,
+            flashDuration: flashDuration,
             alertDuration: alertDuration,
             rebuildDelay: .zero,
             workspaceSettleDelay: .milliseconds(50),
@@ -128,6 +127,155 @@ struct NotchPresenterTests {
         #expect(NotchPresenter.target(display: display, isHovering: hovering, isShowingAlert: alert, hasScreen: screen, hidesResting: hidesResting) == expected)
     }
 
+    @Test func aFlashNeverExpands() async {
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.flash([.sessionFinished(project: "a", worked: 60), .threshold(window(.fiveHour, 81), threshold: 80), .reset([.sevenDay])])
+        await settle(presenter)
+        #expect(!surface.calls.contains("expand"))
+        #expect(presenter.appliedTarget == .compact)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func needsYouExpandsWithItsTextThenRests() async {
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.flash([.sessionFinished(project: "a", worked: 60), .sessionNeedsYou(project: "vitastir")])
+        await settle(presenter)
+        #expect(surface.alertsAtExpand == [[.sessionNeedsYou(project: "vitastir")]])
+        #expect(presenter.appliedTarget == .compact)
+        #expect(presenter.model.alerts.isEmpty)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func needsYouExpandsOverAFullScreenApp() async {
+        fullScreen.isOn = true
+        let (presenter, _) = makePresenter(virtual: true)
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.flash([.sessionNeedsYou(project: "vitastir")])
+        await settle(presenter)
+        #expect(surface.alertsAtExpand == [[.sessionNeedsYou(project: "vitastir")]])
+        #expect(presenter.appliedTarget == .hidden)
+    }
+
+    @Test func flashesInARowMerge() async throws {
+        let (presenter, _) = makePresenter(flashDuration: .seconds(5))
+        presenter.show(state(.notch(.normal)))
+        presenter.flash([.threshold(window(.fiveHour, 96), threshold: 95)])
+        presenter.flash([.sessionFinished(project: "a", worked: 60)])
+        let deadline = Date().addingTimeInterval(2)
+        while presenter.model.flash == nil, Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        let flash = try #require(presenter.model.flash)
+        #expect(flash.ring == .red)
+        #expect(flash.dot == .green)
+        #expect(NotchFlash.isFresh(flash, now: Date()))
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func theNeedsYouBlinkPlaysOnTheCompactNotch() async {
+        var targetsWhileFlashing: [NotchTarget] = []
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.flash([.sessionNeedsYou(project: "vitastir")])
+        while presenter.isBusy {
+            if presenter.model.flash != nil {
+                targetsWhileFlashing.append(presenter.appliedTarget)
+            }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(!targetsWhileFlashing.isEmpty)
+        #expect(targetsWhileFlashing.allSatisfy { $0 == .compact })
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func needsYouAlertsTogetherShowAsOneBatch() async {
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.flash([.sessionNeedsYou(project: "vitastir"), .sessionNeedsYou(project: "Workdeck")])
+        await settle(presenter)
+        #expect(surface.alertsAtExpand == [[.sessionNeedsYou(project: "vitastir"), .sessionNeedsYou(project: "Workdeck")]])
+        #expect(presenter.model.alerts.isEmpty)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aNeedsYouArrivingDuringAnotherJoinsIt() async throws {
+        let (presenter, _) = makePresenter(alertDuration: .seconds(1))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.flash([.sessionNeedsYou(project: "vitastir")])
+        while surface.alertsAtExpand.isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        presenter.flash([.sessionNeedsYou(project: "pokemon")])
+        #expect(presenter.model.alerts == [.sessionNeedsYou(project: "vitastir"), .sessionNeedsYou(project: "pokemon")])
+        await settle(presenter)
+        #expect(presenter.model.alerts.isEmpty)
+        #expect(surface.alertsAtExpand.count == 1)
+    }
+
+    @Test func needsYouWithoutAScreenDoesNothing() async {
+        let (presenter, created) = makePresenter(screen: nil)
+        presenter.flash([.sessionNeedsYou(project: "vitastir")])
+        await settle(presenter)
+        #expect(created() == 0)
+    }
+
+    @Test func alertsTogetherMakeOneFlash() async throws {
+        let (presenter, _) = makePresenter(flashDuration: .seconds(5))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.flash([.sessionFinished(project: "a", worked: 60), .threshold(window(.fiveHour, 96), threshold: 95)])
+        let deadline = Date().addingTimeInterval(2)
+        while presenter.model.flash == nil, Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        let flash = try #require(presenter.model.flash)
+        #expect(flash.ring == .red)
+        #expect(flash.dot == .green)
+    }
+
+    @Test func theFlashClearsAfterItPlays() async {
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.flash([.reset([.fiveHour])])
+        await settle(presenter)
+        #expect(presenter.model.flash == nil)
+    }
+
+    @Test func aHiddenNotchDoesNotFlash() async {
+        var seen: [NotchFlashEvent?] = []
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.hidden))
+        await settle(presenter)
+        presenter.flash([.reset([.fiveHour])])
+        seen.append(presenter.model.flash)
+        while presenter.isBusy {
+            seen.append(presenter.model.flash)
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(seen.allSatisfy { $0 == nil })
+    }
+
+    @Test func noScreenNoFlash() async {
+        var seen: [NotchFlashEvent?] = []
+        let (presenter, _) = makePresenter(screen: nil)
+        presenter.show(state(.notch(.normal)))
+        presenter.flash([.reset([.fiveHour])])
+        while presenter.isBusy {
+            seen.append(presenter.model.flash)
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(seen.allSatisfy { $0 == nil })
+    }
+
     @Test func fullScreenHidesTheVirtualNotch() async {
         fullScreen.isOn = true
         let (presenter, created) = makePresenter(virtual: true)
@@ -151,21 +299,10 @@ struct NotchPresenterTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func alertOverFullScreenExpandsThenHides() async {
-        fullScreen.isOn = true
-        let (presenter, _) = makePresenter(virtual: true)
-        presenter.show(state(.notch(.normal)))
-        presenter.present(.reset([.fiveHour]))
-        await settle(presenter)
-        #expect(surface.alertsAtExpand == [.reset([.fiveHour])])
-        #expect(presenter.appliedTarget == .hidden)
-    }
-
-    @Test(.timeLimit(.minutes(1)))
     func fullScreenIsReadOnlyForARestingNotch() async {
         let (presenter, _) = makePresenter(virtual: true)
         presenter.show(state(.hidden))
-        presenter.present(.reset([.fiveHour]))
+        presenter.flash([.reset([.fiveHour])])
         await settle(presenter)
         #expect(fullScreen.checks == 0)
         presenter.show(state(.notch(.normal)))
@@ -205,20 +342,6 @@ struct NotchPresenterTests {
         await settle(presenter)
         #expect(presenter.appliedTarget == .expanded)
         #expect(surface.calls.filter { $0 == "compact" }.count == 1)
-    }
-
-    @Test(.timeLimit(.minutes(1)))
-    func anAlertExpandsWithoutDelay() async {
-        // With a 10 s hover delay, expanding within 2 s proves the alert does not wait for it.
-        let (presenter, _) = makePresenter(alertDuration: .seconds(5), hoverEnterDelay: .seconds(10))
-        presenter.show(state(.notch(.normal)))
-        await settle(presenter)
-        presenter.present(.reset([.fiveHour]))
-        let deadline = Date().addingTimeInterval(2)
-        while presenter.appliedTarget != .expanded, Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(10))
-        }
-        #expect(presenter.appliedTarget == .expanded)
     }
 
     @Test func peekingReportsAfterTheDelaysAndStops() async throws {
@@ -496,18 +619,6 @@ struct NotchPresenterTests {
         #expect(presenter.appliedTarget == .compact)
     }
 
-    @Test(.timeLimit(.minutes(1)))
-    func alertExpandsThenReturnsToRestingState() async throws {
-        let (presenter, _) = makePresenter()
-        presenter.show(state(.hidden))
-        presenter.present(.reset([.fiveHour]))
-        await settle(presenter)
-        #expect(surface.alertsAtExpand == [.reset([.fiveHour])])
-        #expect(presenter.appliedTarget == .hidden)
-        #expect(surface.calls == ["expand", "hide"])
-        #expect(presenter.model.alert == nil)
-    }
-
     @Test func screenChangeWhileHiddenClosesTheLibraryWindow() async {
         let (presenter, _) = makePresenter()
         presenter.show(state(.notch(.normal)))
@@ -528,13 +639,6 @@ struct NotchPresenterTests {
         #expect(surface.calls == ["compact", "hide", "close", "compact"])
     }
 
-    @Test func noScreenMeansNoAlert() async {
-        let (presenter, created) = makePresenter(screen: nil)
-        presenter.present(.reset([.sevenDay]))
-        await settle(presenter)
-        #expect(created() == 0)
-    }
-
     @Test func refreshActionReachesTheNotchViews() {
         let (presenter, _) = makePresenter()
         var refreshed = 0
@@ -549,30 +653,6 @@ struct NotchPresenterTests {
         presenter.setSessionAction { activated.append($0) }
         presenter.model.onActivateSession?("s1")
         #expect(activated == ["s1"])
-    }
-
-    @Test(.timeLimit(.minutes(1)))
-    func alertsArrivingTogetherShowAsOneBatch() async {
-        let (presenter, _) = makePresenter()
-        presenter.present(.sessionFinished(project: "vitastir", worked: 200))
-        presenter.present(.sessionFinished(project: "Workdeck", worked: 175))
-        await settle(presenter)
-        #expect(surface.batchesAtExpand == [[.sessionFinished(project: "vitastir", worked: 200), .sessionFinished(project: "Workdeck", worked: 175)]])
-        #expect(presenter.model.alerts.isEmpty)
-    }
-
-    @Test(.timeLimit(.minutes(1)))
-    func anAlertArrivingDuringAnotherJoinsIt() async throws {
-        let (presenter, _) = makePresenter(alertDuration: .seconds(1))
-        presenter.present(.reset([.fiveHour]))
-        while surface.batchesAtExpand.isEmpty {
-            try await Task.sleep(for: .milliseconds(5))
-        }
-        presenter.present(.sessionNeedsYou(project: "pokemon"))
-        #expect(presenter.model.alerts == [.reset([.fiveHour]), .sessionNeedsYou(project: "pokemon")])
-        await settle(presenter)
-        #expect(surface.calls.filter { $0 == "expand" }.count == 1)
-        #expect(presenter.model.alerts.isEmpty)
     }
 
     @Test func projectActionReachesTheNotchViews() {

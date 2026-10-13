@@ -4,7 +4,9 @@ import SwiftUI
 @Observable
 final class LimitsNotchModel {
     var state = LimitsViewState.hidden
-    /// Alerts on screen together; the first decides the single-alert layout.
+    /// The flash playing now; cleared when it ends so recreated views do not replay it.
+    var flash: NotchFlashEvent?
+    /// "Needs you" alerts expanding the notch now; the first decides the single-alert layout (flash spec §2.1).
     var alerts: [LimitsAlert] = []
     var alert: LimitsAlert? {
         alerts.first
@@ -38,6 +40,8 @@ struct UsageRing: View {
     let percent: Double?
     let color: Color
     var lineWidth: CGFloat = 2.5
+    /// An alert's flash: the arc takes its color and glows once (flash spec §2).
+    var flash: NotchFlashEvent? = nil
 
     static func fraction(for percent: Double?) -> Double {
         min(max((percent ?? 0) / 100, 0), 1)
@@ -51,6 +55,10 @@ struct UsageRing: View {
                 .trim(from: 0, to: Self.fraction(for: percent))
                 .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
+        }
+        .flashMark(flash, color: flash?.ring) {
+            Circle()
+                .stroke(lineWidth: lineWidth)
         }
         .padding(lineWidth / 2)
         .animation(.easeInOut(duration: 0.3), value: percent)
@@ -72,7 +80,8 @@ struct LimitsCompactLeading: View {
             HStack(spacing: 6) {
                 UsageRing(
                     percent: model.state.pressing?.usedPercent ?? (model.state.hasData ? 0 : nil),
-                    color: level(of: model.state).notchColor
+                    color: level(of: model.state).notchColor,
+                    flash: model.flash
                 )
                 .frame(width: 14, height: 14)
                 Text((model.state.compactLabel.map { "\($0) " } ?? "") + LimitsPresentation.compactNotchText(pressing: model.state.pressing, hasData: model.state.hasData))
@@ -89,7 +98,7 @@ struct LimitsCompactTrailing: View {
     let model: LimitsNotchModel
 
     var body: some View {
-        SessionsCounter(state: model.state.sessions)
+        SessionsCounter(state: model.state.sessions, flash: model.flash)
             .font(Terminal.font(12, weight: .semibold))
     }
 }
@@ -99,7 +108,7 @@ struct LimitsExpandedView: View {
 
     @State private var hoveredRefresh: String?
     @State private var isToggleHovered = false
-    /// Which alert line the pointer is over, for the clickable session alerts.
+    /// Which alert line the pointer is over, for the clickable "needs you" alerts.
     @State private var hoveredAlert: String?
 
     /// Cells in a usage bar; with the percent and reset time a row stays within about 40 characters.
@@ -223,6 +232,11 @@ struct LimitsExpandedView: View {
 
     static let maxBatchLines = 3
 
+    /// A limit flash glows the block of the account it is about (flash spec §2.3).
+    private func ringFlash(for account: AccountLimitsViewState) -> NotchFlashColor? {
+        model.flash?.accounts.contains(account.name) == true ? model.flash?.ring : nil
+    }
+
     private var details: some View {
         VStack(alignment: .leading, spacing: 4) {
             if model.state.showsLimits {
@@ -233,14 +247,17 @@ struct LimitsExpandedView: View {
                     let width = blocks.map(\.name.count).max() ?? 0
                     ForEach(blocks) { account in
                         summaryRow(account, nameWidth: width)
+                            .flashGlow(model.flash, color: ringFlash(for: account))
                     }
                 } else {
                     ForEach(blocks) { account in
                         let isFirst = account.id == blocks.first?.id
                         if blocks.count > 1, isFirst {
                             accountsHeader(title: LimitsPresentation.blockTitle(account, isOnlyBlock: false), plan: account.plan, collapsed: false)
+                                .flashGlow(model.flash, color: ringFlash(for: account))
                         } else {
                             TerminalHeader(title: LimitsPresentation.blockTitle(account, isOnlyBlock: blocks.count == 1), trailing: account.plan)
+                                .flashGlow(model.flash, color: ringFlash(for: account))
                                 .padding(.top, isFirst ? 0 : 4)
                         }
                         ForEach(UsageWindowKind.allCases, id: \.self) { kind in
@@ -260,7 +277,7 @@ struct LimitsExpandedView: View {
             if !model.state.sessions.rows.isEmpty {
                 TerminalHeader(title: "sessions", trailing: "\(model.state.sessions.totalCount)")
                     .padding(.top, model.state.showsLimits ? 4 : 0)
-                SessionsList(state: model.state.sessions) { id in
+                SessionsList(state: model.state.sessions, flash: model.flash) { id in
                     model.onActivateSession?(id)
                 }
             }
@@ -329,6 +346,13 @@ struct LimitsExpandedView: View {
                     .help(account.problem ?? "")
             }
             Spacer(minLength: 0)
+        }
+    }
+
+    private func alertColor(_ alert: LimitsAlert) -> Color {
+        switch alert {
+        case .threshold, .sessionNeedsYou: .orange
+        case .reset, .sessionFinished: .green
         }
     }
 
@@ -434,13 +458,6 @@ struct LimitsExpandedView: View {
                 Text("   " + LimitsText.forecastText(forecast, now: model.state.now))
                     .foregroundStyle(LimitsPresentation.forecastLevel(of: window, thresholds: model.state.thresholds).notchColor)
             }
-        }
-    }
-
-    private func alertColor(_ alert: LimitsAlert) -> Color {
-        switch alert {
-        case .threshold, .sessionNeedsYou: .orange
-        case .reset, .sessionFinished: .green
         }
     }
 }
