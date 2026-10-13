@@ -6,8 +6,9 @@ nonisolated struct HookPayload: Equatable, Sendable {
     var transcriptPath: String?
 }
 
-/// Copies an allowlist of fields from Claude Code's hook JSON. Everything else, including prompts, answers,
-/// and tool input and output, is never read.
+/// Copies an allowlist of fields from Claude Code's hook JSON. Everything else, including prompts, answers, and tool
+/// input and output, is never stored: from tool input only the action summary and an edit's file name, from an edit's
+/// response only its line counts.
 nonisolated enum HookPayloadFilter {
     static let maxFieldLength = 100
     static let maxActionLength = 30
@@ -29,6 +30,45 @@ nonisolated enum HookPayloadFilter {
         default: nil
         }
         return truncated([toolName, target].compactMap { $0 }.joined(separator: " "))
+    }
+
+    static let editTools: Set<String> = ["Edit", "MultiEdit", "Write"]
+
+    /// Lines an applied edit added and removed, from Claude Code's `tool_response` (spec §2.1): the `+` and `-` lines
+    /// of its patch, or every line of a file `Write` created. The text is only counted, never kept.
+    static func lineCounts(toolName: String, response: [String: Any]?) -> LineCounts? {
+        guard editTools.contains(toolName), let response else { return nil }
+        if let patch = response["structuredPatch"] as? [[String: Any]], !patch.isEmpty {
+            var counts = LineCounts(added: 0, removed: 0)
+            for hunk in patch {
+                guard let lines = hunk["lines"] as? [String] else { return nil }
+                for line in lines {
+                    if line.hasPrefix("+") {
+                        counts.added += 1
+                    } else if line.hasPrefix("-") {
+                        counts.removed += 1
+                    }
+                }
+            }
+            return counts
+        }
+        if toolName == "Write", response["type"] as? String == "create", let content = response["content"] as? String {
+            return LineCounts(added: lineCount(content), removed: 0)
+        }
+        return nil
+    }
+
+    /// "a\nb\n" and "a\nb" are two lines, "" none. Bytes, not characters: "\r\n" is one character.
+    static func lineCount(_ text: String) -> Int {
+        let newline = UInt8(ascii: "\n")
+        let breaks = text.utf8.reduce(0) { $0 + ($1 == newline ? 1 : 0) }
+        guard let last = text.utf8.last else { return 0 }
+        return last == newline ? breaks : breaks + 1
+    }
+
+    /// Tool call IDs such as `toolu_01AbC…`.
+    static func isSafeToolUseID(_ value: String) -> Bool {
+        (1...64).contains(value.count) && value.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }
     }
 
     private static func fileName(_ value: Any?) -> String? {
@@ -92,6 +132,15 @@ nonisolated enum HookPayloadFilter {
         )
         if name == .preToolUse, let tool = root["tool_name"] as? String {
             event.action = action(toolName: String(tool.prefix(maxFieldLength)), input: root["tool_input"] as? [String: Any])
+        }
+        if name == .preToolUse || name == .postToolUse, let id = root["tool_use_id"] as? String, isSafeToolUseID(id) {
+            event.toolUseID = id
+        }
+        if name == .postToolUse, let tool = root["tool_name"] as? String,
+           let counts = lineCounts(toolName: tool, response: root["tool_response"] as? [String: Any]) {
+            event.linesAdded = counts.added
+            event.linesRemoved = counts.removed
+            event.editedFile = fileName((root["tool_input"] as? [String: Any])?["file_path"]).map { String($0.prefix(maxFieldLength)) }
         }
         if name == .stop, agentID == nil, let tasks = root["background_tasks"] as? [[String: Any]] {
             event.backgroundAgentIDs = tasks

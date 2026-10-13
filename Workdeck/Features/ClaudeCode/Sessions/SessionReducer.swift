@@ -4,6 +4,8 @@ import Foundation
 nonisolated enum SessionReducer {
     /// How soon after the last agent stopped a re-invocation still counts as the same work.
     static let workResumeWindow: TimeInterval = 10
+    /// Early counts kept for steps not seen yet; older ones belong to steps that already left the ticker.
+    static let maxEarlyLines = 8
 
     /// Events are applied oldest first: async hooks may have written them out of order.
     static func reduce(_ events: [HookEvent]) -> ClaudeSession? {
@@ -31,7 +33,7 @@ nonisolated enum SessionReducer {
     }
 
     private static func applyEvent(_ event: HookEvent, to current: ClaudeSession?) -> ClaudeSession {
-        var session = current ?? ClaudeSession(id: event.sessionID, status: .idle, since: event.time, lastEventAt: event.time)
+        var session = current ?? ClaudeSession(id: event.sessionID, status: .idle, since: event.time, lastEventAt: event.time, turn: TurnEdits(startedAt: event.time))
         // Compaction keeps the session running; startup, resume and clear begin afresh.
         if event.name == .sessionStart, event.source != "compact" {
             session = ClaudeSession(
@@ -45,7 +47,8 @@ nonisolated enum SessionReducer {
                 hostBundleID: session.hostBundleID,
                 termProgram: session.termProgram,
                 lastEventAt: event.time,
-                isBlank: event.source == "startup" || event.source == "clear"
+                isBlank: event.source == "startup" || event.source == "clear",
+                turn: TurnEdits(startedAt: event.time)
             )
         } else if event.name != .sessionStart {
             session.isBlank = false
@@ -73,9 +76,12 @@ nonisolated enum SessionReducer {
                 setStatus(session.statusBeforeCompact == .idle ? .idle : .working, at: event.time, on: &session)
             }
         case .userPromptSubmit:
+            session.steps = []
+            session.turn = TurnEdits(startedAt: event.time)
+            session.earlyLines = []
             setStatus(.working, at: event.time, on: &session)
         case .preToolUse:
-            setAction(event.action, for: event.agentID, at: event.time, on: &session)
+            setAction(event.action, toolUseID: event.toolUseID, for: event.agentID, at: event.time, on: &session)
             if let agentID = event.agentID, let index = session.agents.firstIndex(where: { $0.id == agentID }) {
                 session.agents[index].steps += 1
             }
@@ -88,6 +94,9 @@ nonisolated enum SessionReducer {
         case .postToolUse:
             // The finished command stays on screen until the next one starts; only mark the agent as heard from.
             markSeen(event.agentID, at: event.time, on: &session)
+            if let lines = event.lineCounts {
+                addEdit(lines, of: event, to: &session)
+            }
             // Agents run in parallel: only the agent that asked for permission ends the wait.
             if session.status != .waiting || event.agentID == session.waitingAgentID {
                 setStatus(.working, at: event.time, on: &session)
@@ -138,17 +147,48 @@ nonisolated enum SessionReducer {
         return session
     }
 
-    /// An agent's own tool call updates that agent; a call without an agent ID is the main agent's.
-    private static func setAction(_ action: String?, for agentID: String?, at time: Date, on session: inout ClaudeSession) {
+    /// An agent's own tool call updates that agent; a call without an agent ID is the main agent's and joins the ticker.
+    private static func setAction(_ action: String?, toolUseID: String?, for agentID: String?, at time: Date, on session: inout ClaudeSession) {
         guard let agentID else {
             session.action = action
+            if let action {
+                session.steps.append(SessionStep(toolUseID: toolUseID, action: action, lines: takeEarlyLines(toolUseID, from: &session), at: time))
+                session.steps.removeFirst(max(0, session.steps.count - ClaudeSession.maxSteps))
+            }
             return
         }
         // An agent that already stopped, or whose start has not been read yet, leaves the session row alone.
         if let index = session.agents.firstIndex(where: { $0.id == agentID }) {
             session.agents[index].action = action
+            session.agents[index].actionToolUseID = toolUseID
+            session.agents[index].actionLines = takeEarlyLines(toolUseID, from: &session)
             session.agents[index].lastSeenAt = max(session.agents[index].lastSeenAt ?? .distantPast, time)
         }
+    }
+
+    /// An applied edit joins the turn, and the step or agent action of the same tool call (spec §2.3).
+    private static func addEdit(_ lines: LineCounts, of event: HookEvent, to session: inout ClaudeSession) {
+        session.turn.edits += 1
+        session.turn.added += lines.added
+        session.turn.removed += lines.removed
+        if let file = event.editedFile {
+            session.turn.files.insert(file)
+        }
+        guard let toolUseID = event.toolUseID else { return }
+        if let agentID = event.agentID, let index = session.agents.firstIndex(where: { $0.id == agentID && $0.actionToolUseID == toolUseID }) {
+            session.agents[index].actionLines = lines
+        } else if event.agentID == nil, let index = session.steps.firstIndex(where: { $0.toolUseID == toolUseID }) {
+            session.steps[index].lines = lines
+        } else {
+            session.earlyLines.append(EarlyLines(toolUseID: toolUseID, lines: lines))
+            session.earlyLines.removeFirst(max(0, session.earlyLines.count - maxEarlyLines))
+        }
+    }
+
+    /// The counts that arrived before this tool call's step, if any.
+    private static func takeEarlyLines(_ toolUseID: String?, from session: inout ClaudeSession) -> LineCounts? {
+        guard let toolUseID, let index = session.earlyLines.firstIndex(where: { $0.toolUseID == toolUseID }) else { return nil }
+        return session.earlyLines.remove(at: index).lines
     }
 
     private static func markSeen(_ agentID: String?, at time: Date, on session: inout ClaudeSession) {

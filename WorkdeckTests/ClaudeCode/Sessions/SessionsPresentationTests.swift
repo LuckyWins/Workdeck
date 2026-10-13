@@ -111,6 +111,64 @@ struct SessionsPresentationTests {
         #expect(agent.name == "code-reviewer")
         #expect(agent.customType == nil)
     }
+
+    @Test func focusIsTheFirstWorkingSessionWhateverActedLast() {
+        // Display order: waiting first, then working sessions with the most recent start first.
+        var first = session("a", .working)
+        first.steps = [SessionStep(toolUseID: "t1", action: "Read x.swift", at: fixedNow)]
+        var second = session("b", .working)
+        second.steps = [SessionStep(toolUseID: "t2", action: "Bash ls", at: fixedNow.addingTimeInterval(5))]
+        let state = SessionsPresentation.viewState(sessions: [session("w", .waiting), first, second], now: fixedNow)
+        #expect(state.rows.map(\.isFocused) == [false, true, false])
+        #expect(state.rows.map { $0.steps.map(\.action) } == [[], ["Read x.swift"], []])
+    }
+
+    @Test func compactingCanBeFocusedIdleAndWaitingCannot() {
+        #expect(SessionsPresentation.viewState(sessions: [session("a", .compacting)], now: fixedNow).rows.map(\.isFocused) == [true])
+        #expect(SessionsPresentation.viewState(sessions: [session("w", .waiting), session("i", .idle)], now: fixedNow).rows.map(\.isFocused) == [false, false])
+    }
+
+    @Test func tickerStepsAgeFromTheCurrentOne() throws {
+        var main = session("a", .working)
+        main.steps = [
+            SessionStep(toolUseID: "t1", action: "Read x.swift", at: fixedNow),
+            SessionStep(toolUseID: "t2", action: "Edit x.swift", lines: LineCounts(added: 6, removed: 2), at: fixedNow.addingTimeInterval(1)),
+            SessionStep(toolUseID: nil, action: "Bash ls", at: fixedNow.addingTimeInterval(2)),
+        ]
+        let steps = try #require(SessionsPresentation.viewState(sessions: [main], now: fixedNow).rows.first?.steps)
+        #expect(steps.map(\.age) == [2, 1, 0])
+        #expect(steps.map(\.opacity) == [0.25, 0.5, 1])
+        #expect(steps.map(\.lines) == [nil, LineCounts(added: 6, removed: 2), nil])
+        #expect(steps.map(\.id) == ["t1", "t2", "\(fixedNow.addingTimeInterval(2).timeIntervalSince1970) Bash ls"])
+    }
+
+    @Test func rowsAndAgentsCarryTheirActionCounts() throws {
+        var agentWithEdit = RunningAgent(id: "x", type: "Explore", startedAt: fixedNow, action: "Edit y.swift")
+        agentWithEdit.actionLines = LineCounts(added: 12, removed: 3)
+        var main = session("a", .working, agents: [agentWithEdit])
+        main.action = "Edit a.swift"
+        main.steps = [SessionStep(toolUseID: "t1", action: "Edit a.swift", lines: LineCounts(added: 3, removed: 1), at: fixedNow)]
+        let row = try #require(SessionsPresentation.viewState(sessions: [main], now: fixedNow).rows.first)
+        #expect(row.actionLines == LineCounts(added: 3, removed: 1))
+        #expect(row.agents.first?.actionLines == LineCounts(added: 12, removed: 3))
+        // After a Stop the action is gone, and its counts with it.
+        main.action = nil
+        #expect(SessionsPresentation.viewState(sessions: [main], now: fixedNow).rows.first?.actionLines == nil)
+    }
+
+    @Test func theTurnLineFollowsTheStatusAndHidesWithoutEdits() {
+        func turnRow(_ status: SessionStatus, edits: Int) -> TurnRow? {
+            var main = session("a", status)
+            main.turn = TurnEdits(startedAt: fixedNow, edits: edits, added: 84, removed: 21, files: ["a.swift", "b.swift"])
+            return SessionsPresentation.viewState(sessions: [main], now: fixedNow).rows.first?.turn
+        }
+        let lines = LineCounts(added: 84, removed: 21)
+        #expect(turnRow(.working, edits: 3) == TurnRow(isFinished: false, fileCount: 2, lines: lines))
+        #expect(turnRow(.waiting, edits: 3) == TurnRow(isFinished: false, fileCount: 2, lines: lines))
+        #expect(turnRow(.compacting, edits: 3) == TurnRow(isFinished: false, fileCount: 2, lines: lines))
+        #expect(turnRow(.idle, edits: 3) == TurnRow(isFinished: true, fileCount: 2, lines: lines))
+        #expect(turnRow(.working, edits: 0) == nil)
+    }
 }
 
 struct SessionsTextTests {
@@ -138,5 +196,19 @@ struct SessionsTextTests {
         #expect(SessionsText.moreAgents(3) == "+3 agents")
         #expect(SessionsText.steps(1) == "1 step")
         #expect(SessionsText.steps(87) == "87 steps")
+    }
+
+    @Test func lineCountsLeaveOutZeroParts() {
+        #expect(SessionsText.added(LineCounts(added: 12, removed: 3)) == "+12")
+        #expect(SessionsText.removed(LineCounts(added: 12, removed: 3)) == "\u{2212}3")
+        #expect(SessionsText.added(LineCounts(added: 0, removed: 3)) == nil)
+        #expect(SessionsText.removed(LineCounts(added: 4, removed: 0)) == nil)
+    }
+
+    @Test func turnTexts() {
+        let lines = LineCounts(added: 1, removed: 0)
+        #expect(SessionsText.turn(TurnRow(isFinished: false, fileCount: 5, lines: lines)) == "this turn · 5 files")
+        #expect(SessionsText.turn(TurnRow(isFinished: true, fileCount: 1, lines: lines)) == "last turn · 1 file")
+        #expect(SessionsText.turn(TurnRow(isFinished: false, fileCount: 0, lines: lines)) == "this turn")
     }
 }

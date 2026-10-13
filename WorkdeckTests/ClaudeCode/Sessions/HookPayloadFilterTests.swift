@@ -177,4 +177,93 @@ struct HookPayloadFilterTests {
         let subagent = try #require(parse(["hook_event_name": "SubagentStop", "session_id": sessionID, "agent_id": "a1", "background_tasks": [["id": "a1", "type": "subagent"]]]))
         #expect(subagent.event.backgroundAgentIDs == nil)
     }
+
+    private func editResponse(_ hunks: [[String]]) -> [String: Any] {
+        ["filePath": "/a/b/c.swift", "structuredPatch": hunks.map { ["oldStart": 1, "oldLines": 1, "newStart": 1, "newLines": 1, "lines": $0] }]
+    }
+
+    @Test func countsLinesAcrossHunks() {
+        let response = editResponse([[" keep", "-old", "+new", "+more", "\\ No newline at end of file"], ["-gone"]])
+        for tool in ["Edit", "MultiEdit", "Write"] {
+            #expect(HookPayloadFilter.lineCounts(toolName: tool, response: response) == LineCounts(added: 2, removed: 2))
+        }
+    }
+
+    @Test(arguments: [("a\nb\n", 2), ("a\nb", 2), ("", 0), ("a\r\nb\r\n", 2), ("\n", 1)] as [(String, Int)])
+    func countsANewFile(content: String, expected: Int) {
+        let response: [String: Any] = ["type": "create", "filePath": "/a/new.swift", "content": content, "structuredPatch": []]
+        #expect(HookPayloadFilter.lineCounts(toolName: "Write", response: response) == LineCounts(added: expected, removed: 0))
+    }
+
+    @Test func malformedOrOtherResponsesHaveNoCounts() {
+        #expect(HookPayloadFilter.lineCounts(toolName: "Edit", response: nil) == nil)
+        #expect(HookPayloadFilter.lineCounts(toolName: "Edit", response: ["structuredPatch": "text"]) == nil)
+        #expect(HookPayloadFilter.lineCounts(toolName: "Edit", response: ["structuredPatch": [["oldStart": 1]]]) == nil)
+        #expect(HookPayloadFilter.lineCounts(toolName: "Edit", response: ["structuredPatch": []]) == nil)
+        // An overwrite with the same text has an empty patch.
+        #expect(HookPayloadFilter.lineCounts(toolName: "Write", response: ["type": "update", "content": "a\n", "structuredPatch": []]) == nil)
+        // Only Write creates files; another tool's "create" is not counted.
+        #expect(HookPayloadFilter.lineCounts(toolName: "Edit", response: ["type": "create", "content": "a\n", "structuredPatch": []]) == nil)
+        for tool in ["Bash", "Read", "NotebookEdit", "mcp__x__y"] {
+            #expect(HookPayloadFilter.lineCounts(toolName: tool, response: editResponse([["+a"]])) == nil)
+        }
+    }
+
+    @Test func postToolUseOfAnEditKeepsCountsFileNameAndCallID() throws {
+        let payload = try #require(parse([
+            "hook_event_name": "PostToolUse",
+            "session_id": sessionID,
+            "tool_name": "Edit",
+            "tool_use_id": "toolu_01AbC-9",
+            "tool_input": ["file_path": "/Users/me/Workdeck/c.swift", "old_string": "SECRET-OLD", "new_string": "SECRET-NEW"],
+            "tool_response": editResponse([[" SECRET-CONTEXT", "-SECRET-OLD", "+SECRET-NEW"]]),
+        ]))
+        #expect(payload.event.linesAdded == 1)
+        #expect(payload.event.linesRemoved == 1)
+        #expect(payload.event.lineCounts == LineCounts(added: 1, removed: 1))
+        #expect(payload.event.editedFile == "c.swift")
+        #expect(payload.event.toolUseID == "toolu_01AbC-9")
+        #expect(payload.event.action == nil)
+        let encoded = String(decoding: try JSONEncoder().encode(payload.event), as: UTF8.self)
+        #expect(!encoded.contains("SECRET"))
+        #expect(!encoded.contains("/Users/me"))
+    }
+
+    @Test func otherToolsAndEventsHaveNoCounts() throws {
+        let bash = try #require(parse([
+            "hook_event_name": "PostToolUse", "session_id": sessionID, "tool_name": "Bash",
+            "tool_input": ["command": "ls"], "tool_response": editResponse([["+a"]]),
+        ]))
+        #expect(bash.event.lineCounts == nil)
+        #expect(bash.event.editedFile == nil)
+        let pre = try #require(parse([
+            "hook_event_name": "PreToolUse", "session_id": sessionID, "tool_name": "Edit",
+            "tool_input": ["file_path": "/a/c.swift"], "tool_response": editResponse([["+a"]]),
+        ]))
+        #expect(pre.event.lineCounts == nil)
+        #expect(pre.event.editedFile == nil)
+    }
+
+    @Test func toolCallIDsOnToolEventsOnly() throws {
+        for name in ["PreToolUse", "PostToolUse"] {
+            let payload = try #require(parse(["hook_event_name": name, "session_id": sessionID, "tool_name": "Read", "tool_use_id": "toolu_01X"]))
+            #expect(payload.event.toolUseID == "toolu_01X")
+        }
+        let stop = try #require(parse(["hook_event_name": "Stop", "session_id": sessionID, "tool_use_id": "toolu_01X"]))
+        #expect(stop.event.toolUseID == nil)
+    }
+
+    @Test(arguments: ["", "../x", "a b", "a/b", String(repeating: "a", count: 65), "é"])
+    func unsafeToolCallIDsAreDropped(id: String) throws {
+        let payload = try #require(parse(["hook_event_name": "PreToolUse", "session_id": sessionID, "tool_name": "Read", "tool_use_id": id]))
+        #expect(payload.event.toolUseID == nil)
+    }
+
+    @Test func decodedCountsAreClamped() {
+        // Event files can be edited by hand; sums must not overflow, and counts are never negative.
+        var event = HookEvent(time: fixedNow, name: .postToolUse, sessionID: sessionID)
+        event.linesAdded = Int.max
+        event.linesRemoved = -5
+        #expect(event.lineCounts == LineCounts(added: LineCounts.maxCount, removed: 0))
+    }
 }

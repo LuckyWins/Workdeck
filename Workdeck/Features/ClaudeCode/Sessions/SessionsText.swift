@@ -36,6 +36,26 @@ nonisolated enum SessionsText {
         count == 1 ? "1 step" : "\(count) steps"
     }
 
+    /// "+12"; `nil` for none (spec §3.3).
+    static func added(_ lines: LineCounts) -> String? {
+        lines.added > 0 ? "+\(lines.added)" : nil
+    }
+
+    /// "−3" with a minus sign; `nil` for none.
+    static func removed(_ lines: LineCounts) -> String? {
+        lines.removed > 0 ? "\u{2212}\(lines.removed)" : nil
+    }
+
+    /// "this turn · 5 files", "last turn · 1 file"; just the label when no file name was reported.
+    static func turn(_ turn: TurnRow) -> String {
+        let label = turn.isFinished ? "last turn" : "this turn"
+        switch turn.fileCount {
+        case 0: return label
+        case 1: return "\(label) · 1 file"
+        default: return "\(label) · \(turn.fileCount) files"
+        }
+    }
+
     static func moreSessions(_ count: Int) -> String {
         "+\(count) more"
     }

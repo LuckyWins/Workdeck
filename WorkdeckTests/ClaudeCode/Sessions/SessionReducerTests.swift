@@ -359,4 +359,123 @@ struct SessionReducerTests {
         ]))
         #expect(session.workStartedAt == fixedNow.addingTimeInterval(80))
     }
+
+    private func edit(_ id: String?, at seconds: TimeInterval, added: Int, removed: Int, file: String = "a.swift", agent: String? = nil) -> HookEvent {
+        hookEvent(.postToolUse, at: seconds) {
+            $0.toolUseID = id
+            $0.linesAdded = added
+            $0.linesRemoved = removed
+            $0.editedFile = file
+            $0.agentID = agent
+        }
+    }
+
+    @Test func theTickerKeepsTheLastThreeMainSteps() throws {
+        let tools = (1...4).map { index in
+            hookEvent(.preToolUse, at: 10 + Double(index)) { $0.action = "Read \(index).swift"; $0.toolUseID = "t\(index)" }
+        }
+        let agent = hookEvent(.subagentStart, at: 5) { $0.agentID = "a1"; $0.agentType = "Explore" }
+        let agentTool = hookEvent(.preToolUse, at: 16) { $0.agentID = "a1"; $0.action = "Bash ls"; $0.toolUseID = "t9" }
+        let session = try #require(SessionReducer.reduce([start, agent, hookEvent(.userPromptSubmit, at: 10)] + tools + [agentTool]))
+        #expect(session.steps.map(\.action) == ["Read 2.swift", "Read 3.swift", "Read 4.swift"])
+        #expect(session.steps.map(\.toolUseID) == ["t2", "t3", "t4"])
+        #expect(session.steps.last?.at == fixedNow.addingTimeInterval(14))
+        #expect(session.agents.first?.actionToolUseID == "t9")
+    }
+
+    @Test func aPromptClearsTheTickerAndAStopKeepsIt() throws {
+        let tool = hookEvent(.preToolUse, at: 11) { $0.action = "Bash ls" }
+        let base = [start, hookEvent(.userPromptSubmit, at: 10), tool, hookEvent(.stop, at: 20)]
+        #expect(try #require(SessionReducer.reduce(base)).steps.map(\.action) == ["Bash ls"])
+        #expect(try #require(SessionReducer.reduce(base + [hookEvent(.userPromptSubmit, at: 30)])).steps.isEmpty)
+    }
+
+    @Test func countsReachTheirStepIncludingParallelCalls() throws {
+        let first = hookEvent(.preToolUse, at: 11) { $0.action = "Edit a.swift"; $0.toolUseID = "t1" }
+        let second = hookEvent(.preToolUse, at: 11.5) { $0.action = "Edit b.swift"; $0.toolUseID = "t2" }
+        let session = try #require(SessionReducer.reduce([
+            start, hookEvent(.userPromptSubmit, at: 10), first, second,
+            edit("t2", at: 12, added: 3, removed: 1, file: "b.swift"),
+            edit("t1", at: 13, added: 5, removed: 0),
+        ]))
+        #expect(session.steps.map(\.lines) == [LineCounts(added: 5, removed: 0), LineCounts(added: 3, removed: 1)])
+    }
+
+    @Test func countsReachTheirStepWhenLinesArriveOutOfOrder() throws {
+        // Async hooks may write the PostToolUse line first; the event times still order them.
+        let tool = hookEvent(.preToolUse, at: 11) { $0.action = "Edit a.swift"; $0.toolUseID = "t1" }
+        let session = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10), edit("t1", at: 12, added: 2, removed: 1), tool]))
+        #expect(session.steps.last?.lines == LineCounts(added: 2, removed: 1))
+    }
+
+    @Test func anAgentsActionCarriesItsCountsUntilItsNextStep() throws {
+        let agent = hookEvent(.subagentStart, at: 5) { $0.agentID = "a1"; $0.agentType = "Explore" }
+        let tool = hookEvent(.preToolUse, at: 6) { $0.agentID = "a1"; $0.action = "Edit x.swift"; $0.toolUseID = "t1" }
+        let edited = [start, agent, tool, edit("t1", at: 7, added: 12, removed: 3, agent: "a1")]
+        let session = try #require(SessionReducer.reduce(edited))
+        #expect(session.agents.first?.actionLines == LineCounts(added: 12, removed: 3))
+        #expect(session.steps.isEmpty)
+        let next = hookEvent(.preToolUse, at: 8) { $0.agentID = "a1"; $0.action = "Read y.swift"; $0.toolUseID = "t2" }
+        #expect(try #require(SessionReducer.reduce(edited + [next])).agents.first?.actionLines == nil)
+    }
+
+    @Test func theTurnSumsMainAndAgentEditsByFile() throws {
+        let agent = hookEvent(.subagentStart, at: 5) { $0.agentID = "a1"; $0.agentType = "Explore" }
+        let session = try #require(SessionReducer.reduce([
+            start, hookEvent(.userPromptSubmit, at: 1), agent,
+            edit("t1", at: 10, added: 5, removed: 2, file: "a.swift"),
+            edit("t2", at: 11, added: 1, removed: 0, file: "a.swift"),
+            edit("t3", at: 12, added: 0, removed: 4, file: "b.swift", agent: "a1"),
+            // A step that already left the ticker, or an event without an ID, still counts.
+            edit("gone", at: 13, added: 2, removed: 2, file: "c.swift"),
+            edit(nil, at: 14, added: 1, removed: 0, file: "c.swift"),
+        ]))
+        #expect(session.turn == TurnEdits(startedAt: fixedNow.addingTimeInterval(1), edits: 5, added: 9, removed: 8, files: ["a.swift", "b.swift", "c.swift"]))
+    }
+
+    @Test func aPromptOrANewSessionStartsANewTurnButCompactionDoesNot() throws {
+        let before = [start, hookEvent(.userPromptSubmit, at: 1), edit("t1", at: 10, added: 5, removed: 2)]
+        let compacted = try #require(SessionReducer.reduce(before + [hookEvent(.preCompact, at: 20), hookEvent(.sessionStart, at: 30) { $0.source = "compact" }]))
+        #expect(compacted.turn.added == 5)
+        // A background agent's edit after the Stop still belongs to the turn.
+        let afterStop = try #require(SessionReducer.reduce(before + [hookEvent(.stop, at: 20), edit("t2", at: 25, added: 1, removed: 0, agent: "bg")]))
+        #expect(afterStop.turn.added == 6)
+        let prompted = try #require(SessionReducer.reduce(before + [hookEvent(.userPromptSubmit, at: 40)]))
+        #expect(prompted.turn == TurnEdits(startedAt: fixedNow.addingTimeInterval(40)))
+        for source in ["startup", "resume", "clear"] {
+            let restarted = try #require(SessionReducer.reduce(before + [hookEvent(.sessionStart, at: 50) { $0.source = source }]))
+            #expect(restarted.turn == TurnEdits(startedAt: fixedNow.addingTimeInterval(50)))
+            #expect(restarted.steps.isEmpty)
+        }
+    }
+
+    @Test func aSessionWithoutAStartBeginsItsTurnAtTheFirstEvent() throws {
+        let session = try #require(SessionReducer.reduce([hookEvent(.postToolUse, at: 3), edit("t1", at: 4, added: 1, removed: 0)]))
+        #expect(session.turn.startedAt == fixedNow.addingTimeInterval(3))
+        #expect(session.turn.added == 1)
+    }
+
+    @Test func countsReachTheirStepWhenThePostIsStampedFirst() throws {
+        // Each hook stamps its own time; a fast edit's PostToolUse hook can start a moment before the PreToolUse one.
+        let agent = hookEvent(.subagentStart, at: 5) { $0.agentID = "a1"; $0.agentType = "Explore" }
+        let session = try #require(SessionReducer.reduce([
+            start, agent, hookEvent(.userPromptSubmit, at: 10),
+            edit("t1", at: 11.995, added: 2, removed: 1),
+            hookEvent(.preToolUse, at: 12) { $0.action = "Edit a.swift"; $0.toolUseID = "t1" },
+            edit("t2", at: 12.995, added: 4, removed: 0, agent: "a1"),
+            hookEvent(.preToolUse, at: 13) { $0.agentID = "a1"; $0.action = "Edit b.swift"; $0.toolUseID = "t2" },
+        ]))
+        #expect(session.steps.last?.lines == LineCounts(added: 2, removed: 1))
+        #expect(session.agents.first?.actionLines == LineCounts(added: 4, removed: 0))
+        #expect(session.turn.added == 6)
+    }
+
+    @Test func earlyCountsAreBoundedAndClearedByAPrompt() throws {
+        // Counts of steps that already left the ticker never find their step.
+        let edits = (0..<20).map { index in edit("gone\(index)", at: 11 + Double(index), added: 1, removed: 0) }
+        let session = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10)] + edits))
+        #expect(session.earlyLines.count == SessionReducer.maxEarlyLines)
+        #expect(session.earlyLines.last?.toolUseID == "gone19")
+        #expect(try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10)] + edits + [hookEvent(.userPromptSubmit, at: 40)])).earlyLines.isEmpty)
+    }
 }

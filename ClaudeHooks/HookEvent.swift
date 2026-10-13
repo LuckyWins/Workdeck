@@ -45,6 +45,28 @@ nonisolated struct HookEvent: Codable, Equatable, Sendable {
     var backgroundAgentIDs: [String]?
     /// `PreToolUse` only: the tool and a short target, e.g. "Read NotchPresenter.swift".
     var action: String?
+    /// `PreToolUse` and `PostToolUse`: the tool call's ID, which pairs its two events.
+    var toolUseID: String?
+    /// `PostToolUse` of `Edit`, `MultiEdit` and `Write`: lines the applied edit added and removed (counted, never kept),
+    /// and the edited file's name.
+    var linesAdded: Int?
+    var linesRemoved: Int?
+    var editedFile: String?
     /// The extra instance whose hook wrote this event (`--instance <name>`); `nil` for the main one.
     var instance: String?
+
+    /// The counts of an applied edit; `nil` for every other event.
+    var lineCounts: LineCounts? {
+        guard let linesAdded, let linesRemoved else { return nil }
+        // Event files can be edited by hand: no negative counts, and no sum that overflows.
+        return LineCounts(added: min(max(linesAdded, 0), LineCounts.maxCount), removed: min(max(linesRemoved, 0), LineCounts.maxCount))
+    }
+}
+
+/// Lines an edit added and removed.
+nonisolated struct LineCounts: Equatable, Hashable, Sendable {
+    var added: Int
+    var removed: Int
+
+    static let maxCount = 1_000_000_000
 }

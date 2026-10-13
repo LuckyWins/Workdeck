@@ -7,6 +7,31 @@ nonisolated enum SessionStatus: Equatable, Sendable {
     case compacting
 }
 
+/// One of the main agent's recent tool calls (spec §2.3).
+nonisolated struct SessionStep: Equatable, Sendable {
+    var toolUseID: String?
+    var action: String
+    /// Set when the call's edit is applied.
+    var lines: LineCounts?
+    var at: Date
+}
+
+/// Edits since the last prompt, by the main agent and every agent (spec §2.3). Files are told apart by name.
+nonisolated struct TurnEdits: Equatable, Sendable {
+    var startedAt: Date
+    /// Applied edits with counts.
+    var edits = 0
+    var added = 0
+    var removed = 0
+    var files: Set<String> = []
+}
+
+/// An applied edit's counts waiting for its tool call's step.
+nonisolated struct EarlyLines: Equatable, Sendable {
+    var toolUseID: String
+    var lines: LineCounts
+}
+
 nonisolated struct RunningAgent: Equatable, Sendable, Identifiable {
     var id: String
     var type: String
@@ -23,6 +48,9 @@ nonisolated struct RunningAgent: Equatable, Sendable, Identifiable {
     /// Tool calls the agent made.
     var steps = 0
     var transcriptPath: String?
+    /// The tool call of `action`, and its counts once its edit is applied.
+    var actionToolUseID: String?
+    var actionLines: LineCounts?
 }
 
 /// A Claude Code session reconstructed from its hook events.
@@ -67,6 +95,13 @@ nonisolated struct ClaudeSession: Equatable, Sendable, Identifiable {
 
     /// An agent stopped with `TaskStop` sends no `SubagentStop`.
     var lastTaskStopAt: Date?
+    /// The main agent's last tool calls, oldest first, at most `maxSteps`; a prompt clears them.
+    var steps: [SessionStep] = []
+    var turn = TurnEdits(startedAt: .distantPast)
+    /// Counts whose step was not seen yet: each hook stamps its own time, so a fast edit's PostToolUse can come first.
+    var earlyLines: [EarlyLines] = []
+
+    static let maxSteps = 3
 
     /// How long after a `TaskStop` an agent may stay silent before it counts as the stopped one.
     static let taskStopGrace: TimeInterval = 30

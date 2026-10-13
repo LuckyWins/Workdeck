@@ -282,6 +282,8 @@ Stopped agents: an agent stopped by the main agent's `TaskStop` tool sends no `S
 
 The Sessions footer and README change from "tool input is never stored" to "Prompts and answers are never stored; for tool calls only the tool name and a short target (file name, start of a command with secret-looking values masked, domain, search text) are kept."
 
+Amended 2026-10-13 (edit counts spec): for file edits also the file name and the number of lines added and removed, and each tool call's ID.
+
 ### 10.8 Testing
 
 Unit: action extraction for every tool kind, truncation, other input never stored; reducer rows of §10.2; event upgrade on launch; alert policy (threshold, Stop vs idle prompt, frontmost host, first sighting); settings defaults and persistence; keep-awake decisions with a fake; system assertion create and release. Manual `docs/testing.md` S10–S13: action and compacting display, finished alert after the threshold, needs-you alert, `pmset -g assertions` while working.

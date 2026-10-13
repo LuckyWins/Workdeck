@@ -39,8 +39,8 @@ struct SessionFileTrimmerTests {
         let all = try lines(history)
         let session = try #require(SessionReducer.reduce(history))
         let kept = SessionFileTrimmer.kept(all, session: session, tailSize: all[6].count)
-        // The start, the Stop that made the session idle, and the tail.
-        #expect(kept == [all[0], all[5], all[6]])
+        // The start, the turn's prompt, the Stop that made the session idle, and the tail.
+        #expect(kept == [all[0], all[1], all[5], all[6]])
     }
 
     @Test func trimmedLinesRebuildTheSameSession() throws {
@@ -86,5 +86,60 @@ struct SessionFileTrimmerTests {
         let all = try lines([start, hookEvent(.userPromptSubmit, at: 1), hookEvent(.stop, at: 2)])
         let session = try #require(SessionReducer.reduce(try events(all)))
         #expect(SessionFileTrimmer.kept(all, session: session, tailSize: size(all)) == all)
+    }
+
+    @Test func trimmedLinesRebuildTheSameTurn() throws {
+        let counted: (TimeInterval, String) -> HookEvent = { seconds, file in
+            hookEvent(.postToolUse, at: seconds) { $0.toolUseID = "t\(Int(seconds))"; $0.linesAdded = 5; $0.linesRemoved = 2; $0.editedFile = file }
+        }
+        let history = [
+            start,
+            hookEvent(.userPromptSubmit, at: 5),
+            counted(7, "old.swift"),
+            hookEvent(.userPromptSubmit, at: 10),
+            counted(20, "a.swift"),
+            counted(30, "b.swift"),
+        ] + (0..<40).map { index in hookEvent(.postToolUse, at: 40 + Double(index)) }
+        let all = try lines(history)
+        let original = try #require(SessionReducer.reduce(history))
+        let kept = SessionFileTrimmer.kept(all, session: original, tailSize: size(all.suffix(5)))
+        // The start, the prompt that started the work, the turn's prompt and its two edits; the earlier turn's edit goes.
+        #expect(kept == [all[0], all[1], all[3], all[4], all[5]] + all.suffix(5))
+        let rebuilt = try #require(SessionReducer.reduce(try events(kept)))
+        #expect(rebuilt.turn == original.turn)
+        #expect(rebuilt.status == original.status)
+        #expect(rebuilt.since == original.since)
+        #expect(rebuilt.workStartedAt == original.workStartedAt)
+    }
+
+    @Test func keepsOnlyTheNewestCountedEditsOfAVeryLongTurn() throws {
+        // Keeping every edit would leave the trimmed file above the trim size, so it would be rewritten again and again.
+        let counted = (0..<600).map { index in
+            hookEvent(.postToolUse, at: 10 + Double(index)) { $0.toolUseID = "t\(index)"; $0.linesAdded = 1; $0.linesRemoved = 0; $0.editedFile = "a.swift" }
+        }
+        let history = [start, hookEvent(.userPromptSubmit, at: 5)] + counted + (0..<5).map { index in hookEvent(.postToolUse, at: 700 + Double(index)) }
+        let all = try lines(history)
+        let session = try #require(SessionReducer.reduce(history))
+        let kept = SessionFileTrimmer.kept(all, session: session, tailSize: size(all.suffix(5)))
+        #expect(kept == [all[0], all[1]] + all[(602 - SessionFileTrimmer.maxKeptEdits)..<602] + all.suffix(5))
+    }
+
+    @Test func keepsTheTurnsPromptEvenWithoutEdits() throws {
+        // A running agent's latest line is kept and holds an edit of the turn before; without the new turn's prompt a
+        // relaunch would show it as an edit of this turn.
+        let history = [
+            start,
+            hookEvent(.userPromptSubmit, at: 10),
+            hookEvent(.subagentStart, at: 20) { $0.agentID = "a1"; $0.agentType = "Explore" },
+            hookEvent(.postToolUse, at: 30) { $0.agentID = "a1"; $0.toolUseID = "t1"; $0.linesAdded = 3; $0.linesRemoved = 0; $0.editedFile = "a.swift" },
+            hookEvent(.stop, at: 40),
+            hookEvent(.userPromptSubmit, at: 50),
+            hookEvent(.stop, at: 60),
+        ] + (0..<10).map { index in hookEvent(.notification, at: 70 + Double(index)) { $0.notificationType = "auth_success" } }
+        let all = try lines(history)
+        let original = try #require(SessionReducer.reduce(history))
+        let rebuilt = try #require(SessionReducer.reduce(try events(SessionFileTrimmer.kept(all, session: original, tailSize: size(all.suffix(5))))))
+        #expect(original.turn.edits == 0)
+        #expect(rebuilt.turn.edits == 0)
     }
 }
