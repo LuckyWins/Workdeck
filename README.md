@@ -21,7 +21,7 @@ Keeps your Mac awake while the lid is closed — for long builds, remote session
 Shows how much of your Claude Code plan limits you have used — the 5-hour window and the weekly window — in the MacBook notch, Dynamic Island style.
 
 - The compact view shows a ring and the percent of the window closest to its limit, e.g. `42%` (labeled `7d 91%` when the weekly window is closer); hover to expand a terminal-style panel with a usage bar per window and when it resets.
-- Two modes: always visible, or only near limits.
+- **Show:** "Always", or "When active": the notch appears while a session works or waits for you and while a limit is near, stays a minute after work ends, and shows when you point at its place. Hovering waits a moment before expanding and before collapsing, so passing the pointer by does not open it.
 - Alerts at two configurable thresholds (80 % and 95 % by default) and, optionally, when a limit you came close to resets (one alert when both windows reset together).
 - A forecast in the expanded view, e.g. `runs out ~16:40 · resets 18:00`, when a limit will run out before it resets at your current pace (can be turned off in Settings).
 - On a screen without a notch (an external display with the lid closed) the same notch is drawn at the top center of the main display as a virtual notch, and it hides while that display shows a full-screen app (alerts still appear). Settings → **Without a notch** switches to text next to the Workdeck icon in the menu bar instead.

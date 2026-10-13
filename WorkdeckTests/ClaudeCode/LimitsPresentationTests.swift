@@ -9,7 +9,9 @@ struct LimitsPresentationTests {
         mode: LimitsDisplayMode = .always,
         notch: Bool = true,
         pressing: UsageWindow?,
-        hasData: Bool = false
+        hasData: Bool = false,
+        active: Bool = false,
+        peeking: Bool = false
     ) -> LimitsDisplay {
         LimitsPresentation.display(
             isEnabled: enabled,
@@ -18,8 +20,20 @@ struct LimitsPresentationTests {
             hasNotchScreen: notch,
             pressing: pressing,
             hasData: hasData,
-            thresholds: [80, 95]
+            thresholds: [80, 95],
+            hasSessions: active,
+            isPeeking: peeking
         )
+    }
+
+    @Test func whenActiveShowsTheNotchWhileSomethingHappens() {
+        let normal = window(.fiveHour, 10)
+        #expect(display(mode: .whenActive, pressing: normal) == .hidden)
+        #expect(display(mode: .whenActive, pressing: normal, active: true) == .notch(.normal))
+        #expect(display(mode: .whenActive, pressing: normal, peeking: true) == .notch(.normal))
+        #expect(display(mode: .whenActive, pressing: window(.fiveHour, 81)) == .notch(.warning))
+        // Peeking never shows text in the menu bar.
+        #expect(display(mode: .whenActive, notch: false, pressing: normal, peeking: true) == .hidden)
     }
 
     @Test(arguments: [(nil as Double?, LimitsLevel.noData), (10, .normal), (79.9, .normal), (80, .warning), (94, .warning), (95, .critical), (100, .critical)])
@@ -38,22 +52,22 @@ struct LimitsPresentationTests {
     }
 
     @Test func nearLimitsModeHidesBelowFirstThreshold() {
-        #expect(display(mode: .nearLimits, pressing: window(.fiveHour, 79)) == .hidden)
-        #expect(display(mode: .nearLimits, pressing: nil) == .hidden)
-        #expect(display(mode: .nearLimits, pressing: window(.fiveHour, 81)) == .notch(.warning))
+        #expect(display(mode: .whenActive, pressing: window(.fiveHour, 79)) == .hidden)
+        #expect(display(mode: .whenActive, pressing: nil) == .hidden)
+        #expect(display(mode: .whenActive, pressing: window(.fiveHour, 81)) == .notch(.warning))
     }
 
     @Test func menuBarFallbackWithoutNotch() {
         #expect(display(notch: false, pressing: window(.sevenDay, 96)) == .menuBar(text: "7d 96%", level: .critical))
         #expect(display(notch: false, pressing: nil) == .menuBar(text: "—", level: .noData))
-        #expect(display(mode: .nearLimits, notch: false, pressing: window(.fiveHour, 40)) == .hidden)
+        #expect(display(mode: .whenActive, notch: false, pressing: window(.fiveHour, 40)) == .hidden)
     }
 
     @Test func noRunningWindowWithDataMeansNotStarted() {
         // After a reset, or before the first message, the next window starts at 0%.
         #expect(display(pressing: nil, hasData: true) == .notch(.normal))
         #expect(display(notch: false, pressing: nil, hasData: true) == .menuBar(text: "5h 0%", level: .normal))
-        #expect(display(mode: .nearLimits, pressing: nil, hasData: true) == .hidden)
+        #expect(display(mode: .whenActive, pressing: nil, hasData: true) == .hidden)
     }
 
     @Test(arguments: [
@@ -73,7 +87,7 @@ struct LimitsPresentationTests {
         )
         #expect(onlySessions == .notch(.noData))
         let nearLimits = LimitsPresentation.display(
-            isEnabled: true, isConnected: true, mode: .nearLimits, hasNotchScreen: true,
+            isEnabled: true, isConnected: true, mode: .whenActive, hasNotchScreen: true,
             pressing: window(.fiveHour, 10), hasData: true, thresholds: [80, 95], hasSessions: true
         )
         #expect(nearLimits == .notch(.normal))
@@ -92,7 +106,7 @@ struct LimitsPresentationTests {
     @Test func limitsShowOnlyWithASourceAndOutsideQuietNearLimitsMode() {
         #expect(!LimitsPresentation.showsLimits(isConnected: false, mode: .always, level: .warning))
         #expect(LimitsPresentation.showsLimits(isConnected: true, mode: .always, level: .normal))
-        #expect(!LimitsPresentation.showsLimits(isConnected: true, mode: .nearLimits, level: .normal))
-        #expect(LimitsPresentation.showsLimits(isConnected: true, mode: .nearLimits, level: .warning))
+        #expect(!LimitsPresentation.showsLimits(isConnected: true, mode: .whenActive, level: .normal))
+        #expect(LimitsPresentation.showsLimits(isConnected: true, mode: .whenActive, level: .warning))
     }
 }

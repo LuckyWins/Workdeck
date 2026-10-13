@@ -57,6 +57,16 @@ final class FakePresenter: LimitsPresenting {
         toggleAccountsAction = action
     }
 
+    var pointerOnNotch = false
+    func isPointerOnNotch() -> Bool {
+        pointerOnNotch
+    }
+
+    private(set) var peekAction: ((Bool) -> Void)?
+    func setPeekAction(_ action: @escaping (Bool) -> Void) {
+        peekAction = action
+    }
+
     private(set) var chatsAction: ((String) -> Void)?
     func setChatsAction(_ action: @escaping (String) -> Void) {
         chatsAction = action
@@ -154,7 +164,7 @@ struct ClaudeCodeControllerTests {
     let sleepPreventer = FakeSleepPreventer()
     let settings = ClaudeCodeSettings(defaults: UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!)
 
-    private func makeController(notch: Bool = true) -> (ClaudeCodeController, ClaudeUsageStore) {
+    private func makeController(notch: Bool = true, clock: @escaping () -> Date = { fixedNow }, linger: TimeInterval = 60) -> (ClaudeCodeController, ClaudeUsageStore) {
         let store = ClaudeUsageStore(fileURL: fileURL) { fixedNow }
         let limits = ClaudeLimitsController(settings: settings, store: store, connector: connector, poller: poller, activity: activity)
         let sessions = ClaudeSessionsController(
@@ -165,7 +175,7 @@ struct ClaudeCodeControllerTests {
             sleepPreventer: sleepPreventer,
             frontmostBundleID: { nil }
         )
-        let controller = ClaudeCodeController(settings: settings, limits: limits, sessions: sessions, presenter: presenter, cameraHousings: { [notch] })
+        let controller = ClaudeCodeController(settings: settings, limits: limits, sessions: sessions, presenter: presenter, cameraHousings: { [notch] }, clock: clock, linger: linger)
         return (controller, store)
     }
 
@@ -474,11 +484,11 @@ struct ClaudeCodeControllerTests {
         #expect(controller.rowSubtitle == "5h 42% · 7d 0% · updated just now · no sessions")
     }
 
-    @Test func sessionsKeepTheNotchInNearLimitsMode() throws {
+    @Test func sessionsKeepTheNotchWhenActive() throws {
         connector.status = .connected
         hooksConnector.status = .connected
         settings.isEnabled = true
-        settings.mode = .nearLimits
+        settings.mode = .whenActive
         try writeUsage(fiveHour: 10)
         addLiveSession()
         writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "s1"), to: sessionsDirectory)
@@ -487,9 +497,166 @@ struct ClaudeCodeControllerTests {
         store.reload()
         let state = try #require(presenter.shown.last)
         #expect(state.display == .notch(.normal))
-        #expect(!state.showsLimits)
+        #expect(state.showsLimits)
         #expect(state.sessions.totalCount == 1)
         #expect(state.sessions.rows.first?.projectName == "Workdeck")
+    }
+
+    @Test func theNotchLingersAMinuteAfterWorkEnds() throws {
+        connector.status = .connected
+        hooksConnector.status = .connected
+        settings.isEnabled = true
+        settings.mode = .whenActive
+        try writeUsage(fiveHour: 10)
+        addLiveSession()
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "s1"), to: sessionsDirectory)
+        var now = fixedNow
+        let (controller, store) = makeController(clock: { now })
+        controller.start()
+        store.reload()
+        #expect(controller.state.display == .notch(.normal))
+        writeSessionEvent(hookEvent(.stop, at: 2, session: "s1"), to: sessionsDirectory)
+        controller.sessions.store.reload()
+        controller.refresh()
+        #expect(controller.state.display == .notch(.normal))
+        now = fixedNow.addingTimeInterval(59)
+        controller.refresh()
+        #expect(controller.state.display == .notch(.normal))
+        now = fixedNow.addingTimeInterval(61)
+        controller.refresh()
+        #expect(controller.state.display == .hidden)
+        #expect(controller.state.isPeekable)
+    }
+
+    @Test func aNewSessionDuringTheLingerKeepsTheNotch() throws {
+        connector.status = .connected
+        hooksConnector.status = .connected
+        settings.isEnabled = true
+        settings.mode = .whenActive
+        try writeUsage(fiveHour: 10)
+        addLiveSession()
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "s1"), to: sessionsDirectory)
+        var now = fixedNow
+        let (controller, store) = makeController(clock: { now })
+        controller.start()
+        store.reload()
+        writeSessionEvent(hookEvent(.stop, at: 2, session: "s1"), to: sessionsDirectory)
+        controller.sessions.store.reload()
+        controller.refresh()
+        now = fixedNow.addingTimeInterval(30)
+        controller.refresh()
+        #expect(controller.state.display == .notch(.normal))
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 31, session: "s1"), to: sessionsDirectory)
+        controller.sessions.store.reload()
+        controller.refresh()
+        now = fixedNow.addingTimeInterval(75)
+        controller.refresh()
+        #expect(controller.state.display == .notch(.normal))
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func theLingerEndsWithARefresh() async throws {
+        connector.status = .connected
+        hooksConnector.status = .connected
+        settings.isEnabled = true
+        settings.mode = .whenActive
+        try writeUsage(fiveHour: 10)
+        addLiveSession()
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "s1"), to: sessionsDirectory)
+        let (controller, store) = makeController(clock: { Date() }, linger: 0.05)
+        controller.start()
+        store.reload()
+        writeSessionEvent(hookEvent(.stop, at: 2, session: "s1"), to: sessionsDirectory)
+        controller.sessions.store.reload()
+        controller.refresh()
+        #expect(controller.state.display == .notch(.normal))
+        while controller.state.display != .hidden {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+    }
+
+    @Test func peekingShowsTheHiddenNotch() throws {
+        connector.status = .connected
+        settings.isEnabled = true
+        settings.mode = .whenActive
+        try writeUsage(fiveHour: 10)
+        let (controller, store) = makeController()
+        controller.start()
+        store.reload()
+        #expect(controller.state.display == .hidden)
+        #expect(controller.state.isPeekable)
+        presenter.peekAction?(true)
+        #expect(controller.state.display == .notch(.normal))
+        #expect(!controller.state.isPeekable)
+        presenter.peekAction?(false)
+        #expect(controller.state.display == .hidden)
+    }
+
+    @Test func aNotchUnderThePointerStaysWhenItsReasonEnds() throws {
+        connector.status = .connected
+        hooksConnector.status = .connected
+        settings.isEnabled = true
+        settings.mode = .whenActive
+        try writeUsage(fiveHour: 10)
+        addLiveSession()
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "s1"), to: sessionsDirectory)
+        var now = fixedNow
+        let (controller, store) = makeController(clock: { now })
+        controller.start()
+        store.reload()
+        writeSessionEvent(hookEvent(.stop, at: 2, session: "s1"), to: sessionsDirectory)
+        controller.sessions.store.reload()
+        controller.refresh()
+        // The user reads the notch when the linger runs out.
+        presenter.pointerOnNotch = true
+        now = fixedNow.addingTimeInterval(61)
+        controller.refresh()
+        #expect(controller.state.display == .notch(.normal))
+        #expect(controller.state.isPeeking)
+        presenter.pointerOnNotch = false
+        presenter.peekAction?(false)
+        #expect(controller.state.display == .hidden)
+    }
+
+    @Test func switchingToAlwaysEndsAPeek() throws {
+        connector.status = .connected
+        settings.isEnabled = true
+        settings.mode = .whenActive
+        try writeUsage(fiveHour: 10)
+        let (controller, store) = makeController()
+        controller.start()
+        store.reload()
+        presenter.peekAction?(true)
+        #expect(controller.state.isPeeking)
+        settings.mode = .always
+        controller.refresh()
+        #expect(!controller.state.isPeeking)
+    }
+
+    @Test func alwaysDoesNotLingerForSessionsAlone() throws {
+        hooksConnector.status = .connected
+        settings.isEnabled = true
+        addLiveSession()
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "s1"), to: sessionsDirectory)
+        let (controller, _) = makeController()
+        controller.start()
+        controller.sessions.store.reload()
+        controller.refresh()
+        #expect(controller.state.display != .hidden)
+        writeSessionEvent(hookEvent(.stop, at: 2, session: "s1"), to: sessionsDirectory)
+        controller.sessions.store.reload()
+        controller.refresh()
+        #expect(controller.state.display == .hidden)
+    }
+
+    @Test func alwaysIsNeverPeekable() throws {
+        connector.status = .connected
+        settings.isEnabled = true
+        try writeUsage(fiveHour: 10)
+        let (controller, store) = makeController()
+        controller.start()
+        store.reload()
+        #expect(!controller.state.isPeekable)
     }
 
     @Test func sessionsAreHiddenWithoutHooks() {
@@ -601,7 +768,7 @@ struct ClaudeCodeControllerTests {
         connector.status = .connected
         hooksConnector.status = .connected
         settings.isEnabled = true
-        settings.mode = .nearLimits
+        settings.mode = .whenActive
         try writeUsage(fiveHour: 10)
         addLiveSession()
         let (controller, store) = makeController()

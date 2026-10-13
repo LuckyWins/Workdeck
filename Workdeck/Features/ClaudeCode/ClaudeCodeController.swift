@@ -16,6 +16,13 @@ final class ClaudeCodeController {
     /// notch and the menu bar text.
     @ObservationIgnored private let cameraHousings: @MainActor () -> [Bool]
     @ObservationIgnored private var screenObserver: (any NSObjectProtocol)?
+    @ObservationIgnored private let clock: () -> Date
+    @ObservationIgnored private let linger: TimeInterval
+    /// When the last active session went idle; "When active" keeps the notch `linger` seconds after it.
+    @ObservationIgnored private var workEndedAt: Date?
+    @ObservationIgnored private var wasActive = false
+    @ObservationIgnored private var lingerTask: Task<Void, Never>?
+    @ObservationIgnored private var isPeeking = false
     /// Opens the Chats window on the latest session of the alert's account (`nil`: no session, All).
     @ObservationIgnored var onOpenChats: ((String?) -> Void)?
     /// Plan labels by account label ("main", "personal"), from the instances' `.claude.json`.
@@ -26,13 +33,17 @@ final class ClaudeCodeController {
         limits: ClaudeLimitsController,
         sessions: ClaudeSessionsController,
         presenter: any LimitsPresenting,
-        cameraHousings: @escaping @MainActor () -> [Bool] = { NSScreen.screens.map { $0.safeAreaInsets.top > 0 } }
+        cameraHousings: @escaping @MainActor () -> [Bool] = { NSScreen.screens.map { $0.safeAreaInsets.top > 0 } },
+        clock: @escaping () -> Date = { Date() },
+        linger: TimeInterval = 60
     ) {
         self.settings = settings
         self.limits = limits
         self.sessions = sessions
         self.presenter = presenter
         self.cameraHousings = cameraHousings
+        self.clock = clock
+        self.linger = linger
     }
 
     /// The indicator has something to show: limits, sessions, or both.
@@ -69,6 +80,11 @@ final class ClaudeCodeController {
         presenter.setToggleAccountsAction { [weak self] in
             guard let self else { return }
             settings.collapsesOtherAccounts.toggle()
+            refresh()
+        }
+        presenter.setPeekAction { [weak self] peeking in
+            guard let self else { return }
+            isPeeking = peeking
             refresh()
         }
         presenter.setChatsAction { [weak self] account in
@@ -167,17 +183,34 @@ final class ClaudeCodeController {
         let sessionsView = sessions.viewState
         // Main needs no letter; another account is always marked, even when it is the only one with data.
         let label = compact.name.map { String($0.prefix(1)) }
-        let display = LimitsPresentation.display(
-            isEnabled: settings.isEnabled,
-            isConnected: limits.hasDataSource,
-            mode: settings.mode,
-            hasNotchScreen: NotchPresenter.targetIndex(cameraHousings: cameraHousings(), notchless: settings.notchlessDisplay) != nil,
-            pressing: pressing,
-            hasData: hasData,
-            thresholds: settings.thresholds,
-            hasSessions: sessionsView.activeCount > 0,
-            label: label
-        )
+        let isActive = sessionsView.activeCount > 0
+        let isLingering = lingers(isActive: isActive)
+        let hasNotchScreen = NotchPresenter.targetIndex(cameraHousings: cameraHousings(), notchless: settings.notchlessDisplay) != nil
+        func decide() -> LimitsDisplay {
+            LimitsPresentation.display(
+                isEnabled: settings.isEnabled,
+                isConnected: limits.hasDataSource,
+                mode: settings.mode,
+                hasNotchScreen: hasNotchScreen,
+                pressing: pressing,
+                hasData: hasData,
+                thresholds: settings.thresholds,
+                hasSessions: isActive || (settings.mode == .whenActive && isLingering),
+                isPeeking: isPeeking,
+                label: label
+            )
+        }
+        var display = decide()
+        let canPeek = settings.mode == .whenActive && settings.isEnabled && hasNotchScreen && hasAnySource
+        if !canPeek {
+            isPeeking = false
+        }
+        // A notch the pointer is on stays until the pointer leaves, even when its reason to show ends (spec §7).
+        if canPeek, display == .hidden, !isPeeking, presenter.isPointerOnNotch() {
+            isPeeking = true
+            display = decide()
+        }
+        let isPeekable = canPeek && display == .hidden
         let level = LimitsPresentation.displayLevel(pressing: pressing, hasData: hasData, thresholds: settings.thresholds)
         state = LimitsViewState(
             display: display,
@@ -187,7 +220,9 @@ final class ClaudeCodeController {
             thresholds: settings.thresholds,
             forecasts: limits.forecasts(for: compact),
             refresh: limits.refreshState(for: compact),
-            showsLimits: LimitsPresentation.showsLimits(isConnected: limits.hasDataSource, mode: settings.mode, level: level),
+            showsLimits: limits.hasDataSource,
+            isPeekable: isPeekable,
+            isPeeking: isPeeking,
             sessions: sessionsView,
             accounts: blocks.map { account in
                 AccountLimitsViewState(
@@ -216,20 +251,49 @@ final class ClaudeCodeController {
         settings.fetchFromAPI && account.poller.status == .waitingForClaudeCode
     }
 
+    /// "When active" keeps the notch `linger` seconds after the last active session goes idle (spec §3).
+    private func lingers(isActive: Bool) -> Bool {
+        let now = clock()
+        if isActive {
+            wasActive = true
+            lingerTask?.cancel()
+            lingerTask = nil
+            return false
+        }
+        if wasActive {
+            wasActive = false
+            workEndedAt = now
+        }
+        guard let workEndedAt else { return false }
+        let remaining = linger - now.timeIntervalSince(workEndedAt)
+        guard remaining > 0 else { return false }
+        if lingerTask == nil {
+            lingerTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(remaining))
+                guard !Task.isCancelled, let self else { return }
+                lingerTask = nil
+                refresh()
+            }
+        }
+        return true
+    }
+
     /// Why the usage API brings no data for an account, e.g. its Keychain item is missing (spec §6).
     private func usageProblem(of account: AccountLimits) -> String? {
         guard settings.fetchFromAPI, account.poller.status.isProblem else { return nil }
         return LimitsText.pollerStatusText(account.poller.status, now: account.store.now)
     }
 
-    /// Near limits, the account closest to its limit; otherwise the account of the latest session (spec §4.3).
+    /// "When active": the account closest to its limit; otherwise the account of the latest session (spec §4.3).
     private func compactAccount(among shown: [AccountLimits]) -> AccountLimits {
-        if settings.mode == .nearLimits {
+        if settings.mode == .whenActive {
             let closest = shown.max { lhs, rhs in
                 (UsageFormatting.mostPressing(lhs.store.currentWindows)?.usedPercent ?? -1)
                     < (UsageFormatting.mostPressing(rhs.store.currentWindows)?.usedPercent ?? -1)
             }
-            if let closest {
+            // Only an account near its limit wins; below the threshold the notch shows for work, so show its account.
+            if let closest, let first = settings.thresholds.first,
+               (UsageFormatting.mostPressing(closest.store.currentWindows)?.usedPercent ?? -1) >= Double(first) {
                 return closest
             }
         }

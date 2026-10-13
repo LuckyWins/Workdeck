@@ -73,7 +73,7 @@ Fired alert keys are kept per account: the main account keeps `claudeLimits.fire
 ### 4.3 Limits, Compact and Menu Bar
 
 - The ring and percent show the active account. Without any session, an account with data is shown rather than one that only waits for Claude Code or has a usage API problem. An extra account's percent is prefixed with its first letter (`p 26%`); the main account has no letter.
-- "Only near limits": the notch shows when any account is near a limit, and then shows that account.
+- "When active" (formerly "Only near limits", `specs/2026-10-13-notch-hover-and-when-active-design.md`): when any account is at or above the first threshold, the notch shows that account; below it, the notch shows for work, so it shows the active account.
 - The menu bar text on a screen without a notch shows what the compact notch shows.
 
 ### 4.4 Alerts
@@ -123,7 +123,7 @@ Unit tests never touch the real Keychain, network, `~/.claude*`, sessions folder
 - Connectors per instance: settings URL, command arguments, backups, restore on disconnect.
 - `ClaudeLimitsController`: connect all, one invalid `settings.json`, reconcile on launch and on add, remove deletes files and alert memory.
 - Active account from sessions; fallback to main.
-- View state: blocks per account, one-account header, compact prefix, "Only near limits" by any account.
+- View state: blocks per account, one-account header, compact prefix, "When active" near a limit by any account.
 - Alerts: per-account evaluation and memory, titles with the account, click opens Chats focused on the latest session's project.
 - `ChatsController`: live for sessions of an extra instance.
 - Credentials: the service name per instance, from the probed rule.

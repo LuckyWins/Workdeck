@@ -46,7 +46,7 @@ Watch the snapshot with `cat ~/Library/Application\ Support/Workdeck/claude-usag
 | L3 | Data arrives | Run a Claude Code session (Pro/Max) and send a message. | Claude Code's status line shows `5h N%`; the notch shows the same; popover row shows both windows and "updated just now". |
 | L4 | Hover | Hover the compact notch, then move away. | Expands with both windows, reset times and age; collapses on exit. |
 | L5 | Threshold alert | In Settings, set "First alert at" below the current usage. | Notch expands for ~6 s with "5-hour limit at N%", then returns; indicator turns orange. Hovering during or after the alert still expands/collapses correctly. |
-| L6 | Only near limits | Set Show to "Only near limits" with usage below the first threshold. | Notch disappears completely (no empty pill); an alert from L5 still pops and hides again. |
+| L6 | When active | Set Show to "When active" with usage below the first threshold, no active session, and the pointer away from the notch; wait a minute after the last session finished. | Notch disappears completely (no empty pill); an alert from L5 still pops and hides again. |
 | L7 | Lid closed | Connect an external display, close the lid. | Usage text appears next to the Workdeck icon; at or above the first threshold the icon becomes a warning triangle. Opening the lid brings the notch back. |
 | L8 | Existing status line | With your own `statusLine` set, connect. | Claude Code shows `5h N% · <your output>`; Disconnect restores your original `statusLine` exactly. |
 | L9 | Reset alert | Wait for (or simulate by editing `resets_at` in the snapshot to the past) a window that was above the first threshold. | "5-hour limit reset" with "back to 0%" appears once when "Notify when a limit resets" is on; when both windows were above the first threshold and reset at one check, one "5-hour and weekly limits reset" appears; nothing when the setting is off. |
@@ -124,6 +124,8 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | V4 | Lid opened | Open the lid with the monitor connected. | The notch moves to the MacBook's camera housing; the monitor shows none. |
 | V5 | Menu bar text | Settings → Without a notch → Menu bar text; then back to Virtual notch. | The notch disappears and `5h 42%` shows next to the Workdeck icon; switching back restores the virtual notch at once. The picker is hidden while the lid is open. |
 | V6 | Auto-hidden menu bar | System Settings → Control Center → Automatically hide and show the menu bar → Always; look at the top center of the monitor; then set it back. | Note whether the compact virtual notch is visible. A known limitation: it may be invisible; Menu bar text is the workaround. |
+| V7 | Hover delays | Move the pointer quickly across the notch (on the virtual notch, along the menu bar); rest on its edge and wiggle. | Passing by does not expand it; resting expands it after a moment; a brief slip off the edge does not collapse it. |
+| V8 | When active | Settings → Show → When active. Let a session finish; wait a minute; then point at the notch's place. | The notch stays about a minute after the session finishes, then hides; pointing at its place shows it, leaving hides it again. |
 
 ## Results
 

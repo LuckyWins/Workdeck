@@ -18,6 +18,10 @@ protocol LimitsPresenting: AnyObject {
     func setChatsAction(_ action: @escaping (String) -> Void)
     /// What the control that hides or shows the other accounts' limits does.
     func setToggleAccountsAction(_ action: @escaping () -> Void)
+    /// Called with true when the pointer has rested on the hidden notch's place, false when it has left (spec §5).
+    func setPeekAction(_ action: @escaping (Bool) -> Void)
+    /// Whether the pointer is on the notch or at its place right now.
+    func isPointerOnNotch() -> Bool
 }
 
 /// The notch operations the presenter needs; DynamicNotchKit in the app, a fake in tests.
@@ -58,6 +62,19 @@ final class NotchPresenter: LimitsPresenting {
     private let makeSurface: @MainActor (LimitsNotchModel) -> any NotchSurface
     private let screen: @MainActor () -> NotchScreen?
     private let fullScreen: any FullScreenDetecting
+    private let pointer: any PointerMonitoring
+    private let hoverEnterDelay: Duration
+    private let hoverExitDelay: Duration
+    private var hoverTask: Task<Void, Never>?
+    private var peekTask: Task<Void, Never>?
+    private var isPointerRunning = false
+    private var isPointerInZone = false
+    private var isPeeking = false
+    /// DynamicNotchKit's hover signal as it arrives; `isHovering` follows it after the hover delays.
+    private var isPointerOnNotchWindow = false
+    /// The peek zone of the current target screen, kept until the state or the screens change (`.some(nil)`: no
+    /// target screen).
+    private var cachedZone: CGRect??
     private let alertDuration: Duration
     private let rebuildDelay: Duration
     private let workspaceSettleDelay: Duration
@@ -74,21 +91,28 @@ final class NotchPresenter: LimitsPresenting {
     private var needsRebuild = false
     private var screenObserver: (any NSObjectProtocol)?
     private var workspaceObservers: [any NSObjectProtocol] = []
+    private var onPeekChange: ((Bool) -> Void)?
 
     init(
         model: LimitsNotchModel = LimitsNotchModel(),
         makeSurface: @escaping @MainActor (LimitsNotchModel) -> any NotchSurface = { DynamicNotchSurface(model: $0) },
         screen: @escaping @MainActor () -> NotchScreen?,
         fullScreen: any FullScreenDetecting = SystemFullScreenDetector(),
+        pointer: any PointerMonitoring = GlobalPointerMonitor(),
         alertDuration: Duration = .seconds(6),
         rebuildDelay: Duration = .milliseconds(500),
         workspaceSettleDelay: Duration = .seconds(1),
+        hoverEnterDelay: Duration = .milliseconds(250),
+        hoverExitDelay: Duration = .milliseconds(500),
         observeScreenChanges: Bool = true
     ) {
         self.model = model
         self.makeSurface = makeSurface
         self.screen = screen
         self.fullScreen = fullScreen
+        self.pointer = pointer
+        self.hoverEnterDelay = hoverEnterDelay
+        self.hoverExitDelay = hoverExitDelay
         self.alertDuration = alertDuration
         self.rebuildDelay = rebuildDelay
         self.workspaceSettleDelay = workspaceSettleDelay
@@ -143,11 +167,23 @@ final class NotchPresenter: LimitsPresenting {
 
     /// True while an alert, a rebuild, or notch operations are still pending.
     var isBusy: Bool {
-        reconcileTask != nil || alertTask != nil || rebuildTask != nil || workspaceTask != nil
+        reconcileTask != nil || alertTask != nil || rebuildTask != nil || workspaceTask != nil || hoverTask != nil || peekTask != nil
     }
 
     func show(_ state: LimitsViewState) {
         model.state = state
+        cachedZone = nil
+        // The controller kept a notch the pointer was on when its reason to show ended; follow that peek.
+        if state.isPeeking, !isPeeking {
+            isPeeking = true
+            isPointerInZone = isPointerAtNotchPlace(pointer.location)
+        } else if !state.isPeeking, !state.isPeekable, isPeeking {
+            // The controller dropped the peek (another mode, the indicator off): stop following the pointer.
+            isPeeking = false
+            peekTask?.cancel()
+            peekTask = nil
+        }
+        updatePointerMonitor()
         requestReconcile()
     }
 
@@ -201,9 +237,26 @@ final class NotchPresenter: LimitsPresenting {
         model.onToggleAccounts = action
     }
 
+    func setPeekAction(_ action: @escaping (Bool) -> Void) {
+        onPeekChange = action
+    }
+
+    func isPointerOnNotch() -> Bool {
+        isPointerOnNotchWindow || isPointerAtNotchPlace(pointer.location)
+    }
+
+    private func isPointerAtNotchPlace(_ point: CGPoint) -> Bool {
+        if cachedZone == nil {
+            cachedZone = .some(screen().map { NotchPeekZone.rect(for: $0) })
+        }
+        guard let zone = cachedZone ?? nil else { return false }
+        return NotchPeekZone.contains(zone, point)
+    }
+
     /// DynamicNotchKit rebuilds its window on `NSScreen.screens.first` after a screen change, in any
     /// state. Once it has, put the notch back where it belongs (or remove the stray window).
     func screenParametersChanged() {
+        cachedZone = nil
         rebuildTask?.cancel()
         rebuildTask = Task {
             try? await Task.sleep(for: rebuildDelay)
@@ -227,9 +280,71 @@ final class NotchPresenter: LimitsPresenting {
         }
     }
 
+    /// Waits `hoverEnterDelay` before expanding and `hoverExitDelay` before collapsing, so a pointer passing by
+    /// or slipping off the edge changes nothing (spec §4).
     private func hoverChanged(_ hovering: Bool) {
-        isHovering = hovering
-        requestReconcile()
+        isPointerOnNotchWindow = hovering
+        schedulePeek()
+        hoverTask?.cancel()
+        hoverTask = nil
+        guard hovering != isHovering else { return }
+        hoverTask = Task {
+            try? await Task.sleep(for: hovering ? hoverEnterDelay : hoverExitDelay)
+            guard !Task.isCancelled else { return }
+            hoverTask = nil
+            isHovering = hovering
+            // Leaving a peeked notch away from its place ends the peek now, so it hides without collapsing first.
+            if !hovering, isPeeking, !isPointerInZone {
+                endPeek()
+            }
+            requestReconcile()
+        }
+    }
+
+    private func endPeek() {
+        peekTask?.cancel()
+        peekTask = nil
+        isPeeking = false
+        onPeekChange?(false)
+        updatePointerMonitor()
+    }
+
+    private func updatePointerMonitor() {
+        let wanted = model.state.isPeekable || isPeeking
+        if wanted, !isPointerRunning {
+            isPointerRunning = true
+            pointer.start { [weak self] point in self?.pointerMoved(to: point) }
+        } else if !wanted, isPointerRunning {
+            isPointerRunning = false
+            isPointerInZone = false
+            peekTask?.cancel()
+            peekTask = nil
+            pointer.stop()
+        }
+    }
+
+    private func pointerMoved(to point: CGPoint) {
+        let inside = isPointerAtNotchPlace(point)
+        guard inside != isPointerInZone else { return }
+        isPointerInZone = inside
+        schedulePeek()
+    }
+
+    /// A peek starts after the pointer rests in the zone and ends after it has left both the zone and the notch.
+    private func schedulePeek() {
+        let wanted = isPointerInZone || (isPeeking && isPointerOnNotchWindow)
+        peekTask?.cancel()
+        peekTask = nil
+        guard wanted != isPeeking else { return }
+        peekTask = Task {
+            try? await Task.sleep(for: wanted ? hoverEnterDelay : hoverExitDelay)
+            // The pointer or the state may have changed while waiting; act only if the peek is still wanted.
+            guard !Task.isCancelled, wanted == (isPointerInZone || (isPeeking && isPointerOnNotchWindow)) else { return }
+            peekTask = nil
+            isPeeking = wanted
+            onPeekChange?(wanted)
+            updatePointerMonitor()
+        }
     }
 
     private func requestReconcile() {
@@ -261,6 +376,10 @@ final class NotchPresenter: LimitsPresenting {
 
         switch target {
         case .hidden:
+            // A hidden notch is not hovered: shown again, it starts compact, not expanded.
+            hoverTask?.cancel()
+            hoverTask = nil
+            isHovering = false
             guard let surface else { break }
             await surface.hide()
             if rebuild {

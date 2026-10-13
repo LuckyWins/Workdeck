@@ -2,14 +2,16 @@ import Foundation
 
 nonisolated enum LimitsDisplayMode: String, CaseIterable, Identifiable, Sendable {
     case always
-    case nearLimits
+    /// Visible while something happens, for a minute after, and while peeked at (spec §3). Keeps the raw value of
+    /// the "Only near limits" mode it replaced, so a saved choice carries over.
+    case whenActive = "nearLimits"
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .always: "Always"
-        case .nearLimits: "Only near limits"
+        case .whenActive: "When active"
         }
     }
 }
@@ -84,8 +86,12 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
     /// When each window runs out at the current pace; only windows that run out before their reset.
     var forecasts: [UsageWindowKind: Date] = [:]
     var refresh = LimitsRefreshState.hidden
-    /// False when the notch is shown only for sessions (no limits source, or "Only near limits" below the threshold).
+    /// False when the notch is shown only for sessions (no limits source).
     var showsLimits = true
+    /// "When active" hides the notch for now, so pointing at its place may show it (spec §5).
+    var isPeekable = false
+    /// The notch is shown because the pointer is at its place (spec §5).
+    var isPeeking = false
     var sessions = SessionsViewState.none
     /// One block per account with data; the main account alone when none has data.
     var accounts: [AccountLimitsViewState] = []
@@ -144,6 +150,8 @@ nonisolated enum LimitsPresentation {
         return .normal
     }
 
+    /// `hasSessions`: a session is active, or worked less than a minute ago ("When active" linger).
+    /// `isPeeking`: the pointer points at the hidden notch's place.
     static func display(
         isEnabled: Bool,
         isConnected: Bool,
@@ -153,16 +161,14 @@ nonisolated enum LimitsPresentation {
         hasData: Bool,
         thresholds: [Int],
         hasSessions: Bool = false,
+        isPeeking: Bool = false,
         label: String? = nil
     ) -> LimitsDisplay {
         guard isEnabled else { return .hidden }
         let level = displayLevel(pressing: pressing, hasData: hasData, thresholds: thresholds)
         let limitsVisible = showsLimits(isConnected: isConnected, mode: mode, level: level)
         if hasNotchScreen {
-            if limitsVisible {
-                return .notch(level)
-            }
-            return hasSessions ? .notch(level) : .hidden
+            return limitsVisible || hasSessions || isPeeking ? .notch(level) : .hidden
         }
         guard limitsVisible else { return .hidden }
         return .menuBar(text: (label.map { "\($0) " } ?? "") + compactText(pressing: pressing, hasData: hasData), level: level)
@@ -174,10 +180,11 @@ nonisolated enum LimitsPresentation {
         return level == .noData && hasData ? .normal : level
     }
 
-    /// Whether the limits part is visible: a source is on and "Only near limits" is not keeping it quiet.
+    /// Whether the limits alone keep the indicator visible: a source is on and "When active" is not keeping it
+    /// quiet below the first threshold.
     static func showsLimits(isConnected: Bool, mode: LimitsDisplayMode, level: LimitsLevel) -> Bool {
         guard isConnected else { return false }
-        return !(mode == .nearLimits && (level == .noData || level == .normal))
+        return !(mode == .whenActive && (level == .noData || level == .normal))
     }
 
     /// Next to the ring in the compact notch: "42%", labeled only for the weekly window ("7d 91%"),

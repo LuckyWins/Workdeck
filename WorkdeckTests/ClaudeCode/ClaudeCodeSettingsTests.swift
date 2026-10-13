@@ -25,11 +25,18 @@ struct ClaudeCodeSettingsTests {
         #expect(!settings.notifyWhenNeedsYou)
     }
 
+    @Test func theStoredNearLimitsModeReadsAsWhenActive() {
+        let defaults = makeDefaults()
+        defaults.set("nearLimits", forKey: "claudeLimits.mode")
+        #expect(ClaudeCodeSettings(defaults: defaults).mode == .whenActive)
+        #expect(LimitsDisplayMode.whenActive.title == "When active")
+    }
+
     @Test func persistsEverything() {
         let defaults = makeDefaults()
         let settings = ClaudeCodeSettings(defaults: defaults)
         settings.isEnabled = true
-        settings.mode = .nearLimits
+        settings.mode = .whenActive
         settings.firstThreshold = 70
         settings.secondThreshold = 90
         settings.notifyOnReset = false
@@ -45,7 +52,7 @@ struct ClaudeCodeSettingsTests {
 
         let reloaded = ClaudeCodeSettings(defaults: defaults)
         #expect(reloaded.isEnabled)
-        #expect(reloaded.mode == .nearLimits)
+        #expect(reloaded.mode == .whenActive)
         #expect(reloaded.thresholds == [70, 90])
         #expect(!reloaded.notifyOnReset)
         #expect(reloaded.connectedAt == fixedNow)
