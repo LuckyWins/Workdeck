@@ -96,8 +96,8 @@ struct AccountsCompositionTests {
         reload(controller)
         #expect(controller.state.compactLabel == "p")
         #expect(controller.state.pressing?.usedPercent == 60)
-        // The compact account's block comes first; the collapse control keeps it.
-        #expect(controller.state.accounts.map(\.name) == ["personal", "main"])
+        // Blocks keep a fixed order, so parallel sessions on two accounts do not swap them.
+        #expect(controller.state.accounts.map(\.name) == ["main", "personal"])
     }
 
     @Test func whenActiveShowsTheWorkingAccountBelowTheThreshold() throws {

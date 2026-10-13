@@ -244,7 +244,7 @@ struct LimitsExpandedView: View {
             if model.state.showsLimits {
                 let blocks = model.state.limitBlocks
                 if model.state.collapsesOtherAccounts, blocks.count > 1 {
-                    // The short view: one line per account, the compact account first.
+                    // The short view: one line per account, in the accounts' fixed order.
                     accountsHeader(title: "limits", plan: nil, collapsed: true)
                     let width = blocks.map(\.name.count).max() ?? 0
                     ForEach(blocks) { account in

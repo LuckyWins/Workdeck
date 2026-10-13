@@ -203,8 +203,6 @@ final class ClaudeCodeController {
         let shown = withData.isEmpty ? [limits.main] : withData
         let compact = compactAccount(among: shown)
         let plans = planLabels()
-        // The compact account's block comes first, so collapsing keeps what the compact notch shows.
-        let blocks = [compact] + shown.filter { $0 !== compact }
         let store = compact.store
         let pressing = UsageFormatting.mostPressing(store.currentWindows)
         let hasData = store.age != nil
@@ -252,7 +250,8 @@ final class ClaudeCodeController {
             isPeekable: isPeekable,
             isPeeking: isPeeking,
             sessions: sessionsView,
-            accounts: blocks.map { account in
+            // Blocks keep the accounts' fixed order (main, then instances), so sessions on two accounts do not swap them.
+            accounts: shown.map { account in
                 AccountLimitsViewState(
                     name: account.label,
                     windows: account.store.allWindows,
