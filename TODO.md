@@ -7,7 +7,7 @@ Ideas and deferred work. **Planned** lists what is agreed and in what order; eac
 Agreed on 2026-10-13, partly inspired by [Coucou](https://github.com/Louis-CFM/coucou).
 
 1. **Notch hover delays and "When active".** Spec: `specs/2026-10-13-notch-hover-and-when-active-design.md`.
-2. **State colors and a livelier notch.** The expanded notch's background takes a soft tint by event (finished green, needs you orange, limit thresholds orange or red) that fades in and out; the ring fills smoothly to a new percent; the compact notch pulses once when a session finishes; new sessions and agents slide into the list. Animations run only on events, no frames at rest. No mascot.
+2. **Flashes and a livelier notch.** Alerts flash the compact notch's ring (and the session dot) once in their color instead of expanding it; session and agent rows animate in and out. Spec: `specs/2026-10-13-notch-flash-design.md`.
 3. **Edit line counts and a step ticker.** Each Edit/Write action shows `+N −M` (green and red), counted in the hook from the tool input without storing any text; a session row shows the turn's total (`this turn · 5 files +84 −21`). The focused (most recent working) session shows its last three steps, older ones dimmer, the current one bright.
 4. **A diff before connecting.** Connect and Disconnect show the real diff of each `settings.json` they change (context lines, red and green backgrounds, one tab per account) instead of the text-only confirmation.
 5. **Open a session's exact terminal tab.** Clicking a terminal session focuses its window and tab (by TTY in Terminal and iTerm), not just the app.
@@ -36,6 +36,7 @@ Ideas from [Coucou](https://github.com/Louis-CFM/coucou), a similar MIT-licensed
 - **Answer permission prompts from the notch (low priority).** Allow / Deny / Always buttons for a Claude Code permission request. The hook would wait for the click over a Unix socket and exit at once when Workdeck is not running, so Claude Code is never blocked. It breaks today's rule that the hook always exits fast, decides on the user's behalf, and needs a security review. Less useful with auto mode on.
 - **Answer `AskUserQuestion` from the notch (low priority).** Options as buttons, single and multiple choice. Same hook mechanism as above. Real questions are often long or visual, so the terminal stays the better place for most of them.
 - **Demo mode.** A scripted session with limits, sessions, agents and alerts, without Claude Code and without writing anything to disk. For README screenshots and GIFs and for checking the notch layout.
+- **Flash or expand, per alert type.** A Settings choice for each alert (limit threshold, limit reset, session finished, needs you): only flash the compact notch, or expand it with the alert's text as before. Today "needs you" expands and the rest flash (`specs/2026-10-13-notch-flash-design.md` §2.1).
 - **Small things:**
   - choose the display for the notch (real or virtual);
   - keyboard shortcuts: expand or collapse the notch, open the latest session;
