@@ -2,11 +2,14 @@ import Foundation
 
 /// Identifiers and code-signing requirements shared by the app and the privileged helper.
 nonisolated enum HelperConstants {
+    /// The app's bundle identifier; every other identifier derives from it. The LaunchDaemon file in
+    /// `LaunchDaemons/`, the targets' bundle identifiers and the log predicates in the docs repeat these strings.
     static let appIdentifier = "com.appcreators.workdeck"
-    static let machServiceName = "com.appcreators.workdeck.helper"
-    static let launchDaemonPlistName = "com.appcreators.workdeck.helper.plist"
+    /// The helper's bundle identifier, launchd label and Mach service.
+    static let machServiceName = appIdentifier + ".helper"
+    static let launchDaemonPlistName = machServiceName + ".plist"
+    static let errorDomain = machServiceName
     static let teamIdentifier = "J55BY69CVU"
-    static let errorDomain = "com.appcreators.workdeck.helper"
 
     /// Requirement the helper enforces on every connecting client.
     static let clientRequirement =

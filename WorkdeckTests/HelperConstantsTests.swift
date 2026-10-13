@@ -11,6 +11,14 @@ struct HelperConstantsTests {
             == #"anchor apple generic and identifier "com.appcreators.workdeck.helper" and certificate leaf[subject.OU] = "J55BY69CVU""#)
     }
 
+    @Test func identifiersMatchTheBundleAndLaunchDaemon() {
+        // The LaunchDaemon file, the target bundle IDs and the log predicates in the docs use these exact strings.
+        #expect(HelperConstants.appIdentifier == "com.appcreators.workdeck")
+        #expect(HelperConstants.machServiceName == "com.appcreators.workdeck.helper")
+        #expect(HelperConstants.launchDaemonPlistName == "com.appcreators.workdeck.helper.plist")
+        #expect(HelperConstants.errorDomain == "com.appcreators.workdeck.helper")
+    }
+
     @Test(arguments: [HelperConstants.clientRequirement, HelperConstants.helperRequirement])
     func requirementCompiles(_ requirement: String) {
         var compiled: SecRequirement?
