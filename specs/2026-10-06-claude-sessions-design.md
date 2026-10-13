@@ -166,6 +166,8 @@ All file-system, clock, process, and workspace access is injected so units are t
   - Any other `hostBundleID` (for example `com.apple.Terminal`, `com.googlecode.iterm2`, `com.mitchellh.ghostty`) → activate that application.
   - No `hostBundleID` → nothing happens.
 
+  Amended 2026-10-13 (exact tab spec): Terminal and iTerm2 sessions get their own tab.
+
 ### 5.5 Combined Display
 
 - `LimitsViewState` gains `sessions: SessionsViewState` (the counter level and the rows to show).

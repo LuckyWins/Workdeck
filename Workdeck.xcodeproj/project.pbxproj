@@ -578,6 +578,7 @@
 		000000000000000111000000 /* Debug configuration for PBXNativeTarget "Workdeck" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/Workdeck.entitlements;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -585,6 +586,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Workdeck;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Workdeck brings a Claude Code session's terminal tab to the front.";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.appcreators.workdeck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -596,6 +598,7 @@
 		000000000000000112000000 /* Release configuration for PBXNativeTarget "Workdeck" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/Workdeck.entitlements;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -603,6 +606,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Workdeck;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Workdeck brings a Claude Code session's terminal tab to the front.";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.appcreators.workdeck;
 				PRODUCT_NAME = "$(TARGET_NAME)";

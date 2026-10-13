@@ -897,6 +897,23 @@ struct ClaudeCodeControllerTests {
         #expect(sleepPreventer.isPreventing)
     }
 
+    @Test func aNeedsYouAlertOpensTheSessionThatWaitsMostRecently() {
+        // The alert names only the project; of its sessions, the one that most recently started waiting raised it.
+        hooksConnector.status = .connected
+        for (id, pid, waitsAt) in [("working", Int32(43), nil), ("older", Int32(44), 5.0), ("newer", Int32(45), 9.0)] as [(String, Int32, TimeInterval?)] {
+            writeSessionEvent(hookEvent(.sessionStart, at: 0, session: id) { $0.pid = pid; $0.cwd = "/p/Workdeck"; $0.hostBundleID = "com.microsoft.VSCode" }, to: sessionsDirectory)
+            writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: id), to: sessionsDirectory)
+            if let waitsAt {
+                writeSessionEvent(hookEvent(.notification, at: waitsAt, session: id) { $0.notificationType = "permission_prompt" }, to: sessionsDirectory)
+            }
+            liveness.startTimes[pid] = fixedNow.addingTimeInterval(-60)
+        }
+        let (controller, _) = makeController()
+        controller.start()
+        presenter.projectAction?("Workdeck")
+        #expect(activator.activated == ["newer"])
+    }
+
     @Test func clickingASessionAlertOpensItsProject() {
         hooksConnector.status = .connected
         addLiveSession()
