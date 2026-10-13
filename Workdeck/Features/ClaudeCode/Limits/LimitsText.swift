@@ -56,14 +56,26 @@ nonisolated enum LimitsText {
         return formatted(date, "EEE HH:mm", calendar: calendar)
     }
 
-    static func ageText(_ age: TimeInterval) -> String {
-        if age < 60 {
-            return "Updated just now"
+    static let waitingHelp = "Waiting for Claude Code to renew its login"
+
+    /// The refresh button's tooltip; while waiting it also says why the figures are old.
+    static func refreshHelp(isWaiting: Bool) -> String {
+        isWaiting ? "\(waitingHelp) — click to check again" : "Refresh usage"
+    }
+
+    /// The age line in the expanded notch, one line next to `↻`: "updated 4 min ago"; while the usage API waits for
+    /// Claude Code to renew its login, "13h ago · waiting for Claude Code" (spec §12.3).
+    static func notchAgeText(_ age: TimeInterval?, isWaiting: Bool) -> String {
+        let waiting = "waiting for Claude Code"
+        guard let age else { return isWaiting ? waiting : "" }
+        let short = if age < 60 {
+            "just now"
+        } else if age < 60 * 60 {
+            "\(Int(age / 60)) min ago"
+        } else {
+            "\(Int(age / 3600))h ago"
         }
-        if age < 60 * 60 {
-            return "Updated \(Int(age / 60)) min ago"
-        }
-        return "Updated \(Int(age / 3600)) h ago — open Claude Code to refresh"
+        return isWaiting ? "\(short) · \(waiting)" : "updated \(short)"
     }
 
     static func alertTitle(_ alert: LimitsAlert, showsAccount: Bool = false) -> String {
@@ -182,6 +194,8 @@ nonisolated enum LimitsText {
             "Keychain access denied — click Refresh to try again"
         case let .failed(message):
             message
+        case .waitingForClaudeCode:
+            waitingHelp
         }
     }
 

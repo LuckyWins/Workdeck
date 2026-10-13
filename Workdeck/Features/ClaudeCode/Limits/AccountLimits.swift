@@ -64,7 +64,13 @@ final class AccountLimits {
             connector.repairPathIfNeeded()
             connectionStatus = connector.status
         }
-        store.onChange = onChange
+        store.onChange = { [weak self] in
+            // Fresh usage means Claude Code runs again and has renewed its login; check now, not at the next tick.
+            if let self, poller.status == .waitingForClaudeCode {
+                poller.loginMayHaveRenewed()
+            }
+            onChange()
+        }
         poller.onChange = { [weak self] in
             guard let self else { return }
             if poller.status != lastLoggedPollerStatus {

@@ -48,6 +48,19 @@ struct AccountLimitsTests {
         store.reload()
     }
 
+    @Test func freshUsageWhileWaitingChecksTheLoginAgain() throws {
+        let (controller, _) = makeController()
+        controller.start()
+        let store = try #require(controller.accounts.last?.store)
+        extraPoller.status = .waitingForClaudeCode
+        // Claude Code is writing usage again, so it has renewed its login.
+        try writeUsage(12, to: store)
+        #expect(extraPoller.renewalChecks == 1)
+        extraPoller.status = .ok(fetchedAt: fixedNow)
+        try writeUsage(13, to: store)
+        #expect(extraPoller.renewalChecks == 1)
+    }
+
     @Test func connectConnectsEveryAccount() {
         let (controller, _) = makeController()
         controller.start()

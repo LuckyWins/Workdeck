@@ -61,6 +61,8 @@ nonisolated struct AccountLimitsViewState: Equatable, Sendable, Identifiable {
     var refresh = LimitsRefreshState.hidden
     /// Why the usage API brings no data for this account, e.g. its Keychain item is missing.
     var problem: String?
+    /// The usage API waits for Claude Code to renew its login; not a problem (spec §12).
+    var isWaiting = false
     /// "Pro", "Team 5x", from the account's `.claude.json`.
     var plan: String?
 

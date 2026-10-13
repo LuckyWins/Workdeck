@@ -41,13 +41,18 @@ struct LimitsTextTests {
         #expect(notStarted.count <= longest.count)
     }
 
-    @Test(arguments: [
-        (10.0, "Updated just now"),
-        (3 * 60.0, "Updated 3 min ago"),
-        (2 * 3600.0, "Updated 2 h ago — open Claude Code to refresh"),
-    ])
-    func age(seconds: TimeInterval, expected: String) {
-        #expect(LimitsText.ageText(seconds) == expected)
+    @Test func refreshHelps() {
+        #expect(LimitsText.refreshHelp(isWaiting: false) == "Refresh usage")
+        #expect(LimitsText.refreshHelp(isWaiting: true) == "Waiting for Claude Code to renew its login — click to check again")
+    }
+
+    @Test func notchAgeTexts() {
+        #expect(LimitsText.notchAgeText(10, isWaiting: false) == "updated just now")
+        #expect(LimitsText.notchAgeText(4 * 60, isWaiting: false) == "updated 4 min ago")
+        #expect(LimitsText.notchAgeText(13 * 3600, isWaiting: false) == "updated 13h ago")
+        #expect(LimitsText.notchAgeText(13 * 3600, isWaiting: true) == "13h ago · waiting for Claude Code")
+        #expect(LimitsText.notchAgeText(nil, isWaiting: true) == "waiting for Claude Code")
+        #expect(LimitsText.notchAgeText(nil, isWaiting: false) == "")
     }
 
     @Test func alertTexts() {
@@ -85,6 +90,7 @@ struct LimitsTextTests {
         #expect(LimitsText.pollerStatusText(.rateLimited(until: fixedNow.addingTimeInterval(2 * 3600 + 20 * 60)), now: fixedNow, calendar: utc) == "Rate limited — retrying at 14:20")
         #expect(LimitsText.pollerStatusText(.noCredentials, now: fixedNow, calendar: utc) == "Claude Code login not found")
         #expect(LimitsText.pollerStatusText(.failed("HTTP 500"), now: fixedNow, calendar: utc) == "HTTP 500")
+        #expect(LimitsText.pollerStatusText(.waitingForClaudeCode, now: fixedNow, calendar: utc) == "Waiting for Claude Code to renew its login")
     }
 
     @Test func sessionAlertTexts() {

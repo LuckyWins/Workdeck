@@ -7,9 +7,9 @@ struct UsagePollerTests {
     let snapshotURL = makeTemporaryDirectory().appending(path: "Workdeck/claude-usage.json")
     let transport = FakeTransport()
 
-    private func makePoller(token: String? = "t", now: @escaping () -> Date = { fixedNow }) -> UsagePoller {
+    private func makePoller(token: String? = "t", expiresAt: Date? = nil, now: @escaping () -> Date = { fixedNow }) -> UsagePoller {
         UsagePoller(
-            credentials: FakeCredentials(token: token),
+            credentials: FakeCredentials(token: token, expiresAt: expiresAt),
             client: UsageAPIClient(transport: transport),
             snapshotURL: snapshotURL,
             clock: now,
@@ -46,6 +46,80 @@ struct UsagePollerTests {
         await poller.pollTask?.value
         #expect(poller.status == .loginExpired)
         #expect(try UsageSnapshotFile.read(from: snapshotURL) == existing)
+    }
+
+    @Test func anExpiredLoginWaitsWithoutARequest() async {
+        let poller = makePoller(expiresAt: fixedNow.addingTimeInterval(-60))
+        poller.start()
+        await poller.pollTask?.value
+        #expect(poller.status == .waitingForClaudeCode)
+        #expect(!poller.status.isProblem)
+        #expect(transport.requests.isEmpty)
+    }
+
+    @Test func expiryAtNowWaits() async {
+        let poller = makePoller(expiresAt: fixedNow)
+        poller.start()
+        await poller.pollTask?.value
+        #expect(poller.status == .waitingForClaudeCode)
+        #expect(transport.requests.isEmpty)
+    }
+
+    @Test func anUnexpiredLoginFetches() async {
+        transport.enqueue(.init(status: 200, body: usageBody(fiveHour: (3, 3600))))
+        let poller = makePoller(expiresAt: fixedNow.addingTimeInterval(3600))
+        poller.start()
+        await poller.pollTask?.value
+        #expect(poller.status == .ok(fetchedAt: fixedNow))
+        #expect(transport.requests.count == 1)
+    }
+
+    @Test func aRejectedUnexpiredLoginIsAProblem() async {
+        transport.enqueue(.init(status: 401, body: ""))
+        let poller = makePoller(expiresAt: fixedNow.addingTimeInterval(3600))
+        poller.start()
+        await poller.pollTask?.value
+        #expect(poller.status == .loginExpired)
+        #expect(poller.status.isProblem)
+    }
+
+    @Test func aRenewedLoginFetchesAgain() async {
+        let credentials = RenewingCredentials(expiresAt: fixedNow.addingTimeInterval(-60))
+        let poller = makePoller(credentials: credentials)
+        poller.start()
+        await poller.pollTask?.value
+        #expect(poller.status == .waitingForClaudeCode)
+        credentials.renew(until: fixedNow.addingTimeInterval(8 * 3600))
+        transport.enqueue(.init(status: 200, body: usageBody(fiveHour: (3, 3600))))
+        poller.poll()
+        await poller.pollTask?.value
+        #expect(poller.status == .ok(fetchedAt: fixedNow))
+    }
+
+    @Test func stoppingDuringTheReadKeepsThePollerIdle() async {
+        let credentials = HeldExpiredCredentials()
+        let poller = makePoller(credentials: credentials)
+        poller.start()
+        poller.stop()
+        credentials.release()
+        await poller.pollTask?.value
+        #expect(poller.status == .idle)
+    }
+
+    @Test func aRenewalCheckPollsAtOnceWhileWaiting() async {
+        let credentials = RenewingCredentials(expiresAt: fixedNow.addingTimeInterval(-60))
+        let poller = makePoller(credentials: credentials)
+        poller.start()
+        await poller.pollTask?.value
+        credentials.renew(until: fixedNow.addingTimeInterval(8 * 3600))
+        transport.enqueue(.init(status: 200, body: usageBody(fiveHour: (3, 3600))))
+        // Within the one-minute throttle of the last attempt.
+        poller.loginMayHaveRenewed()
+        await poller.pollTask?.value
+        #expect(poller.status == .ok(fetchedAt: fixedNow))
+        poller.loginMayHaveRenewed()
+        await poller.pollTask?.value
+        #expect(transport.requests.count == 1)
     }
 
     @Test func popoverChecksAreThrottledToOncePerMinute() async {

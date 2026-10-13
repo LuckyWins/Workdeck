@@ -317,3 +317,51 @@ The footers stay; the API footnote drops "macOS will ask for Keychain access —
 ### 11.6 Testing
 
 Unit: credentials reader with a fake process runner (exit codes 0, 44, other; timeout; malformed output; the token is never in error text); poller pause and resume, `refreshNow()` (bypasses the throttle, clears the denial block, respects 429, no concurrent fetch); forecast (both windows, all `nil` cases, exhaustion after the reset); `showForecast` default; forecast text; controller passes forecasts only when the setting is on and calls `pollIfStale()` when the session becomes active. Manual (`docs/testing.md`): no Keychain prompt after Claude Code refreshes its token; polling stops while the screen is locked and resumes after unlocking; the refresh button; the settings layout with and without a data source.
+
+## 12. Amendment: Waiting for Claude Code (2026-10-13)
+
+Claude Code's access token lives a few hours and only Claude Code renews it. With every Claude Code window closed it expires, the usage API answers 401, and every account showed an orange "Login expired — open Claude Code to refresh" plus a second line "updated 13 h ago — open claude code to refresh" that wrapped or was cut. While Claude Code is closed this Mac adds no usage, so old figures are expected, not an error.
+
+### 12.1 Token Expiry
+
+- The Keychain item's JSON holds `claudeAiOauth.expiresAt` next to `accessToken`: milliseconds since 1970 (probe in §12.6). The credentials reader returns the token with this date (`ClaudeLogin { token, expiresAt: Date? }`). The token is still never stored or logged; the date is not secret. A missing or non-numeric `expiresAt`, a boolean, or a number too small to be milliseconds (below 10^12, as seconds would be) is `nil`, which behaves as before: the poller asks the server instead of waiting forever.
+
+### 12.2 Polling
+
+- Before a fetch, a login whose `expiresAt` is at or before now makes no request: the status becomes `waitingForClaudeCode`. It is not a problem (`isProblem` is false).
+- The 5-minute polling goes on and reads the Keychain each time, without network; once Claude Code has renewed the token, the next poll fetches again. While Claude Code runs, the status line brings fresh figures as well, and new figures for a waiting account make its poller check the login at once instead of at the next tick, so `just now · waiting for Claude Code` does not linger.
+- A 401/403 with a token whose `expiresAt` is in the future, or unknown, stays `loginExpired`, a real problem (for example after signing out).
+
+### 12.3 Notch and Settings
+
+- An account whose poller waits shows no problem line; its age line reads `13h ago · waiting for Claude Code` in the dim color ("updated" is dropped so the line fits next to `↻` in the 300 pt panel), with "Waiting for Claude Code to renew its login — click to check again" as the refresh button's tooltip (otherwise "Refresh usage").
+- The age line in the expanded notch drops the "— open Claude Code to refresh" suffix and stays on one line (`updated 13h ago`, `updated 4 min ago`, `updated just now`). The popover row keeps its own wording.
+- The last known figures stay; windows whose reset has passed show `0% ↺ next msg` as before (§5).
+- Settings shows "Waiting for Claude Code to renew its login" for the status.
+
+### 12.4 Errors
+
+| Condition | Behavior |
+|---|---|
+| `expiresAt` missing or malformed | As before: fetch, and 401 is `loginExpired`. |
+| Token expired by `expiresAt` | No request; `waitingForClaudeCode`. |
+| 401/403 with an unexpired token | `loginExpired`, orange. |
+
+### 12.5 Testing
+
+- Parsing: `expiresAt` in milliseconds, missing, a string.
+- Poller: an expired login makes no request and waits; an unexpired one fetches; 401 with an unexpired login is `loginExpired`; a renewed token after waiting fetches and returns to `ok`.
+- Texts: the waiting status in Settings; the one-line age text in the notch with and without waiting.
+- View state: waiting is not a problem.
+
+### 12.6 Probe (first implementation task, run by the user)
+
+The user runs, for each account's Keychain item, a command that prints only the field names and `expiresAt`, never the token:
+
+```sh
+security find-generic-password -s "Claude Code-credentials" -w | python3 -c 'import json,sys; o=json.load(sys.stdin)["claudeAiOauth"]; print(sorted(o), o.get("expiresAt"))'
+```
+
+Expected: the names include `expiresAt`, and its value is a number of milliseconds. Results are recorded here.
+
+Probed on 2026-10-13 for `main` and `personal`: both items hold `accessToken`, `expiresAt`, `rateLimitTier`, `refreshToken`, `refreshTokenExpiresAt`, `scopes`, `subscriptionType`. `expiresAt` is milliseconds since 1970 (`1791902111809` = 17:35 local, about eight hours after Claude Code renewed the token at 09:35).

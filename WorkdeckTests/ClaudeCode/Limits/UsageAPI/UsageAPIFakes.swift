@@ -4,10 +4,42 @@ import Synchronization
 
 struct FakeCredentials: ClaudeCredentialsReading {
     var token: String?
+    var expiresAt: Date?
 
-    func accessToken() throws -> String {
+    func login() throws -> ClaudeLogin {
         guard let token else { throw ClaudeCredentialsError.notFound }
-        return token
+        return ClaudeLogin(token: token, expiresAt: expiresAt)
+    }
+}
+
+/// Returns an expired login once released, so a test can stop the poller while the read is in flight.
+final class HeldExpiredCredentials: ClaudeCredentialsReading {
+    private let gate = DispatchSemaphore(value: 0)
+
+    func release() {
+        gate.signal()
+    }
+
+    func login() throws -> ClaudeLogin {
+        gate.wait()
+        return ClaudeLogin(token: "t", expiresAt: fixedNow.addingTimeInterval(-60))
+    }
+}
+
+/// A login whose expiry the test can move, as Claude Code does when it renews the token.
+final class RenewingCredentials: ClaudeCredentialsReading {
+    private let expiry: Mutex<Date>
+
+    init(expiresAt: Date) {
+        expiry = Mutex(expiresAt)
+    }
+
+    func renew(until date: Date) {
+        expiry.withLock { $0 = date }
+    }
+
+    func login() throws -> ClaudeLogin {
+        ClaudeLogin(token: "t", expiresAt: expiry.withLock { $0 })
     }
 }
 
@@ -70,7 +102,7 @@ final class ScriptedCredentials: ClaudeCredentialsReading {
         gate?.signal()
     }
 
-    func accessToken() throws -> String {
+    func login() throws -> ClaudeLogin {
         reads.withLock { $0 += 1 }
         gate?.wait()
         throw error

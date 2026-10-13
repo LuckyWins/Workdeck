@@ -62,6 +62,7 @@ Watch the snapshot with `cat ~/Library/Application\ Support/Workdeck/claude-usag
 | L19 | Refresh button | API on; hover the notch and click the refresh icon at the end of the "Updated …" line. Turn the API off and hover again. | A spinner replaces the icon briefly and the line shows "Updated just now"; the notch stays expanded while the pointer is over it; with the API off the icon is gone. |
 | L20 | Settings layout | Disconnect the status line and turn the API off. Then turn either on. | Only "Status line" and the API toggle are shown; turning either on reveals Show, the alert pickers, the reset toggle and the forecast toggle. |
 | L21 | Forecast | Use Claude Code heavily in a running 5-hour window, then hover the notch. Turn off "Forecast when limits run out". | When the limit would run out before the reset, the row shows "runs out ~HH:mm · resets HH:mm" with the first part orange; with the setting off, the usual "resets in …" text returns. |
+| L22 | Waiting for Claude Code | With "Fetch usage from Anthropic" on, quit every Claude Code window and wait until the token expires (`expiresAt`, about eight hours), or check the next morning. Then start Claude Code. | Each account shows `13h ago · waiting for Claude Code` in grey, no orange error and no second line; Settings shows "Waiting for Claude Code to renew its login". Within five minutes of Claude Code starting, the line returns to `updated … ago`. |
 
 ## Claude Code Sessions Checklist
 

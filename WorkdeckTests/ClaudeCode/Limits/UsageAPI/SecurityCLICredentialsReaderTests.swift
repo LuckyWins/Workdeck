@@ -25,7 +25,7 @@ struct SecurityCLICredentialsReaderTests {
 
     @Test func runsSecurityWithFixedArguments() throws {
         let runner = FakeProcessRunner(ProcessResult(exitCode: 0, stdout: json, timedOut: false))
-        _ = try SecurityCLICredentialsReader(runner: runner).accessToken()
+        _ = try SecurityCLICredentialsReader(runner: runner).login()
         let call = try #require(runner.lastCall)
         #expect(call.0.path == "/usr/bin/security")
         #expect(call.1 == ["find-generic-password", "-s", "Claude Code-credentials", "-w"])
@@ -34,13 +34,13 @@ struct SecurityCLICredentialsReaderTests {
 
     @Test func returnsTokenOnSuccess() throws {
         let runner = FakeProcessRunner(ProcessResult(exitCode: 0, stdout: json, timedOut: false))
-        #expect(try SecurityCLICredentialsReader(runner: runner).accessToken() == "secret-token")
+        #expect(try SecurityCLICredentialsReader(runner: runner).login().token == "secret-token")
     }
 
     @Test func exit44MeansNotFound() {
         let runner = FakeProcessRunner(ProcessResult(exitCode: 44, stdout: Data(), timedOut: false))
         #expect(throws: ClaudeCredentialsError.notFound) {
-            try SecurityCLICredentialsReader(runner: runner).accessToken()
+            try SecurityCLICredentialsReader(runner: runner).login()
         }
     }
 
@@ -48,21 +48,21 @@ struct SecurityCLICredentialsReaderTests {
     func otherExitCodesMeanDenied(code: Int32) {
         let runner = FakeProcessRunner(ProcessResult(exitCode: code, stdout: Data(), timedOut: false))
         #expect(throws: ClaudeCredentialsError.accessDenied) {
-            try SecurityCLICredentialsReader(runner: runner).accessToken()
+            try SecurityCLICredentialsReader(runner: runner).login()
         }
     }
 
     @Test func timeoutMeansDenied() {
         let runner = FakeProcessRunner(ProcessResult(exitCode: 15, stdout: json, timedOut: true))
         #expect(throws: ClaudeCredentialsError.accessDenied) {
-            try SecurityCLICredentialsReader(runner: runner).accessToken()
+            try SecurityCLICredentialsReader(runner: runner).login()
         }
     }
 
     @Test func unexpectedOutputIsMalformed() {
         let runner = FakeProcessRunner(ProcessResult(exitCode: 0, stdout: Data("not json\n".utf8), timedOut: false))
         #expect(throws: ClaudeCredentialsError.malformed) {
-            try SecurityCLICredentialsReader(runner: runner).accessToken()
+            try SecurityCLICredentialsReader(runner: runner).login()
         }
     }
 }

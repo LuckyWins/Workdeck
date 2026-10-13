@@ -14,6 +14,7 @@ struct AccountsCompositionTests {
     let mainHooks = FakeHooksConnector()
     let extraHooks = FakeHooksConnector()
     let extraPoller = FakePoller()
+    let mainPoller = FakePoller()
 
     var personal: ClaudeInstance { .extra(named: "personal", home: root) }
     var support: URL { root.appending(path: "support") }
@@ -30,7 +31,7 @@ struct AccountsCompositionTests {
             settings: settings,
             store: ClaudeUsageStore(fileURL: support.appending(path: "claude-usage.json")) { fixedNow },
             connector: mainConnector,
-            poller: FakePoller(),
+            poller: mainPoller,
             activity: FakeActivity(),
             makeAccount: { [extraConnector, extraPoller, support] instance in
                 AccountLimits(
@@ -146,6 +147,41 @@ struct AccountsCompositionTests {
         presenter.chatsAction?("personal")
         presenter.chatsAction?("main")
         #expect(opened == ["p1", nil])
+    }
+
+    @Test func aWaitingAccountShowsNoProblem() {
+        let controller = makeController()
+        controller.limits.setFetchFromAPI(true)
+        let idleSummary = controller.connectionSummary(for: personal)
+        extraPoller.status = .waitingForClaudeCode
+        controller.refresh()
+        let block = controller.state.accounts.first { $0.name == "personal" }
+        #expect(block?.problem == nil)
+        #expect(block?.isWaiting == true)
+        #expect(controller.connectionSummary(for: personal) == idleSummary)
+    }
+
+    @Test func aWaitingAccountWithoutDataShowsOnlyWithTheAPIOn() {
+        let controller = makeController()
+        extraPoller.status = .waitingForClaudeCode
+        controller.limits.setFetchFromAPI(true)
+        controller.refresh()
+        #expect(controller.state.accounts.contains { $0.name == "personal" && $0.isWaiting })
+        controller.limits.setFetchFromAPI(false)
+        controller.refresh()
+        #expect(!controller.state.accounts.contains { $0.name == "personal" })
+        #expect(!controller.state.accounts.contains { $0.isWaiting })
+    }
+
+    @Test func theCompactNotchPrefersAnAccountWithData() throws {
+        let controller = makeController()
+        controller.limits.setFetchFromAPI(true)
+        mainPoller.status = .waitingForClaudeCode
+        try usage(60, account: "personal")
+        reload(controller)
+        #expect(controller.state.accounts.map(\.name).contains("main"))
+        #expect(controller.state.compactLabel == "p")
+        #expect(controller.state.pressing?.usedPercent == 60)
     }
 
     @Test func anExtraAccountsUsageAPIProblemIsShown() {

@@ -155,7 +155,7 @@ final class ClaudeCodeController {
     /// Recomputes keep-awake, the notch state, and limit alerts from both parts.
     func refresh() {
         sessions.updateKeepAwake()
-        let withData = limits.accounts.filter { $0.hasData || usageProblem(of: $0) != nil }
+        let withData = limits.accounts.filter { $0.hasData || usageProblem(of: $0) != nil || isWaiting($0) }
         let shown = withData.isEmpty ? [limits.main] : withData
         let compact = compactAccount(among: shown)
         let plans = planLabels()
@@ -197,6 +197,7 @@ final class ClaudeCodeController {
                     forecasts: limits.forecasts(for: account),
                     refresh: limits.refreshState(for: account),
                     problem: usageProblem(of: account),
+                    isWaiting: isWaiting(account),
                     plan: plans[account.label]
                 )
             },
@@ -208,6 +209,11 @@ final class ClaudeCodeController {
             WorkdeckLog.alerts.notice("\(LimitsText.alertTitle(alert, showsAccount: true), privacy: .public), shown")
             presenter.present(alert)
         }
+    }
+
+    /// The usage API waits for Claude Code to renew this account's login (spec §12); shown, but not as a problem.
+    private func isWaiting(_ account: AccountLimits) -> Bool {
+        settings.fetchFromAPI && account.poller.status == .waitingForClaudeCode
     }
 
     /// Why the usage API brings no data for an account, e.g. its Keychain item is missing (spec §6).
@@ -227,7 +233,11 @@ final class ClaudeCodeController {
                 return closest
             }
         }
-        let active = sessions.activeAccount
-        return shown.first { $0.name == active } ?? shown[0]
+        // The latest session's account; without one, an account that has figures beats one that only waits or has
+        // a problem (`activeAccount` falls back to main when there are no sessions).
+        if !sessions.store.sessions.isEmpty, let account = shown.first(where: { $0.name == sessions.activeAccount }) {
+            return account
+        }
+        return shown.first(where: \.hasData) ?? shown[0]
     }
 }

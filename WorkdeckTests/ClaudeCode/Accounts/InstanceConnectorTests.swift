@@ -82,7 +82,7 @@ struct InstanceConnectorTests {
 
     @Test func securityReaderAsksForItsService() throws {
         let runner = FakeProcessRunner(ProcessResult(exitCode: 44, stdout: Data(), timedOut: false))
-        _ = try? SecurityCLICredentialsReader(runner: runner, service: "Claude Code-credentials-e24fc4e6").accessToken()
+        _ = try? SecurityCLICredentialsReader(runner: runner, service: "Claude Code-credentials-e24fc4e6").login()
         #expect(runner.lastCall?.1 == ["find-generic-password", "-s", "Claude Code-credentials-e24fc4e6", "-w"])
     }
 }

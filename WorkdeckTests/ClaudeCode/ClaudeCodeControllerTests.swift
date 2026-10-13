@@ -81,6 +81,9 @@ final class FakePoller: UsagePolling {
     var onChange: (() -> Void)?
     private(set) var refreshCount = 0
     func refreshNow() { refreshCount += 1 }
+
+    private(set) var renewalChecks = 0
+    func loginMayHaveRenewed() { renewalChecks += 1 }
 }
 
 @MainActor

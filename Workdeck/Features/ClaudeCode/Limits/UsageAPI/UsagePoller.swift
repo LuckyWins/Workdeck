@@ -10,11 +10,13 @@ nonisolated enum UsagePollerStatus: Equatable, Sendable {
     /// Reading the token failed or timed out; polling waits until Refresh or the setting is toggled.
     case keychainDenied
     case failed(String)
+    /// Claude Code's token has expired and only Claude Code renews it; no request until it does (spec §12).
+    case waitingForClaudeCode
 
     /// Statuses the user should see instead of usage data.
     var isProblem: Bool {
         switch self {
-        case .idle, .ok: false
+        case .idle, .ok, .waitingForClaudeCode: false
         case .loginExpired, .rateLimited, .noCredentials, .keychainDenied, .failed: true
         }
     }
@@ -34,6 +36,8 @@ protocol UsagePolling: AnyObject {
     var onChange: (() -> Void)? { get set }
     /// The refresh button: polls now despite the 1-minute throttle and retries after a Keychain denial.
     func refreshNow()
+    /// New usage arrived while waiting for Claude Code: it runs again, so its login is likely renewed.
+    func loginMayHaveRenewed()
 }
 
 /// Opt-in: fetches usage from Anthropic every 5 minutes and merges it into the shared snapshot file,
@@ -103,6 +107,11 @@ final class UsagePoller: UsagePolling {
         isPaused = paused
     }
 
+    func loginMayHaveRenewed() {
+        guard status == .waitingForClaudeCode else { return }
+        poll()
+    }
+
     func pollIfStale() {
         guard isRunning else { return }
         if let lastAttempt, clock().timeIntervalSince(lastAttempt) < Self.minimumInterval {
@@ -136,10 +145,10 @@ final class UsagePoller: UsagePolling {
 
     private func performPoll(now: Date) async {
         let credentials = credentials
-        let token: String
+        let login: ClaudeLogin
         do {
-            // Reading the token runs a process, so keep it off the main actor.
-            token = try await Task.detached { try credentials.accessToken() }.value
+            // Reading the login runs a process, so keep it off the main actor.
+            login = try await Task.detached { try credentials.login() }.value
         } catch {
             guard isRunning else { return }
             switch error as? ClaudeCredentialsError {
@@ -154,7 +163,13 @@ final class UsagePoller: UsagePolling {
             return
         }
 
-        let result = await client.fetch(token: token, now: now)
+        guard isRunning else { return }
+        if let expiresAt = login.expiresAt, expiresAt <= now {
+            status = .waitingForClaudeCode
+            return
+        }
+
+        let result = await client.fetch(token: login.token, now: now)
         guard isRunning else { return }
         switch result {
         case let .snapshot(incoming):

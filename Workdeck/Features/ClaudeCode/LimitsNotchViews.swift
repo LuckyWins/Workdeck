@@ -251,7 +251,7 @@ struct LimitsExpandedView: View {
                                 .foregroundStyle(.orange)
                                 .lineLimit(2)
                         }
-                        if account.age != nil || account.refresh != .hidden {
+                        if account.age != nil || account.refresh != .hidden || account.isWaiting {
                             ageRow(account)
                         }
                     }
@@ -335,12 +335,13 @@ struct LimitsExpandedView: View {
     /// "updated 2 min ago ↻": with the usage API on, the whole line refreshes on click.
     @ViewBuilder
     private func ageRow(_ account: AccountLimitsViewState) -> some View {
-        let age = account.age.map { LimitsText.ageText($0).lowercased() } ?? ""
+        let age = LimitsText.notchAgeText(account.age, isWaiting: account.isWaiting)
         let isRefreshHovered = hoveredRefresh == account.name
         switch account.refresh {
         case .hidden:
             Text(age)
                 .foregroundStyle(Terminal.dim)
+                .lineLimit(1)
         case .fetching:
             HStack(spacing: 6) {
                 Text("refreshing…")
@@ -354,6 +355,7 @@ struct LimitsExpandedView: View {
         case .unavailable:
             HStack(spacing: 6) {
                 Text(age)
+                    .lineLimit(1)
                 Spacer(minLength: 8)
                 Text("↻")
             }
@@ -365,6 +367,7 @@ struct LimitsExpandedView: View {
             } label: {
                 HStack(spacing: 6) {
                     Text(isRefreshHovered ? "click to refresh" : age)
+                        .lineLimit(1)
                     Spacer(minLength: 8)
                     Text("↻")
                         .fontWeight(.semibold)
@@ -383,7 +386,7 @@ struct LimitsExpandedView: View {
             .pointerStyle(.link)
             .onHover { hoveredRefresh = $0 ? account.name : nil }
             .animation(.easeOut(duration: 0.12), value: isRefreshHovered)
-            .help("Refresh usage")
+            .help(LimitsText.refreshHelp(isWaiting: account.isWaiting))
         }
     }
 
