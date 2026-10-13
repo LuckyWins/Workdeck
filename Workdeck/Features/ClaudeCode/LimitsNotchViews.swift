@@ -11,11 +11,14 @@ final class LimitsNotchModel {
     var alert: LimitsAlert? {
         alerts.first
     }
+    /// Last week's recap while it is pending: shown when the notch expands, `◆` on the compact notch (recap spec §3.2).
+    var recap: WeeklyRecapSummary?
     @ObservationIgnored var onRefresh: (() -> Void)?
     @ObservationIgnored var onActivateSession: ((String) -> Void)?
     @ObservationIgnored var onActivateProject: ((String) -> Void)?
     @ObservationIgnored var onOpenChats: ((String) -> Void)?
     @ObservationIgnored var onToggleAccounts: (() -> Void)?
+    @ObservationIgnored var onDismissRecap: (() -> Void)?
 }
 
 extension LimitsLevel {
@@ -98,7 +101,7 @@ struct LimitsCompactTrailing: View {
     let model: LimitsNotchModel
 
     var body: some View {
-        SessionsCounter(state: model.state.sessions, flash: model.flash)
+        SessionsCounter(state: model.state.sessions, flash: model.flash, showsRecap: model.recap != nil)
             .font(Terminal.font(12, weight: .semibold))
     }
 }
@@ -120,6 +123,8 @@ struct LimitsExpandedView: View {
                 batchView(model.alerts)
             } else if let alert = model.alert {
                 alertView(alert)
+            } else if let recap = model.recap {
+                RecapView(recap: recap, thresholds: model.state.thresholds) { model.onDismissRecap?() }
             } else {
                 details
             }

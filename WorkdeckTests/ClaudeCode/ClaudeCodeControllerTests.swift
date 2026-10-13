@@ -95,6 +95,16 @@ final class FakePresenter: LimitsPresenting {
     func setChatsAction(_ action: @escaping (String) -> Void) {
         chatsAction = action
     }
+
+    private(set) var recaps: [WeeklyRecapSummary?] = []
+    func showRecap(_ recap: WeeklyRecapSummary?) {
+        recaps.append(recap)
+    }
+
+    private(set) var recapDismissAction: (() -> Void)?
+    func setRecapDismissAction(_ action: @escaping () -> Void) {
+        recapDismissAction = action
+    }
 }
 
 @MainActor

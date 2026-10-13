@@ -99,6 +99,10 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | S28 | iTerm2 panes | In iTerm2, split a tab into two panes and run `claude` in the right one; click its row; then minimize that window and click again. | iTerm2 comes forward with that tab and the right pane selected; the minimized window is restored. |
 | S29 | Automation denied | Deny the Automation prompt (or turn Workdeck off for Terminal in System Settings → Privacy & Security → Automation), then click a Terminal session. | Terminal is activated as before; Diagnostics shows "Terminal tab: AppleScript error -1743". Turning it back on makes the next click show the tab. |
 | S8 | Disconnect | Disconnect… in Settings, check the diff, then Disconnect. | The diff removes only Workdeck's hook entries; your own hooks stay; the sessions disappear from the notch. |
+| R1 | Recap on Monday | Work with Claude Code for at least 15 minutes during a week; on the following Monday unlock the Mac (or set the clock forward and relaunch Workdeck). | The notch expands with "last week · <dates>", coding time, sessions, files, lines, commands, agents, busiest day, longest work, top projects and limits; after about a minute it collapses and the right wing shows ◆; hovering shows the recap; Got it removes it until next week. |
+| R2 | Quiet week | A week with less than 15 minutes of work. | No recap on Monday. |
+| R3 | Alerts during the recap | With "Notify when a session needs you" on and the first threshold set below the current usage, while the recap is expanded trigger a permission prompt (session's app in the background), then let a limit cross the threshold. | "Needs you" shows at once and the recap steps back to ◆; the limit alert waits for the recap's minute to end. |
+| R4 | When active | Set Show to "When active" with nothing going on, then unlock on Monday. | The recap shows; afterwards the compact notch stays visible with ◆ until Got it. |
 
 ## Claude Code Instances and Chats Checklist
 

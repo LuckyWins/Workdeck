@@ -99,6 +99,8 @@ nonisolated struct ClaudeSession: Equatable, Sendable, Identifiable {
     /// The main agent's last tool calls, oldest first, at most `maxSteps`; a prompt clears them.
     var steps: [SessionStep] = []
     var turn = TurnEdits(startedAt: .distantPast)
+    /// Bash tool calls of the session and its agents (weekly recap spec §2).
+    var commands = 0
     /// Counts whose step was not seen yet: each hook stamps its own time, so a fast edit's PostToolUse can come first.
     var earlyLines: [EarlyLines] = []
 

@@ -19,6 +19,10 @@ protocol LimitsPresenting: AnyObject {
     func setChatsAction(_ action: @escaping (String) -> Void)
     /// What the control that hides or shows the other accounts' limits does.
     func setToggleAccountsAction(_ action: @escaping () -> Void)
+    /// Shows last week's recap expanded for a while, then as `◆`; `nil` removes it (recap spec §3.2).
+    func showRecap(_ recap: WeeklyRecapSummary?)
+    /// What `Got it` on the recap does.
+    func setRecapDismissAction(_ action: @escaping () -> Void)
     /// Called with true when the pointer has rested on the hidden notch's place, false when it has left (spec §5).
     func setPeekAction(_ action: @escaping (Bool) -> Void)
     /// Whether the pointer is on the notch or at its place right now.
@@ -78,6 +82,9 @@ final class NotchPresenter: LimitsPresenting {
     private var cachedZone: CGRect??
     private let flashDuration: Duration
     private let alertDuration: Duration
+    private let recapDuration: Duration
+    private var isShowingRecap = false
+    private var recapTask: Task<Void, Never>?
     private let rebuildDelay: Duration
     private let workspaceSettleDelay: Duration
     private var surface: (any NotchSurface)?
@@ -107,6 +114,7 @@ final class NotchPresenter: LimitsPresenting {
         pointer: any PointerMonitoring = GlobalPointerMonitor(),
         flashDuration: Duration = NotchFlash.duration,
         alertDuration: Duration = .seconds(6),
+        recapDuration: Duration = .seconds(60),
         rebuildDelay: Duration = .milliseconds(500),
         workspaceSettleDelay: Duration = .seconds(1),
         hoverEnterDelay: Duration = .milliseconds(250),
@@ -122,6 +130,7 @@ final class NotchPresenter: LimitsPresenting {
         self.hoverExitDelay = hoverExitDelay
         self.flashDuration = flashDuration
         self.alertDuration = alertDuration
+        self.recapDuration = recapDuration
         self.rebuildDelay = rebuildDelay
         self.workspaceSettleDelay = workspaceSettleDelay
         if observeScreenChanges {
@@ -175,7 +184,7 @@ final class NotchPresenter: LimitsPresenting {
 
     /// True while a flash, a rebuild, or notch operations are still pending.
     var isBusy: Bool {
-        reconcileTask != nil || flashTask != nil || alertTask != nil || rebuildTask != nil || workspaceTask != nil || hoverTask != nil || peekTask != nil
+        reconcileTask != nil || flashTask != nil || alertTask != nil || recapTask != nil || rebuildTask != nil || workspaceTask != nil || hoverTask != nil || peekTask != nil
     }
 
     func show(_ state: LimitsViewState) {
@@ -214,7 +223,8 @@ final class NotchPresenter: LimitsPresenting {
         flashTask = Task {
             // Let the reconcile show a notch the alert just made visible, and the expanded alert close, then flash
             // only what is on the compact notch.
-            while reconcileTask != nil || isShowingAlert, !Task.isCancelled {
+            // An alert waiting behind the recap counts as on screen: its flash plays after it (recap spec §3.2).
+            while reconcileTask != nil || isShowingAlert || isShowingRecap || alertTask != nil, !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(10))
             }
             guard !Task.isCancelled else { return }
@@ -239,6 +249,10 @@ final class NotchPresenter: LimitsPresenting {
     /// Expands the notch with alerts for `alertDuration`; alerts arriving meanwhile join them and keep them up a while
     /// longer.
     private func present(_ alerts: [LimitsAlert]) {
+        // "Needs you" waits for nothing: an expanded recap steps back to its mark (recap spec §3.2).
+        if isShowingRecap, alerts.contains(where: { if case .sessionNeedsYou = $0 { true } else { false } }) {
+            endRecapExpansion()
+        }
         guard screen() != nil else { return }
         if isShowingAlert {
             model.alerts.append(contentsOf: alerts)
@@ -248,6 +262,10 @@ final class NotchPresenter: LimitsPresenting {
         pendingAlerts.append(contentsOf: alerts)
         guard alertTask == nil else { return }
         alertTask = Task {
+            // Other alerts wait for the recap's minute to end.
+            while isShowingRecap, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(10))
+            }
             // Alerts that arrive together are shown together.
             while !pendingAlerts.isEmpty, screen() != nil {
                 model.alerts = pendingAlerts
@@ -263,6 +281,44 @@ final class NotchPresenter: LimitsPresenting {
             model.alerts = []
             isShowingAlert = false
             alertTask = nil
+            requestReconcile()
+        }
+    }
+
+    func showRecap(_ recap: WeeklyRecapSummary?) {
+        endRecapExpansion()
+        model.recap = recap
+        guard recap != nil, screen() != nil else {
+            requestReconcile()
+            return
+        }
+        recapTask = Task {
+            // An alert on screen goes first.
+            while isShowingAlert, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+            guard !Task.isCancelled else { return }
+            isShowingRecap = true
+            requestReconcile()
+            repeat {
+                try? await Task.sleep(for: recapDuration)
+            } while isHovering && !Task.isCancelled
+            guard !Task.isCancelled else { return }
+            isShowingRecap = false
+            recapTask = nil
+            requestReconcile()
+        }
+    }
+
+    func setRecapDismissAction(_ action: @escaping () -> Void) {
+        model.onDismissRecap = action
+    }
+
+    private func endRecapExpansion() {
+        recapTask?.cancel()
+        recapTask = nil
+        if isShowingRecap {
+            isShowingRecap = false
             requestReconcile()
         }
     }
@@ -412,11 +468,14 @@ final class NotchPresenter: LimitsPresenting {
     private func reconcileOnce() async {
         let screen = screen()
         // Reading the window list costs a window server round trip; only a resting notch needs it.
-        let mayRest: Bool = if case .notch = model.state.display, !isShowingAlert { true } else { false }
+        let isNotch: Bool = if case .notch = model.state.display { true } else { false }
+        // The recap shows only while the notch does: turning the indicator off ends it (recap spec §3.1).
+        let showsRecap = isShowingRecap && isNotch
+        let mayRest = isNotch && !isShowingAlert && !showsRecap
         let target = Self.target(
             display: model.state.display,
             isHovering: isHovering,
-            isShowingAlert: isShowingAlert,
+            isShowingAlert: isShowingAlert || showsRecap,
             hasScreen: screen != nil,
             hidesResting: mayRest && screen.map { $0.isVirtual && fullScreen.isFullScreen($0.screen) } ?? false
         )

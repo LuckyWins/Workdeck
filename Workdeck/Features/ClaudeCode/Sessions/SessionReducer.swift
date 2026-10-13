@@ -81,6 +81,9 @@ nonisolated enum SessionReducer {
             session.earlyLines = []
             setStatus(.working, at: event.time, on: &session)
         case .preToolUse:
+            if let action = event.action, action == "Bash" || action.hasPrefix("Bash ") {
+                session.commands += 1
+            }
             setAction(event.action, toolUseID: event.toolUseID, for: event.agentID, at: event.time, on: &session)
             if let agentID = event.agentID, let index = session.agents.firstIndex(where: { $0.id == agentID }) {
                 session.agents[index].steps += 1

@@ -483,4 +483,17 @@ struct SessionReducerTests {
         #expect(session.earlyLines.last?.toolUseID == "gone19")
         #expect(try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 10)] + edits + [hookEvent(.userPromptSubmit, at: 40)])).earlyLines.isEmpty)
     }
+
+    @Test func bashCallsOfTheSessionAndItsAgentsAreCounted() throws {
+        let agent = hookEvent(.subagentStart, at: 1) { $0.agentID = "a1"; $0.agentType = "Explore" }
+        let session = try #require(SessionReducer.reduce([
+            start, agent,
+            hookEvent(.preToolUse, at: 2) { $0.action = "Bash ls" },
+            hookEvent(.preToolUse, at: 3) { $0.action = "Bash" },
+            hookEvent(.preToolUse, at: 4) { $0.agentID = "a1"; $0.action = "Bash git status" },
+            hookEvent(.preToolUse, at: 5) { $0.action = "BashOutput" },
+            hookEvent(.preToolUse, at: 6) { $0.action = "Read Bash.swift" },
+        ]))
+        #expect(session.commands == 3)
+    }
 }

@@ -51,7 +51,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 makeHooksConnector: { SessionHooksConnector.forInstance($0) },
                 mainSettingsURL: ClaudeSettingsFile.standard().url
             ),
-            presenter: NotchPresenter(screen: { NotchPresenter.targetScreen(notchless: settings.notchlessDisplay) })
+            presenter: NotchPresenter(screen: { NotchPresenter.targetScreen(notchless: settings.notchlessDisplay) }),
+            recapStore: RecapStore.standard()
         )
     }()
 
@@ -88,6 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        claudeCode.saveRecap()
         lidSleep.prepareForTermination()
     }
 }

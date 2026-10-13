@@ -27,9 +27,15 @@ final class ClaudeCodeSettings {
         static let finishedAfterMinutes = "claudeSessions.finishedAfterMinutes"
         static let notifyNeedsYou = "claudeSessions.notifyNeedsYou"
         static let hookEventsVersion = "claudeSessions.hookEventsVersion"
+        static let dismissedRecapWeek = "claudeRecap.dismissedWeek"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
+
+    /// The Monday ("2026-10-05") of the last week whose recap was dismissed or skipped (recap spec §3.2).
+    var dismissedRecapWeek: String? {
+        didSet { defaults.set(dismissedRecapWeek, forKey: Keys.dismissedRecapWeek) }
+    }
 
     /// Whether the notch or menu bar indicator is shown.
     var isEnabled: Bool {
@@ -163,6 +169,7 @@ final class ClaudeCodeSettings {
         finishedAfterMinutes = Self.finishedAfterOptions.contains(minutes) ? minutes : 10
         notifyWhenNeedsYou = defaults.bool(forKey: Keys.notifyNeedsYou)
         hookEventsVersion = defaults.integer(forKey: Keys.hookEventsVersion)
+        dismissedRecapWeek = defaults.string(forKey: Keys.dismissedRecapWeek)
     }
 
     /// 50–95 in steps of 5.

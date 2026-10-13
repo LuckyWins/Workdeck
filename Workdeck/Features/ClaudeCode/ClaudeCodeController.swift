@@ -27,6 +27,12 @@ final class ClaudeCodeController {
     @ObservationIgnored var onOpenChats: ((String?) -> Void)?
     /// Plan labels by account label ("main", "personal"), from the instances' `.claude.json`.
     @ObservationIgnored var planLabels: () -> [String: String] = { [:] }
+    @ObservationIgnored private let recapStore: RecapStore?
+    @ObservationIgnored private let calendar: Calendar
+    @ObservationIgnored private var recorder: RecapRecorder?
+    /// Last week's recap, shown until dismissed (recap spec §3.2).
+    @ObservationIgnored private var pendingRecap: WeeklyRecapSummary?
+    @ObservationIgnored private var lastRecapSave: Date?
 
     init(
         settings: ClaudeCodeSettings,
@@ -35,7 +41,9 @@ final class ClaudeCodeController {
         presenter: any LimitsPresenting,
         cameraHousings: @escaping @MainActor () -> [Bool] = { NSScreen.screens.map { $0.safeAreaInsets.top > 0 } },
         clock: @escaping () -> Date = { Date() },
-        linger: TimeInterval = 60
+        linger: TimeInterval = 60,
+        recapStore: RecapStore? = nil,
+        calendar: Calendar = RecapCalendar.calendar()
     ) {
         self.settings = settings
         self.limits = limits
@@ -44,6 +52,8 @@ final class ClaudeCodeController {
         self.cameraHousings = cameraHousings
         self.clock = clock
         self.linger = linger
+        self.recapStore = recapStore
+        self.calendar = calendar
     }
 
     /// The indicator has something to show: limits, sessions, or both.
@@ -99,8 +109,18 @@ final class ClaudeCodeController {
         ) { @Sendable [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }
+        if let recapStore {
+            recorder = RecapRecorder(days: recapStore.load(now: clock(), calendar: calendar), calendar: calendar)
+        }
+        presenter.setRecapDismissAction { [weak self] in self?.dismissRecap() }
+        limits.onActivityChange = { [weak self] active in
+            if active {
+                self?.checkRecap()
+            }
+        }
         limits.start()
         sessions.start()
+        checkRecap()
     }
 
     func diagnosticsText(logLines: [String], now: Date = Date()) -> String {
@@ -172,6 +192,7 @@ final class ClaudeCodeController {
 
     /// Recomputes keep-awake, the notch state, and limit alerts from both parts.
     func refresh() {
+        recordRecap()
         sessions.updateKeepAwake()
         // Limit alerts come first: in "When active" an alert counts as activity, so a hidden notch shows (flash spec §2.3).
         let limitAlerts = limits.takeAlerts()
@@ -202,7 +223,7 @@ final class ClaudeCodeController {
                 pressing: pressing,
                 hasData: hasData,
                 thresholds: settings.thresholds,
-                hasSessions: isActive || (settings.mode == .whenActive && isLingering),
+                hasSessions: isActive || (settings.mode == .whenActive && isLingering) || pendingRecap != nil,
                 isPeeking: isPeeking,
                 label: label
             )
@@ -248,6 +269,80 @@ final class ClaudeCodeController {
         )
         presenter.show(state)
         flash(limitAlerts)
+    }
+
+    /// Shows last week's recap if it is due: not dismissed, worth showing, and a notch to show it in (recap spec §3.1).
+    func checkRecap() {
+        guard let recorder, settings.isEnabled,
+              NotchPresenter.targetIndex(cameraHousings: cameraHousings(), notchless: settings.notchlessDisplay) != nil,
+              let lastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: RecapCalendar.weekStart(of: clock(), calendar: calendar))
+        else { return }
+        // A recap left open gives way to the next week's.
+        if let pending = pendingRecap {
+            guard pending.weekStart != lastWeek else { return }
+            pendingRecap = nil
+        }
+        let key = RecapCalendar.dayKey(lastWeek, calendar: calendar)
+        guard settings.dismissedRecapWeek != key else { return }
+        let summary = WeeklyRecap.summary(days: recorder.days, weekStart: lastWeek, calendar: calendar)
+        guard summary.isWorthShowing else {
+            settings.dismissedRecapWeek = key
+            return
+        }
+        pendingRecap = summary
+        presenter.showRecap(summary)
+        refresh()
+    }
+
+    func dismissRecap() {
+        guard let recap = pendingRecap else { return }
+        settings.dismissedRecapWeek = RecapCalendar.dayKey(recap.weekStart, calendar: calendar)
+        pendingRecap = nil
+        presenter.showRecap(nil)
+        refresh()
+    }
+
+    /// Writes the recorded days now (on quit) or at most once a minute (from `refresh()`).
+    /// On quit: keeps the time and stretches up to now, then writes.
+    func saveRecap() {
+        guard let recorder else { return }
+        recordRecap(saving: false)
+        recorder.finish(now: clock())
+        writeRecap()
+    }
+
+    private func writeRecap() {
+        guard let recorder, let recapStore else { return }
+        let now = clock()
+        lastRecapSave = now
+        do {
+            try recapStore.save(recorder.days, now: now, calendar: calendar)
+            recorder.markSaved()
+        } catch {
+            WorkdeckLog.sessions.error("Recap: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func recordRecap(saving: Bool = true) {
+        guard let recorder else { return }
+        let now = clock()
+        recorder.record(
+            // Without hooks, sessions are stale snapshots: nothing to count.
+            sessions: sessions.isHooksConnected ? sessions.store.sessions : [],
+            accounts: limits.accounts.map { account in
+                let windows = account.store.currentWindows
+                return RecapAccountSample(
+                    name: account.label,
+                    fiveHour: windows.first { $0.kind == .fiveHour },
+                    sevenDay: windows.first { $0.kind == .sevenDay }
+                )
+            },
+            now: now
+        )
+        // At most once a minute, and only when something changed.
+        if saving, recorder.hasChanges, lastRecapSave.map({ now.timeIntervalSince($0) >= 60 }) ?? true {
+            writeRecap()
+        }
     }
 
     /// The usage API waits for Claude Code to renew this account's login (spec §12); shown, but not as a problem.

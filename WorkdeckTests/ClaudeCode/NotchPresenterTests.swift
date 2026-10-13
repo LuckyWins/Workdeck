@@ -77,7 +77,7 @@ struct NotchPresenterTests {
     let pointer = FakePointer()
     let screenReads = ScreenReads()
 
-    private func makePresenter(screen: NSScreen? = NSScreen.screens.first, virtual: Bool = false, flashDuration: Duration = .milliseconds(60), alertDuration: Duration = .milliseconds(100), hoverEnterDelay: Duration = .milliseconds(40), hoverExitDelay: Duration = .milliseconds(80)) -> (NotchPresenter, () -> Int) {
+    private func makePresenter(screen: NSScreen? = NSScreen.screens.first, virtual: Bool = false, flashDuration: Duration = .milliseconds(60), alertDuration: Duration = .milliseconds(100), hoverEnterDelay: Duration = .milliseconds(40), hoverExitDelay: Duration = .milliseconds(80), recapDuration: Duration = .seconds(60)) -> (NotchPresenter, () -> Int) {
         var created = 0
         let presenter = NotchPresenter(
             makeSurface: { model in
@@ -93,6 +93,7 @@ struct NotchPresenterTests {
             pointer: pointer,
             flashDuration: flashDuration,
             alertDuration: alertDuration,
+            recapDuration: recapDuration,
             rebuildDelay: .zero,
             workspaceSettleDelay: .milliseconds(50),
             hoverEnterDelay: hoverEnterDelay,
@@ -674,4 +675,101 @@ struct NotchPresenterTests {
         presenter.model.onActivateProject?("vitastir")
         #expect(opened == ["vitastir"])
     }
+
+    private func recap() -> WeeklyRecapSummary {
+        WeeklyRecapSummary(weekStart: fixedNow, seconds: 3600, sessions: 2)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func theRecapExpandsThenLeavesItsMark() async {
+        let (presenter, _) = makePresenter(recapDuration: .milliseconds(200))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.showRecap(recap())
+        await settle(presenter)
+        #expect(surface.calls.contains("expand"))
+        #expect(presenter.appliedTarget == .compact)
+        #expect(presenter.model.recap == recap())
+        presenter.showRecap(nil)
+        await settle(presenter)
+        #expect(presenter.model.recap == nil)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func needsYouCutsTheRecapShort() async {
+        let (presenter, _) = makePresenter(recapDuration: .seconds(30))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.showRecap(recap())
+        while presenter.appliedTarget != .expanded {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        presenter.flash([.sessionNeedsYou(project: "vitastir")])
+        await settle(presenter)
+        #expect(surface.alertsAtExpand.contains([.sessionNeedsYou(project: "vitastir")]))
+        #expect(presenter.model.recap == recap())
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func otherAlertsWaitForTheRecap() async {
+        let (presenter, _) = makePresenter(recapDuration: .milliseconds(300))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.showRecap(recap())
+        while presenter.appliedTarget != .expanded {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        presenter.flash([.threshold(window(.fiveHour, 81), threshold: 80)])
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(presenter.model.alerts.isEmpty)
+        // Once the recap's time is up, the alert shows; the notch may stay expanded in between, so watch the model.
+        var shown = false
+        while presenter.isBusy {
+            if presenter.model.alerts == [.threshold(window(.fiveHour, 81), threshold: 80)] {
+                shown = true
+            }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(shown)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func anAlertThatWaitedForTheRecapStillFlashesAfterIt() async {
+        var targetsWhileFlashing: [NotchTarget] = []
+        let (presenter, _) = makePresenter(recapDuration: .milliseconds(300))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.showRecap(recap())
+        while presenter.appliedTarget != .expanded {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        presenter.flash([.threshold(window(.fiveHour, 81), threshold: 80)])
+        while presenter.isBusy {
+            if presenter.model.flash != nil {
+                targetsWhileFlashing.append(presenter.appliedTarget)
+            }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        // The ring flash plays on the compact notch once the alert is done, not unseen behind the recap.
+        #expect(!targetsWhileFlashing.isEmpty)
+        #expect(targetsWhileFlashing.allSatisfy { $0 == .compact })
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func turningTheIndicatorOffEndsAnExpandedRecap() async {
+        let (presenter, _) = makePresenter(recapDuration: .seconds(30))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.showRecap(recap())
+        while presenter.appliedTarget != .expanded {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        presenter.show(state(.hidden))
+        let deadline = Date().addingTimeInterval(2)
+        while presenter.appliedTarget != .hidden, Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(presenter.appliedTarget == .hidden)
+    }
+
 }

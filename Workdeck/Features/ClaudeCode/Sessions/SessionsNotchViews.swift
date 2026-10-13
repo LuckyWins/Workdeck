@@ -28,11 +28,18 @@ struct SessionsCounter: View {
     let state: SessionsViewState
     /// An alert's flash; session alerts flash the dot, "needs you" blinking (flash spec §2.1).
     var flash: NotchFlashEvent? = nil
+    /// Last week's recap waits to be seen (recap spec §3.2).
+    var showsRecap = false
 
     var body: some View {
         let dotFlash = flash?.dot
         let blinks = flash?.dotBlinks == true
         HStack(spacing: 6) {
+            if showsRecap {
+                Text("◆")
+                    .foregroundStyle(.white)
+                    .transition(.opacity)
+            }
             // The dot also shows for its flash when no session is active, e.g. right after the last one finished.
             if let color = state.activeCount > 0 ? state.level.notchColor : (dotFlash != nil ? Color.clear : nil) {
                 HStack(spacing: 1) {
@@ -61,6 +68,7 @@ struct SessionsCounter: View {
             }
         }
         .animation(.snappy, value: state.activeCount)
+        .animation(.snappy, value: showsRecap)
         .animation(.snappy, value: dotFlash != nil)
         .animation(.snappy, value: state.agentCount)
         .animation(.snappy, value: state.level)
