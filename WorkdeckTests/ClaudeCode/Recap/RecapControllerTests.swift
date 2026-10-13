@@ -116,6 +116,29 @@ struct RecapControllerTests {
         #expect(presenter.recaps.last??.seconds == 7200)
     }
 
+    @Test func detailsDismissesTheRecapAndShowsItsWeek() throws {
+        try saveLastWeek(seconds: 3600)
+        let controller = makeController()
+        let opened = Box(0)
+        controller.onOpenStatistics = { opened.value += 1 }
+        controller.start()
+        presenter.recapDetailsAction?()
+        #expect(presenter.recaps.last == .some(nil))
+        #expect(settings.dismissedRecapWeek == "2026-10-05")
+        #expect(RecapCalendar.dayKey(controller.statistics.weekStart, calendar: calendar) == "2026-10-05")
+        #expect(controller.statistics.summary.seconds == 3600)
+        #expect(opened.value == 1)
+    }
+
+    @Test func statisticsReadTheRecordedDays() throws {
+        try store.save([RecapDay(date: "2026-10-12", projects: ["Workdeck": RecapProjectDay(seconds: 600, sessionIDs: ["s"])])], now: monday, calendar: calendar)
+        let controller = makeController()
+        controller.start()
+        controller.openStatistics(week: nil)
+        #expect(controller.statistics.isCurrentWeek)
+        #expect(controller.statistics.summary.seconds == 600)
+        #expect(controller.statistics.thresholds == settings.thresholds)
+    }
 }
 
 /// A value the tests change while closures read it.

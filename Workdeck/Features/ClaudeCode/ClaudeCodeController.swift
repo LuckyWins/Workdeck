@@ -33,6 +33,10 @@ final class ClaudeCodeController {
     /// Last week's recap, shown until dismissed (recap spec §3.2).
     @ObservationIgnored private var pendingRecap: WeeklyRecapSummary?
     @ObservationIgnored private var lastRecapSave: Date?
+    /// The Statistics window's state, fed the recorder's days on every refresh (statistics spec §3.5).
+    let statistics: StatisticsController
+    /// Opens the Statistics window (the app hands it `WindowOpener`).
+    @ObservationIgnored var onOpenStatistics: (() -> Void)?
 
     init(
         settings: ClaudeCodeSettings,
@@ -54,6 +58,7 @@ final class ClaudeCodeController {
         self.linger = linger
         self.recapStore = recapStore
         self.calendar = calendar
+        statistics = StatisticsController(calendar: calendar, clock: clock)
     }
 
     /// The indicator has something to show: limits, sessions, or both.
@@ -113,6 +118,8 @@ final class ClaudeCodeController {
             recorder = RecapRecorder(days: recapStore.load(now: clock(), calendar: calendar), calendar: calendar)
         }
         presenter.setRecapDismissAction { [weak self] in self?.dismissRecap() }
+        presenter.setRecapDetailsAction { [weak self] in self?.openRecapDetails() }
+        updateStatistics()
         limits.onActivityChange = { [weak self] active in
             if active {
                 self?.checkRecap()
@@ -193,6 +200,7 @@ final class ClaudeCodeController {
     /// Recomputes keep-awake, the notch state, and limit alerts from both parts.
     func refresh() {
         recordRecap()
+        updateStatistics()
         sessions.updateKeepAwake()
         // Limit alerts come first: in "When active" an alert counts as activity, so a hidden notch shows (flash spec §2.3).
         let limitAlerts = limits.takeAlerts()
@@ -299,6 +307,23 @@ final class ClaudeCodeController {
         pendingRecap = nil
         presenter.showRecap(nil)
         refresh()
+    }
+
+    /// Shows the week holding `week` (`nil`: the current week) in the Statistics window (statistics spec §2).
+    func openStatistics(week: Date?) {
+        statistics.show(week: week)
+        onOpenStatistics?()
+    }
+
+    /// `Details…`: the recap is done with, its week opens in the window.
+    private func openRecapDetails() {
+        let week = pendingRecap?.weekStart
+        dismissRecap()
+        openStatistics(week: week)
+    }
+
+    private func updateStatistics() {
+        statistics.update(days: recorder?.days ?? [], isHooksConnected: sessions.isHooksConnected, thresholds: settings.thresholds)
     }
 
     /// Writes the recorded days now (on quit) or at most once a minute (from `refresh()`).

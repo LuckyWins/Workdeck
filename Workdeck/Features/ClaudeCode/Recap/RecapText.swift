@@ -39,6 +39,48 @@ nonisolated enum RecapText {
         format("EEE", date, calendar: calendar)
     }
 
+    /// "▲ 18% from the same days last week" (statistics spec §3.2); `nil` without a comparison.
+    static func comparison(_ change: Double?) -> String? {
+        guard let change else { return nil }
+        guard abs(change) >= 0.01 else { return "about the same as the same days last week" }
+        return "\(change > 0 ? "▲" : "▼") \(Int((abs(change) * 100).rounded()))% from the same days last week"
+    }
+
+    /// A chart's hour tick: "0", "15m", "1h", "1h 30m", so fractional ticks never repeat a label.
+    static func axisHours(_ hours: Double) -> String {
+        let minutes = Int((hours * 60).rounded())
+        guard minutes > 0 else { return "0" }
+        guard minutes >= 60 else { return "\(minutes)m" }
+        return minutes % 60 == 0 ? "\(minutes / 60)h" : "\(minutes / 60)h \(minutes % 60)m"
+    }
+
+    /// "3h 12m a day".
+    static func perDay(_ seconds: Double) -> String {
+        "\(duration(seconds)) a day"
+    }
+
+    /// "1 session", "23 sessions".
+    static func sessions(_ count: Int) -> String {
+        "\(number(count)) \(count == 1 ? "session" : "sessions")"
+    }
+
+    /// "4 sessions · 31 files · +1 380 −290", zero parts left out (statistics spec §3.4).
+    static func projectDetail(_ project: RecapProjectSummary) -> String {
+        var parts: [String] = []
+        if project.sessions > 0 {
+            parts.append(sessions(project.sessions))
+        }
+        if project.files > 0 {
+            parts.append("\(number(project.files)) \(project.files == 1 ? "file" : "files")")
+        }
+        let lines = [project.added > 0 ? "+\(number(project.added))" : nil, project.removed > 0 ? "\u{2212}\(number(project.removed))" : nil]
+            .compactMap { $0 }
+        if !lines.isEmpty {
+            parts.append(lines.joined(separator: " "))
+        }
+        return parts.joined(separator: " · ")
+    }
+
     private static func format(_ pattern: String, _ date: Date, calendar: Calendar) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")

@@ -80,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { await chats.focus(onChat: sessionID) }
             WindowOpener.shared.open(ChatsWindow.id)
         }
+        claudeCode.onOpenStatistics = { WindowOpener.shared.open(StatisticsWindow.id) }
         claudeCode.planLabels = { [unowned self] in instances.plans }
         instances.onAccountsRefreshed = { [unowned self] in claudeCode.refresh() }
         Task { await instances.refreshAccounts() }

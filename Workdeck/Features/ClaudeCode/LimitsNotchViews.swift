@@ -19,6 +19,7 @@ final class LimitsNotchModel {
     @ObservationIgnored var onOpenChats: ((String) -> Void)?
     @ObservationIgnored var onToggleAccounts: (() -> Void)?
     @ObservationIgnored var onDismissRecap: (() -> Void)?
+    @ObservationIgnored var onRecapDetails: (() -> Void)?
 }
 
 extension LimitsLevel {
@@ -124,7 +125,12 @@ struct LimitsExpandedView: View {
             } else if let alert = model.alert {
                 alertView(alert)
             } else if let recap = model.recap {
-                RecapView(recap: recap, thresholds: model.state.thresholds) { model.onDismissRecap?() }
+                RecapView(
+                    recap: recap,
+                    thresholds: model.state.thresholds,
+                    onDetails: { model.onRecapDetails?() },
+                    onDismiss: { model.onDismissRecap?() }
+                )
             } else {
                 details
             }

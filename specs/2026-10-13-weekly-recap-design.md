@@ -60,6 +60,7 @@ Inspired by Coucou's recap (`RecapStore`), adapted: coding time counts only Clau
                                 [Got it]
 ```
 
+- Amended 2026-10-13: the card takes a headline, a Monday–Sunday chart and a "Details…" button (`specs/2026-10-13-statistics-window-design.md` §4).
 - The expanded notch's terminal style. `+` green, `−` red; the weekly peak takes the threshold colors of the limit bars.
 - Fewer than three projects show fewer lines. The limits block lists every account with data during the week; without any, it is left out.
 - Durations: `<1m`, `42m`, `2h 14m`, `18h 42m`. Numbers above 999 get a thin space (`4 820`).

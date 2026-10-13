@@ -23,6 +23,8 @@ protocol LimitsPresenting: AnyObject {
     func showRecap(_ recap: WeeklyRecapSummary?)
     /// What `Got it` on the recap does.
     func setRecapDismissAction(_ action: @escaping () -> Void)
+    /// What `Details…` on the recap does (statistics spec §4).
+    func setRecapDetailsAction(_ action: @escaping () -> Void)
     /// Called with true when the pointer has rested on the hidden notch's place, false when it has left (spec §5).
     func setPeekAction(_ action: @escaping (Bool) -> Void)
     /// Whether the pointer is on the notch or at its place right now.
@@ -312,6 +314,10 @@ final class NotchPresenter: LimitsPresenting {
 
     func setRecapDismissAction(_ action: @escaping () -> Void) {
         model.onDismissRecap = action
+    }
+
+    func setRecapDetailsAction(_ action: @escaping () -> Void) {
+        model.onRecapDetails = action
     }
 
     private func endRecapExpansion() {

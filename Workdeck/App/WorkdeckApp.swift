@@ -22,5 +22,12 @@ struct WorkdeckApp: App {
         .defaultSize(width: 640, height: 520)
         .defaultLaunchBehavior(.suppressed)
         .restorationBehavior(.disabled)
+
+        Window("Claude Code Statistics", id: StatisticsWindow.id) {
+            StatisticsWindow(controller: appDelegate.claudeCode.statistics)
+        }
+        .defaultSize(width: 460, height: 680)
+        .defaultLaunchBehavior(.suppressed)
+        .restorationBehavior(.disabled)
     }
 }

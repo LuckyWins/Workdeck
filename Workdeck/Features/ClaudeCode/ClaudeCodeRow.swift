@@ -19,9 +19,14 @@ struct ClaudeCodeRow: View {
                     .font(.caption)
                     .foregroundStyle(controller.limits.connectError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Chats…") {
-                    openWindow(id: ChatsWindow.id)
-                    NSApp.activate()
+                HStack(spacing: 10) {
+                    Button("Chats…") {
+                        openWindow(id: ChatsWindow.id)
+                        NSApp.activate()
+                    }
+                    Button("Statistics…") {
+                        controller.openStatistics(week: nil)
+                    }
                 }
                 .buttonStyle(.link)
                 .font(.caption)

@@ -105,6 +105,11 @@ final class FakePresenter: LimitsPresenting {
     func setRecapDismissAction(_ action: @escaping () -> Void) {
         recapDismissAction = action
     }
+
+    private(set) var recapDetailsAction: (() -> Void)?
+    func setRecapDetailsAction(_ action: @escaping () -> Void) {
+        recapDetailsAction = action
+    }
 }
 
 @MainActor
