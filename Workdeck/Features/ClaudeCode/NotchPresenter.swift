@@ -90,14 +90,21 @@ final class NotchPresenter: LimitsPresenting {
     private let rebuildDelay: Duration
     private let workspaceSettleDelay: Duration
     private var surface: (any NotchSurface)?
-    private var isHovering = false
+    private var isHovering = false {
+        didSet {
+            if model.isHovering != isHovering {
+                model.isHovering = isHovering
+            }
+        }
+    }
     private var flashTask: Task<Void, Never>?
     private var flashCount = 0
     /// A flash waiting for the notch to settle; a new one merges into it.
     private var pendingFlash: NotchFlashEvent?
     private var isShowingAlert = false
     private var pendingAlerts: [LimitsAlert] = []
-    private var isAlertExtended = false
+    /// When the shown alerts close; an alert that joins them moves it to a full `alertDuration` from then.
+    private var alertDeadline: ContinuousClock.Instant?
     private var alertTask: Task<Void, Never>?
     private var reconcileTask: Task<Void, Never>?
     private var rebuildTask: Task<Void, Never>?
@@ -258,7 +265,7 @@ final class NotchPresenter: LimitsPresenting {
         guard screen() != nil else { return }
         if isShowingAlert {
             model.alerts.append(contentsOf: alerts)
-            isAlertExtended = true
+            restartAlertTime()
             return
         }
         pendingAlerts.append(contentsOf: alerts)
@@ -273,18 +280,27 @@ final class NotchPresenter: LimitsPresenting {
                 model.alerts = pendingAlerts
                 pendingAlerts.removeAll()
                 isShowingAlert = true
+                restartAlertTime()
                 requestReconcile()
-                repeat {
-                    isAlertExtended = false
-                    try? await Task.sleep(for: alertDuration)
-                } while isAlertExtended && screen() != nil
+                // Sleeps to the deadline; a joining alert moves it, and the loop sleeps again.
+                while let deadline = alertDeadline, ContinuousClock.now < deadline, screen() != nil, !Task.isCancelled {
+                    try? await Task.sleep(until: deadline, clock: .continuous)
+                }
             }
             pendingAlerts.removeAll()
+            alertDeadline = nil
+            model.countdown = nil
             model.alerts = []
             isShowingAlert = false
             alertTask = nil
             requestReconcile()
         }
+    }
+
+    /// Shows the alerts a full `alertDuration` from now, with the countdown from full.
+    private func restartAlertTime() {
+        alertDeadline = .now + alertDuration
+        model.countdown = NotchCountdown(start: Date(), duration: alertDuration)
     }
 
     func showRecap(_ recap: WeeklyRecapSummary?) {
@@ -303,9 +319,11 @@ final class NotchPresenter: LimitsPresenting {
             isShowingRecap = true
             requestReconcile()
             repeat {
+                model.countdown = NotchCountdown(start: Date(), duration: recapDuration)
                 try? await Task.sleep(for: recapDuration)
             } while isHovering && !Task.isCancelled
             guard !Task.isCancelled else { return }
+            model.countdown = nil
             isShowingRecap = false
             recapTask = nil
             requestReconcile()
@@ -324,6 +342,7 @@ final class NotchPresenter: LimitsPresenting {
         recapTask?.cancel()
         recapTask = nil
         if isShowingRecap {
+            model.countdown = nil
             isShowingRecap = false
             requestReconcile()
         }

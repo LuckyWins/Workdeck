@@ -15,8 +15,6 @@ nonisolated struct StepRow: Equatable, Sendable, Identifiable {
     var lines: LineCounts?
     /// 0 for the current step, 1 for the one before, 2 for the oldest.
     var age: Int
-    /// The current step bright, earlier ones all as faint as `Terminal.faint`, so they never look like an agent's action.
-    var opacity: Double
 }
 
 /// The turn's edits, the last line of a session's block (spec §3.4).
@@ -162,8 +160,7 @@ nonisolated enum SessionsPresentation {
                 id: step.toolUseID ?? "\(step.at.timeIntervalSince1970) \(step.action)",
                 action: step.action,
                 lines: step.lines,
-                age: age,
-                opacity: age == 0 ? 1 : 0.25
+                age: age
             )
         }
     }

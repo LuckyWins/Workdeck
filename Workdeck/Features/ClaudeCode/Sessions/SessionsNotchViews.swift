@@ -84,6 +84,7 @@ struct SessionsList: View {
     let onActivate: (String) -> Void
 
     @State private var hoveredID: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         TimelineView(.animation(minimumInterval: TerminalSpinner.frameInterval)) { context in
@@ -113,7 +114,8 @@ struct SessionsList: View {
             }
             .animation(.snappy, value: state.rows.map(\.id))
             .animation(.snappy, value: state.rows.flatMap { $0.agents.map(\.id) })
-            .animation(.snappy, value: state.rows.map { $0.steps.map(\.id) })
+            // Rows below a growing ticker slide with it (notch polish spec §4).
+            .animation(reduceMotion ? nil : .timingCurve(0.4, 0, 0.2, 1, duration: 0.38), value: state.rows.map { $0.steps.map(\.id) })
             .animation(.snappy, value: state.rows.map(\.isFocused))
             .animation(.snappy, value: state.rows.map { [$0.actionLines, $0.turn?.lines] + $0.steps.map(\.lines) + $0.agents.map(\.actionLines) })
         }
@@ -155,10 +157,30 @@ struct SessionsList: View {
                     .foregroundStyle(isHovered ? Terminal.text : Terminal.dim)
                     .frame(minWidth: 44, alignment: .trailing)
             }
-            ForEach(row.steps) { step in
-                stepView(step)
-                    // A new step slides in at the bottom; the oldest fades out where it is, at the top (spec §3.5).
-                    .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .bottom)), removal: .opacity))
+            if !row.steps.isEmpty {
+                VStack(alignment: .leading, spacing: 1) {
+                    ForEach(row.steps) { step in
+                        stepView(step, at: date)
+                            // A new step slides in from below; the oldest rises and fades out (notch polish spec §4).
+                            .transition(reduceMotion ? .opacity : .asymmetric(
+                                insertion: .opacity.combined(with: .move(edge: .bottom)),
+                                removal: .opacity.combined(with: .move(edge: .top))
+                            ))
+                    }
+                }
+                .padding(.vertical, 2)
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: .black, location: 0.16),
+                            .init(color: .black, location: 0.92),
+                            .init(color: .clear, location: 1),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
             }
             ForEach(Array(row.agents.enumerated()), id: \.element.id) { index, agent in
                 agentView(agent, isLast: index == row.agents.count - 1 && row.hiddenAgentCount == 0, at: date)
@@ -194,24 +216,53 @@ struct SessionsList: View {
         row.status == .working && !row.isFocused && row.action != nil
     }
 
-    /// One ticker line, lined up with the project name: the current step bright with `▸`, older ones dimmer (spec §3.2).
-    private func stepView(_ step: StepRow) -> some View {
-        HStack(spacing: 6) {
+    /// One ticker line, lined up with the project name: the current step bright with `▸` and a shimmer, finished
+    /// ones faint with `✓`, a little smaller and to the left (notch polish spec §4).
+    private func stepView(_ step: StepRow, at date: Date) -> some View {
+        let isCurrent = step.age == 0
+        return HStack(spacing: 6) {
             // Takes the status dot's width.
             Text("●").hidden()
             HStack(spacing: 6) {
-                Text(step.age == 0 ? "▸" : "·")
-                Text(step.action)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                // Only the mark and text step back; the counts keep their column.
+                HStack(spacing: 6) {
+                    Text(SessionsText.stepMark(step))
+                        .foregroundStyle(isCurrent ? Terminal.text : Terminal.faint)
+                    stepText(step, isCurrent: isCurrent, at: date)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .scaleEffect(isCurrent || reduceMotion ? 1 : 0.92, anchor: .leading)
+                .offset(x: isCurrent || reduceMotion ? 0 : -4)
                 Spacer(minLength: 6)
                 if let lines = step.lines {
                     LineCountsText(lines: lines)
+                        .opacity(isCurrent ? 1 : 0.4)
                 }
             }
             .font(Terminal.font(10))
-            .foregroundStyle(Terminal.text)
-            .opacity(step.opacity)
+        }
+    }
+
+    @ViewBuilder
+    private func stepText(_ step: StepRow, isCurrent: Bool, at date: Date) -> some View {
+        if isCurrent && !reduceMotion {
+            let phase = TickerShimmer.phase(at: date)
+            Text(step.action)
+                .foregroundStyle(
+                    LinearGradient(
+                        stops: [
+                            .init(color: Terminal.dim, location: 0),
+                            .init(color: Terminal.text, location: 0.5),
+                            .init(color: Terminal.dim, location: 1),
+                        ],
+                        startPoint: UnitPoint(x: phase - 0.3, y: 0.5),
+                        endPoint: UnitPoint(x: phase + 0.3, y: 0.5)
+                    )
+                )
+        } else {
+            Text(step.action)
+                .foregroundStyle(isCurrent ? Terminal.text : Terminal.faint)
         }
     }
 

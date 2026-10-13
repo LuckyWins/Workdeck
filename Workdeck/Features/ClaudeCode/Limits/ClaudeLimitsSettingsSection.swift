@@ -56,7 +56,7 @@ struct ClaudeLimitsSettingsSection: View {
                 Toggle("Forecast when limits run out", isOn: $settings.showForecast)
             }
         } header: {
-            Text("Claude Code · Limits")
+            SettingsHeader("Claude Code · Limits", symbol: "gauge.with.dots.needle.50percent", color: .orange)
         } footer: {
             VStack(alignment: .leading, spacing: 6) {
                 Text(footer)

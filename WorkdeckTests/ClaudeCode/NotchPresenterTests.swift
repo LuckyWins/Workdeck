@@ -676,6 +676,106 @@ struct NotchPresenterTests {
         #expect(opened == ["vitastir"])
     }
 
+    private func waitFor(_ condition: () -> Bool) async {
+        while !condition() {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func theCountdownEndsWithTheAlert() async throws {
+        let (presenter, _) = makePresenter(alertDuration: .milliseconds(300))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.flash([.sessionFinished(project: "a", worked: 60)])
+        await waitFor { !presenter.model.alerts.isEmpty }
+        let countdown = try #require(presenter.model.countdown)
+        #expect(abs(countdown.end.timeIntervalSince(countdown.start) - 0.3) < 0.001)
+        await waitFor { presenter.model.alerts.isEmpty }
+        #expect(presenter.model.countdown == nil)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aJoiningAlertRestartsTheCountdown() async throws {
+        let (presenter, _) = makePresenter(alertDuration: .milliseconds(400))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.flash([.sessionFinished(project: "a", worked: 60)])
+        await waitFor { !presenter.model.alerts.isEmpty }
+        let first = try #require(presenter.model.countdown)
+        try? await Task.sleep(for: .milliseconds(200))
+        presenter.flash([.sessionFinished(project: "b", worked: 60)])
+        await waitFor { presenter.model.alerts.count == 2 }
+        let joined = Date()
+        let second = try #require(presenter.model.countdown)
+        #expect(second.start.timeIntervalSince(first.start) > 0.15)
+        await waitFor { presenter.model.alerts.isEmpty }
+        // Up a full alert time from the join, not the first alert's time plus another one.
+        let shown = Date().timeIntervalSince(joined)
+        #expect(shown >= 0.35)
+        // The old rule (the current interval, then one more) would close about 0.6 s after this join.
+        #expect(shown < 0.55)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func theRecapCountsDownItsMinute() async throws {
+        let (presenter, _) = makePresenter(recapDuration: .milliseconds(300))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.showRecap(recap())
+        await waitFor { presenter.model.countdown != nil }
+        let countdown = try #require(presenter.model.countdown)
+        #expect(abs(countdown.end.timeIntervalSince(countdown.start) - 0.3) < 0.001)
+        await waitFor { !presenter.isBusy }
+        #expect(presenter.model.countdown == nil)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aHoveredRecapRestartsItsCountdown() async throws {
+        let (presenter, _) = makePresenter(recapDuration: .milliseconds(200))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.showRecap(recap())
+        await waitFor { presenter.model.countdown != nil }
+        let first = try #require(presenter.model.countdown)
+        surface.onHoverChange?(true)
+        // Still hovered when the minute ends: another full one starts.
+        await waitFor { (presenter.model.countdown?.start ?? first.start) > first.start }
+        let second = try #require(presenter.model.countdown)
+        #expect(abs(second.end.timeIntervalSince(second.start) - 0.2) < 0.001)
+        surface.onHoverChange?(false)
+        await waitFor { presenter.model.countdown == nil }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func needsYouEndsTheRecapsCountdown() async {
+        let (presenter, _) = makePresenter(alertDuration: .milliseconds(200), recapDuration: .seconds(30))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.showRecap(recap())
+        await waitFor { presenter.model.countdown != nil }
+        presenter.flash([.sessionNeedsYou(project: "a")])
+        await waitFor { !presenter.model.alerts.isEmpty }
+        // The alert's own countdown replaced the recap's minute.
+        let countdown = presenter.model.countdown
+        #expect(countdown.map { $0.end.timeIntervalSince($0.start) < 1 } == true)
+        await waitFor { presenter.model.alerts.isEmpty }
+        #expect(presenter.model.countdown == nil)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func theModelFollowsTheDelayedHover() async {
+        let (presenter, _) = makePresenter(hoverEnterDelay: .milliseconds(100), hoverExitDelay: .milliseconds(100))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        surface.onHoverChange?(true)
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(!presenter.model.isHovering)
+        await waitFor { presenter.model.isHovering }
+        surface.onHoverChange?(false)
+        await waitFor { !presenter.model.isHovering }
+    }
+
     private func recap() -> WeeklyRecapSummary {
         WeeklyRecapSummary(weekStart: fixedNow, seconds: 3600, sessions: 2)
     }

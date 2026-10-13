@@ -54,4 +54,11 @@ struct TerminalStyleTests {
         #expect(abs(opacity(0.5) - 0.7) < 0.001)
         #expect(abs(opacity(2) - 1) < 0.001)
     }
+
+    @Test func stepMarks() {
+        #expect(SessionsText.stepMark(StepRow(id: "a", action: "Read A", lines: nil, age: 0)) == "▸")
+        #expect(SessionsText.stepMark(StepRow(id: "b", action: "Read B", lines: nil, age: 1)) == "✓")
+        // Waiting for an agent: no current step, every shown step is done.
+        #expect(SessionsText.stepMark(StepRow(id: "c", action: "Read C", lines: nil, age: 3)) == "✓")
+    }
 }

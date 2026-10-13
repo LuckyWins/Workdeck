@@ -138,7 +138,7 @@ struct SessionsPresentationTests {
         let steps = try #require(SessionsPresentation.viewState(sessions: [main], now: fixedNow).rows.first?.steps)
         #expect(steps.map(\.age) == [2, 1, 0])
         // Earlier steps share the faintest shade, so they never match an agent's current action.
-        #expect(steps.map(\.opacity) == [0.25, 0.25, 1])
+        #expect(steps.map(SessionsText.stepMark) == ["✓", "✓", "▸"])
         #expect(steps.map(\.lines) == [nil, LineCounts(added: 6, removed: 2), nil])
         #expect(steps.map(\.id) == ["t1", "t2", "\(fixedNow.addingTimeInterval(2).timeIntervalSince1970) Bash ls"])
     }
@@ -153,7 +153,7 @@ struct SessionsPresentationTests {
         ]
         let waiting = try #require(SessionsPresentation.viewState(sessions: [main], now: fixedNow).rows.first?.steps)
         #expect(waiting.map(\.action) == ["Read x.swift", "Bash ls"])
-        #expect(waiting.allSatisfy { $0.age > 0 && $0.opacity == 0.25 })
+        #expect(waiting.allSatisfy { $0.age > 0 && SessionsText.stepMark($0) == "✓" })
         // The main agent goes on (e.g. after a background agent): its new step is current again.
         main.steps = [
             SessionStep(toolUseID: "t2", action: "Bash ls", at: fixedNow.addingTimeInterval(1)),

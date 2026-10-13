@@ -40,7 +40,7 @@ struct ClaudeSessionsSettingsSection: View {
                 }
             }
         } header: {
-            Text("Claude Code · Sessions")
+            SettingsHeader("Claude Code · Sessions", symbol: "terminal.fill", color: .green)
         } footer: {
             Text(footer)
                 .foregroundStyle(controller.hooksError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))

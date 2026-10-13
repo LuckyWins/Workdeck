@@ -110,7 +110,7 @@ Files are told apart by name: two files with the same name in different folders 
 
 ### 3.5 Motion
 
-- A new step slides in at the bottom of the ticker and the oldest fades out at the top (`.snappy`, keyed by step).
+- A new step slides in at the bottom of the ticker and the oldest fades out at the top (`.snappy`, keyed by step). Since 2026-10-13 the ticker's motion follows `specs/2026-10-13-notch-polish-design.md` §4.
 - Counts fade in when the edit lands.
 - When focus moves, the old session's ticker collapses and the new one expands.
 - No frames run for this beyond the expanded notch's existing timeline.

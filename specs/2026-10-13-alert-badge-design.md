@@ -22,7 +22,7 @@ Chosen in the browser among a top glow on the panel, a glowing mark, both, and t
  ╰──╯   permission prompt
 ```
 
-- **Badge:** an 18 pt circle filled with the alert's color at about 18 % opacity, the mark (`!` or `✓`) in the color, bold, and a soft glow around the circle in the color.
+- **Badge:** an 18 pt circle filled with the alert's color at about 18 % opacity, the mark (`!` or `✓`) in the color, bold, and a soft glow around the circle in the color. The expanded alert also gets a wash from below and a countdown bar (`specs/2026-10-13-notch-polish-design.md`).
 - **Pulse:** the glow swells and settles three times over about 4.8 s (1.6 s each), then stays at its resting strength while the alert is shown. It starts when the alert appears. A single alert that another joins becomes a batch and its badge pulses anew (the new alert also keeps the notch up longer); a batch that grows further does not restart it. With Reduce Motion on, the badge rests at its glow without pulsing.
 - **Colors** are the flash colors (`NotchFlash.color(of:thresholds:)`): orange for "needs you" and the first threshold, red for the second (highest) threshold, green for "finished" and a reset.
 - **Single alert:** its mark is the badge.

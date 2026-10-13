@@ -23,7 +23,7 @@ struct InstancesSettingsSection: View {
                 }
             }
         } header: {
-            Text("Claude Code · Instances")
+            SettingsHeader("Claude Code · Instances", symbol: "person.2.fill", color: .blue)
         } footer: {
             Text("Each instance has its own login, settings, skills and plugins. Workdeck does not copy them.")
                 .foregroundStyle(.secondary)

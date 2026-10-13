@@ -11,11 +11,13 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("General") {
+            Section {
                 Toggle("Launch at login", isOn: Binding(
                     get: { settings.launchAtLogin },
                     set: { settings.setLaunchAtLogin($0) }
                 ))
+            } header: {
+                SettingsHeader("General", symbol: "gearshape.fill", color: .gray)
             }
 
             Section {
@@ -28,7 +30,7 @@ struct SettingsView: View {
                     helperStatus
                 }
             } header: {
-                Text("Closed-Lid Mode")
+                SettingsHeader("Closed-Lid Mode", symbol: "laptopcomputer", color: .indigo)
             } footer: {
                 Text("Also turns off if the Mac gets too hot.")
                     .foregroundStyle(.secondary)
@@ -47,7 +49,7 @@ struct SettingsView: View {
                     .disabled(diagnosticsState == .copying)
                 }
             } header: {
-                Text("About")
+                SettingsHeader("About", symbol: "info.circle.fill", color: .gray)
             } footer: {
                 Text("Copies Workdeck's recent log and current state, without prompts, answers or tool details, for troubleshooting.")
                     .foregroundStyle(.secondary)

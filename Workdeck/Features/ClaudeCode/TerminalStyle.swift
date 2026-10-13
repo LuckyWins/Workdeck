@@ -161,3 +161,59 @@ extension View {
         modifier(FlashMark(event: event, color: color, blinks: blinks, mark: mark))
     }
 }
+
+/// The current step's shimmer: a light band crossing the text every `period` (notch polish spec §4).
+nonisolated enum TickerShimmer {
+    static let period: TimeInterval = 2.2
+
+    /// The band's center across the text, from −0.3 (before it) to 1.3 (past it).
+    static func phase(at date: Date) -> Double {
+        let progress = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period
+        return -0.3 + 1.6 * progress
+    }
+}
+
+/// A soft glow rising from below the expanded notch's bottom edge in an alert's color (notch polish spec §2).
+/// Drawn past the content's insets; the notch's own mask clips it to the panel.
+struct NotchWash: View {
+    /// Past the side insets to the notch's sides; the mask clips the rest.
+    static let sideReach: CGFloat = 40
+    /// DynamicNotchKit's bottom content inset: the gradient's frame ends at the notch's bottom edge.
+    static let bottomInset: CGFloat = 15
+
+    let color: Color
+
+    var body: some View {
+        EllipticalGradient(
+            colors: [color.opacity(0.6), color.opacity(0)],
+            center: UnitPoint(x: 0.5, y: 1.25),
+            startRadiusFraction: 0,
+            endRadiusFraction: 0.75
+        )
+        .padding(.horizontal, -Self.sideReach)
+        .padding(.bottom, -Self.bottomInset)
+        .allowsHitTesting(false)
+    }
+}
+
+/// A thin bar that shrinks to nothing when the notch closes the alert or recap (notch polish spec §3).
+/// Drawn from the clock on each frame, so a restarted countdown or a recreated view always shows the time left.
+struct CountdownBar: View {
+    static let fullWidth: CGFloat = 160
+
+    let countdown: NotchCountdown
+
+    static func width(of countdown: NotchCountdown, at date: Date) -> CGFloat {
+        fullWidth * countdown.fraction(at: date)
+    }
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
+            Capsule()
+                .fill(.white.opacity(0.35))
+                .frame(width: Self.width(of: countdown, at: context.date), height: 2)
+                .frame(width: Self.fullWidth)
+        }
+        .allowsHitTesting(false)
+    }
+}

@@ -13,6 +13,10 @@ final class LimitsNotchModel {
     }
     /// Last week's recap while it is pending: shown when the notch expands, `◆` on the compact notch (recap spec §3.2).
     var recap: WeeklyRecapSummary?
+    /// The time left of the expanded alert or recap, for the countdown bar (notch polish spec §3).
+    var countdown: NotchCountdown?
+    /// The pointer is on the notch, after the hover delays; the countdown bar hides meanwhile.
+    var isHovering = false
     @ObservationIgnored var onRefresh: (() -> Void)?
     @ObservationIgnored var onActivateSession: ((String) -> Void)?
     @ObservationIgnored var onActivateProject: ((String) -> Void)?
@@ -114,6 +118,7 @@ struct LimitsExpandedView: View {
     @State private var isToggleHovered = false
     /// Which alert line the pointer is over, for clickable alerts.
     @State private var hoveredAlert: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Cells in a usage bar; with the percent and reset time a row stays within about 40 characters.
     static let barWidth = 16
@@ -139,7 +144,33 @@ struct LimitsExpandedView: View {
         .foregroundStyle(Terminal.text)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+        .background {
+            // The animation stays on the wash: content swaps follow DynamicNotchKit's own resizing.
+            ZStack {
+                if let wash = washColor {
+                    NotchWash(color: wash)
+                        .transition(.opacity)
+                }
+            }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: washColor)
+        }
+        .overlay(alignment: .bottom) {
+            if let countdown = model.countdown, !model.isHovering, !reduceMotion {
+                CountdownBar(countdown: countdown)
+                    // 7–9 pt above the notch's bottom edge, inside DynamicNotchKit's 15 pt inset.
+                    .offset(y: 8)
+                    .transition(.opacity)
+            }
+        }
         .frame(width: 300, alignment: .leading)
+    }
+
+    /// The wash under an expanded alert, a batch or the recap; none in the usual view (notch polish spec §2).
+    private var washColor: Color? {
+        if !model.alerts.isEmpty {
+            return NotchFlash.color(of: model.alerts, thresholds: model.state.thresholds)?.color
+        }
+        return model.recap != nil ? .indigo : nil
     }
 
     private func alertView(_ alert: LimitsAlert) -> some View {

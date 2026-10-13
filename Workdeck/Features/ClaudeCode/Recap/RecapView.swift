@@ -79,7 +79,8 @@ struct RecapView: View {
 
     private func header(_ title: String) -> some View {
         HStack(spacing: 6) {
-            Text("─ \(title)")
+            // The rule takes what is left; the title never wraps.
+            Text("─ \(title)").fixedSize()
             Rectangle().fill(Terminal.faint).frame(height: 1)
         }
         .foregroundStyle(Terminal.dim)

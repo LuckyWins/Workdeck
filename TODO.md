@@ -37,6 +37,7 @@ Ideas from [Coucou](https://github.com/Louis-CFM/coucou), a similar MIT-licensed
 - **Answer `AskUserQuestion` from the notch (low priority).** Options as buttons, single and multiple choice. Same hook mechanism as above. Real questions are often long or visual, so the terminal stays the better place for most of them.
 - **Demo mode.** A scripted session with limits, sessions, agents and alerts, without Claude Code and without writing anything to disk. For README screenshots and GIFs and for checking the notch layout.
 - **Flash or expand, per alert type.** A Settings choice for each alert (limit threshold, limit reset, session finished, needs you): only flash the compact notch, or expand it with the alert's text as before. Today every alert expands, then flashes (`specs/2026-10-13-notch-flash-design.md` §2.1).
+- **Countdown bar over the wash.** On an expanded alert the countdown bar (white, 35 %) sits inside the color wash rising from the bottom edge and blends into it, especially on the orange and green washes (`specs/2026-10-13-notch-polish-design.md` §2–§3). Find a way to keep it readable: a darker track under the bar, moving it above the wash's brightest part, a contrasting color, or a weaker wash near the bar.
 - **Small things:**
   - choose the display for the notch (real or virtual);
   - keyboard shortcuts: expand or collapse the notch, open the latest session;

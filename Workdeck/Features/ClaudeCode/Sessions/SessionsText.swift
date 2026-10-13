@@ -2,6 +2,11 @@ import Foundation
 
 /// User-facing strings for Claude Code Sessions.
 nonisolated enum SessionsText {
+    /// The current step's `▸`; a finished one's `✓` (notch polish spec §4).
+    static func stepMark(_ step: StepRow) -> String {
+        step.age == 0 ? "▸" : "✓"
+    }
+
     static func statusText(_ status: SessionStatus) -> String {
         switch status {
         case .working: "working"
