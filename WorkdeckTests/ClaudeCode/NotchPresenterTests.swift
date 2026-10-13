@@ -127,13 +127,25 @@ struct NotchPresenterTests {
         #expect(NotchPresenter.target(display: display, isHovering: hovering, isShowingAlert: alert, hasScreen: screen, hidesResting: hidesResting) == expected)
     }
 
-    @Test func aFlashNeverExpands() async {
+    @Test(.timeLimit(.minutes(1)))
+    func everyAlertExpandsWithItsTextThenFlashesTheCompactNotch() async {
+        // Every alert expands with its text again, and its ring or dot flash still plays once the alert closes.
+        var targetsWhileFlashing: [NotchTarget] = []
+        let alerts: [LimitsAlert] = [.sessionFinished(project: "a", worked: 60), .threshold(window(.fiveHour, 81), threshold: 80), .reset([.sevenDay])]
         let (presenter, _) = makePresenter()
         presenter.show(state(.notch(.normal)))
         await settle(presenter)
-        presenter.flash([.sessionFinished(project: "a", worked: 60), .threshold(window(.fiveHour, 81), threshold: 80), .reset([.sevenDay])])
-        await settle(presenter)
-        #expect(!surface.calls.contains("expand"))
+        presenter.flash(alerts)
+        while presenter.isBusy {
+            if presenter.model.flash != nil {
+                targetsWhileFlashing.append(presenter.appliedTarget)
+            }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(surface.alertsAtExpand == [alerts])
+        // The flash plays only once the alert has closed, never while it is expanded.
+        #expect(!targetsWhileFlashing.isEmpty)
+        #expect(targetsWhileFlashing.allSatisfy { $0 == .compact })
         #expect(presenter.appliedTarget == .compact)
     }
 
@@ -144,7 +156,7 @@ struct NotchPresenterTests {
         await settle(presenter)
         presenter.flash([.sessionFinished(project: "a", worked: 60), .sessionNeedsYou(project: "vitastir")])
         await settle(presenter)
-        #expect(surface.alertsAtExpand == [[.sessionNeedsYou(project: "vitastir")]])
+        #expect(surface.alertsAtExpand == [[.sessionFinished(project: "a", worked: 60), .sessionNeedsYou(project: "vitastir")]])
         #expect(presenter.appliedTarget == .compact)
         #expect(presenter.model.alerts.isEmpty)
     }

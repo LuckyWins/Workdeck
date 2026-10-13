@@ -92,8 +92,9 @@ Files are told apart by name: two files with the same name in different folders 
 
 - The focused session is the first working or compacting session in display order: the one that most recently started working. It changes only when that session stops or another starts working, never on each action.
 - Its row shows the status (`working`, `compacting`) on the right instead of the action.
-- Under the row, up to three step lines in the agents' small font, indented to the project name: the oldest in `Terminal.faint` with `·`, the middle one in `Terminal.dim` with `·`, the current one in `Terminal.text` with `▸`. With fewer steps, fewer lines; with none (thinking before the first tool call), none.
+- Under the row, up to three step lines in the agents' small font, indented to the project name: earlier ones in `Terminal.faint` with `·` (changed 2026-10-13: a dim middle step looked like an agent's current action), the current one in `Terminal.text` with `▸`. With fewer steps, fewer lines; with none (thinking before the first tool call), none.
 - A session waiting for you is never focused; nothing working means no ticker.
+- Agent launches (`Agent …`, `Task …`) stay out of the ticker: the agent cards show them (changed 2026-10-13). While the latest step launched an agent, no step is marked current; the next step of the main agent is current again.
 
 ### 3.3 Counts
 

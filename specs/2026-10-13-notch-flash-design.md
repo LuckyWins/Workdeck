@@ -42,6 +42,8 @@ The place tells where an alert comes from, the color how urgent it is (changed a
 - Without a limits source the ring is not drawn; limit alerts cannot fire then.
 - The rules for when an alert fires are unchanged: thresholds, "Notify when a limit resets", "Notify when a session finishes" with its minimum time, "Notify when a session needs you", and skipping session alerts while that session's app is in front. They now decide flashes.
 
+- **Every alert expands again** (amended 2026-10-13, after living with the flashes): each alert expands the notch with its text for about 6 s, as "needs you" does (thresholds and resets open Chats on click, finished opens the project), alerts arriving together form one batch, and the ring or dot flash plays on the compact notch once the alert closes. The rules for when an alert fires are unchanged. The mark of the expanded alert is a glowing badge (specs/2026-10-13-alert-badge-design.md).
+
 ### 2.2 Look and Timing
 
 - One pulse of about 1.5 s: the ring's stroke or the dot takes the flash color with a soft glow around it, then returns to its own color. "Needs you" blinks the dot three times within the same time. Plays once; never repeats.

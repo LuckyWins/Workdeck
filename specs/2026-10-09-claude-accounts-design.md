@@ -79,8 +79,8 @@ Fired alert keys are kept per account: the main account keeps `claudeLimits.fire
 ### 4.4 Alerts
 
 - Threshold and reset alerts are evaluated per account with the shared settings. With two or more accounts with data, the title names the account: `7d limit at 95% · main`.
-- Limit alerts flash the notch's ring and are not clickable (`specs/2026-10-13-notch-flash-design.md`); the code that opened Chats from them stays for later notifications.
-- Session alerts do not name the account, since the project already tells sessions apart. "Needs you" keeps its text and click (open the project's window); "finished" flashes the session dot (`specs/2026-10-13-notch-flash-design.md`).
+- Limit alerts expand the notch with their text (a click opens Chats on that account's latest session), then flash the notch's ring (`specs/2026-10-13-notch-flash-design.md` §2.1, amended 2026-10-13: for a few days they only flashed).
+- Session alerts do not name the account, since the project already tells sessions apart. "Needs you" and "finished" expand the notch with their text and click (open the project's window), then flash the session dot (`specs/2026-10-13-notch-flash-design.md` §2.1).
 
 ### 4.5 Chats Window
 

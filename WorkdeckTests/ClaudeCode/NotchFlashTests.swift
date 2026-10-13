@@ -70,4 +70,15 @@ struct NotchFlashTests {
     @Test func noAlertsNoFlash() {
         #expect(NotchFlash.event(for: [], thresholds: thresholds, id: 1) == nil)
     }
+
+    @Test func aBatchTakesItsMostUrgentColor() {
+        let finished = LimitsAlert.sessionFinished(project: "a", worked: 60)
+        let needsYou = LimitsAlert.sessionNeedsYou(project: "a")
+        let second = LimitsAlert.threshold(window(.fiveHour, 96), threshold: 95)
+        #expect(NotchFlash.color(of: [finished, needsYou], thresholds: thresholds) == .orange)
+        #expect(NotchFlash.color(of: [finished, second, needsYou], thresholds: thresholds) == .red)
+        #expect(NotchFlash.color(of: [finished, .reset([.sevenDay])], thresholds: thresholds) == .green)
+        #expect(NotchFlash.color(of: [], thresholds: thresholds) == nil)
+    }
+
 }

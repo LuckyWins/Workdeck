@@ -15,7 +15,7 @@ nonisolated struct StepRow: Equatable, Sendable, Identifiable {
     var lines: LineCounts?
     /// 0 for the current step, 1 for the one before, 2 for the oldest.
     var age: Int
-    /// The current step bright, older ones as `Terminal.dim` and `Terminal.faint` are to `Terminal.text`.
+    /// The current step bright, earlier ones all as faint as `Terminal.faint`, so they never look like an agent's action.
     var opacity: Double
 }
 
@@ -150,18 +150,27 @@ nonisolated enum SessionsPresentation {
         )
     }
 
+    /// The ticker without agent launches, which the agent cards show. While the latest step launched an agent, no step
+    /// is current: the agent is what runs now.
     static func stepRows(_ steps: [SessionStep]) -> [StepRow] {
         let recent = Array(steps.suffix(ClaudeSession.maxSteps))
-        return recent.enumerated().map { index, step in
-            let age = recent.count - 1 - index
+        let shown = recent.filter { !launchesAgent($0.action) }
+        let waitsForAgent = recent.last.map { launchesAgent($0.action) } ?? false
+        return shown.enumerated().map { index, step in
+            let age = shown.count - 1 - index + (waitsForAgent ? 1 : 0)
             return StepRow(
                 id: step.toolUseID ?? "\(step.at.timeIntervalSince1970) \(step.action)",
                 action: step.action,
                 lines: step.lines,
                 age: age,
-                opacity: pow(0.5, Double(age))
+                opacity: age == 0 ? 1 : 0.25
             )
         }
+    }
+
+    /// "Agent Explore", "Task": the actions `HookPayloadFilter` gives the Agent and Task tools.
+    static func launchesAgent(_ action: String) -> Bool {
+        ["Agent", "Task"].contains { action == $0 || action.hasPrefix($0 + " ") }
     }
 
     static func turnRow(_ session: ClaudeSession) -> TurnRow? {

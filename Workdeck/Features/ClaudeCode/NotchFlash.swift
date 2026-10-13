@@ -27,7 +27,7 @@ nonisolated struct NotchFlashEvent: Equatable, Sendable {
     var startedAt = Date.distantPast
 }
 
-/// Alerts flash the compact notch once instead of expanding it (spec `2026-10-13-notch-flash-design.md`).
+/// The flash an alert plays on the compact notch once its expanded text closes (spec `2026-10-13-notch-flash-design.md`).
 nonisolated enum NotchFlash {
     static let duration: Duration = .milliseconds(1500)
 
@@ -38,6 +38,11 @@ nonisolated enum NotchFlash {
         case let .threshold(_, threshold, _):
             thresholds.count > 1 && threshold >= (thresholds.max() ?? .max) ? .red : .orange
         }
+    }
+
+    /// The most urgent color of alerts shown together (alert badge spec §2); `nil` for none.
+    static func color(of alerts: [LimitsAlert], thresholds: [Int]) -> NotchFlashColor? {
+        alerts.map { color(of: $0, thresholds: thresholds) }.max()
     }
 
     static func event(for alerts: [LimitsAlert], thresholds: [Int], id: Int) -> NotchFlashEvent? {

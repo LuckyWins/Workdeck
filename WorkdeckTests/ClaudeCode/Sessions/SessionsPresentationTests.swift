@@ -137,9 +137,32 @@ struct SessionsPresentationTests {
         ]
         let steps = try #require(SessionsPresentation.viewState(sessions: [main], now: fixedNow).rows.first?.steps)
         #expect(steps.map(\.age) == [2, 1, 0])
-        #expect(steps.map(\.opacity) == [0.25, 0.5, 1])
+        // Earlier steps share the faintest shade, so they never match an agent's current action.
+        #expect(steps.map(\.opacity) == [0.25, 0.25, 1])
         #expect(steps.map(\.lines) == [nil, LineCounts(added: 6, removed: 2), nil])
         #expect(steps.map(\.id) == ["t1", "t2", "\(fixedNow.addingTimeInterval(2).timeIntervalSince1970) Bash ls"])
+    }
+
+    @Test func agentLaunchesStayOutOfTheTickerAndMarkNoStepCurrent() throws {
+        // The agent card shows the launched agent; a "▸ Agent" line would only repeat it.
+        var main = session("a", .working)
+        main.steps = [
+            SessionStep(toolUseID: "t1", action: "Read x.swift", at: fixedNow),
+            SessionStep(toolUseID: "t2", action: "Bash ls", at: fixedNow.addingTimeInterval(1)),
+            SessionStep(toolUseID: "t3", action: "Agent Explore", at: fixedNow.addingTimeInterval(2)),
+        ]
+        let waiting = try #require(SessionsPresentation.viewState(sessions: [main], now: fixedNow).rows.first?.steps)
+        #expect(waiting.map(\.action) == ["Read x.swift", "Bash ls"])
+        #expect(waiting.allSatisfy { $0.age > 0 && $0.opacity == 0.25 })
+        // The main agent goes on (e.g. after a background agent): its new step is current again.
+        main.steps = [
+            SessionStep(toolUseID: "t2", action: "Bash ls", at: fixedNow.addingTimeInterval(1)),
+            SessionStep(toolUseID: "t3", action: "Task", at: fixedNow.addingTimeInterval(2)),
+            SessionStep(toolUseID: "t4", action: "TaskOutput", at: fixedNow.addingTimeInterval(3)),
+        ]
+        let goingOn = try #require(SessionsPresentation.viewState(sessions: [main], now: fixedNow).rows.first?.steps)
+        #expect(goingOn.map(\.action) == ["Bash ls", "TaskOutput"])
+        #expect(goingOn.map(\.age) == [1, 0])
     }
 
     @Test func rowsAndAgentsCarryTheirActionCounts() throws {

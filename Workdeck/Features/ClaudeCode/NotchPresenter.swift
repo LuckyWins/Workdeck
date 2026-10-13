@@ -6,7 +6,7 @@ import SwiftUI
 protocol LimitsPresenting: AnyObject {
     /// The resting state: compact notch, hidden, or menu bar text (which the presenter ignores).
     func show(_ state: LimitsViewState)
-    /// Flashes the notch once for alerts that happened together; only "needs you" also expands it with its text
+    /// Expands the notch with the text of alerts that happened together, then flashes its ring or dot once
     /// (flash spec §2.1).
     func flash(_ alerts: [LimitsAlert])
     /// What the refresh button in the expanded notch does.
@@ -163,8 +163,7 @@ final class NotchPresenter: LimitsPresenting {
         NSScreen.screens.contains { $0.safeAreaInsets.top > 0 }
     }
 
-    /// `hidesResting`: the virtual notch's display shows a full-screen app, so only a "needs you" alert may show the
-    /// notch.
+    /// `hidesResting`: the virtual notch's display shows a full-screen app, so only an alert may show the notch.
     static func target(display: LimitsDisplay, isHovering: Bool, isShowingAlert: Bool, hasScreen: Bool, hidesResting: Bool = false) -> NotchTarget {
         guard hasScreen else { return .hidden }
         if isShowingAlert {
@@ -196,10 +195,11 @@ final class NotchPresenter: LimitsPresenting {
         requestReconcile()
     }
 
+    /// Expands the notch with the alerts' text, then flashes the ring or dot on the compact notch once they close
+    /// (flash spec §2.1, every alert expands again since 2026-10-13).
     func flash(_ alerts: [LimitsAlert]) {
-        let needsYou = alerts.filter { if case .sessionNeedsYou = $0 { true } else { false } }
-        if !needsYou.isEmpty {
-            present(needsYou)
+        if !alerts.isEmpty {
+            present(alerts)
         }
         flashCount += 1
         guard var event = NotchFlash.event(for: alerts, thresholds: model.state.thresholds, id: flashCount) else {
@@ -212,7 +212,7 @@ final class NotchPresenter: LimitsPresenting {
         pendingFlash = event
         flashTask?.cancel()
         flashTask = Task {
-            // Let the reconcile show a notch the alert just made visible, and a "needs you" alert close, then flash
+            // Let the reconcile show a notch the alert just made visible, and the expanded alert close, then flash
             // only what is on the compact notch.
             while reconcileTask != nil || isShowingAlert, !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(10))
@@ -236,8 +236,8 @@ final class NotchPresenter: LimitsPresenting {
         }
     }
 
-    /// Expands the notch with "needs you" alerts for `alertDuration`; alerts arriving meanwhile join them and keep
-    /// them up a while longer.
+    /// Expands the notch with alerts for `alertDuration`; alerts arriving meanwhile join them and keep them up a while
+    /// longer.
     private func present(_ alerts: [LimitsAlert]) {
         guard screen() != nil else { return }
         if isShowingAlert {

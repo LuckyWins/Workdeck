@@ -6,7 +6,7 @@ final class LimitsNotchModel {
     var state = LimitsViewState.hidden
     /// The flash playing now; cleared when it ends so recreated views do not replay it.
     var flash: NotchFlashEvent?
-    /// "Needs you" alerts expanding the notch now; the first decides the single-alert layout (flash spec §2.1).
+    /// Alerts expanding the notch now; the first decides the single-alert layout (flash spec §2.1).
     var alerts: [LimitsAlert] = []
     var alert: LimitsAlert? {
         alerts.first
@@ -108,7 +108,7 @@ struct LimitsExpandedView: View {
 
     @State private var hoveredRefresh: String?
     @State private var isToggleHovered = false
-    /// Which alert line the pointer is over, for the clickable "needs you" alerts.
+    /// Which alert line the pointer is over, for clickable alerts.
     @State private var hoveredAlert: String?
 
     /// Cells in a usage bar; with the percent and reset time a row stays within about 40 characters.
@@ -135,9 +135,7 @@ struct LimitsExpandedView: View {
         openable(alert, id: "single") {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(LimitsText.alertSymbol(alert))
-                        .fontWeight(.bold)
-                        .foregroundStyle(alertColor(alert))
+                    AlertBadge(symbol: LimitsText.alertSymbol(alert), color: flashColor(alert))
                     Text(LimitsText.alertTitle(alert, showsAccount: model.state.limitBlocks.count > 1))
                         .fontWeight(.semibold)
                     Spacer(minLength: 6)
@@ -146,7 +144,8 @@ struct LimitsExpandedView: View {
                     }
                 }
                 if let subtitle = LimitsText.alertSubtitle(alert, now: model.state.now) {
-                    Text("  \(subtitle)")
+                    Text(subtitle)
+                        .padding(.leading, 24)
                         .foregroundStyle(Terminal.dim)
                 }
             }
@@ -199,9 +198,7 @@ struct LimitsExpandedView: View {
         let isUrgent = alerts.contains { LimitsText.alertSymbol($0) == "!" }
         return VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
-                Text(isUrgent ? "!" : "✓")
-                    .fontWeight(.bold)
-                    .foregroundStyle(isUrgent ? Color.orange : Color.green)
+                AlertBadge(symbol: isUrgent ? "!" : "✓", color: NotchFlash.color(of: alerts, thresholds: model.state.thresholds) ?? .green)
                 Text(LimitsText.batchTitle(alerts))
                     .fontWeight(.semibold)
             }
@@ -209,7 +206,7 @@ struct LimitsExpandedView: View {
                 openable(alert, id: "line\(index)") {
                     HStack(spacing: 6) {
                         Text(LimitsText.alertSymbol(alert))
-                            .foregroundStyle(alertColor(alert))
+                            .foregroundStyle(flashColor(alert).color)
                         Text(LimitsText.batchLine(alert, now: model.state.now, showsAccount: model.state.limitBlocks.count > 1))
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -219,12 +216,12 @@ struct LimitsExpandedView: View {
                         }
                     }
                 }
-                .padding(.leading, 12)
+                .padding(.leading, 24)
             }
             if alerts.count > Self.maxBatchLines {
                 Text(SessionsText.moreSessions(alerts.count - Self.maxBatchLines))
                     .foregroundStyle(Terminal.dim)
-                    .padding(.leading, 12)
+                    .padding(.leading, 24)
             }
         }
         .animation(.snappy, value: alerts.count)
@@ -349,11 +346,9 @@ struct LimitsExpandedView: View {
         }
     }
 
-    private func alertColor(_ alert: LimitsAlert) -> Color {
-        switch alert {
-        case .threshold, .sessionNeedsYou: .orange
-        case .reset, .sessionFinished: .green
-        }
+    /// The flash color of an alert, so the expanded alert matches the flash after it (alert badge spec §2).
+    private func flashColor(_ alert: LimitsAlert) -> NotchFlashColor {
+        NotchFlash.color(of: alert, thresholds: model.state.thresholds)
     }
 
     /// "updated 2 min ago ↻": with the usage API on, the whole line refreshes on click.
@@ -459,5 +454,39 @@ struct LimitsExpandedView: View {
                     .foregroundStyle(LimitsPresentation.forecastLevel(of: window, thresholds: model.state.thresholds).notchColor)
             }
         }
+    }
+}
+
+/// An alert's mark as a glowing badge in its color that pulses three times, then rests (alert badge spec §2).
+struct AlertBadge: View {
+    static let pulses = 3
+    static let pulseDuration = 1.6
+
+    let symbol: String
+    let color: NotchFlashColor
+
+    @State private var isSwelling = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Text(symbol)
+            .fontWeight(.bold)
+            .foregroundStyle(color.color)
+            .frame(width: 18, height: 18)
+            .background(Circle().fill(color.color.opacity(0.18)))
+            .shadow(color: color.color.opacity(isSwelling ? 0.75 : 0.35), radius: isSwelling ? 7 : 3)
+            .task {
+                // Reduce Motion keeps the resting glow. Runs only while the alert is shown; closing it cancels the task.
+                guard !reduceMotion else { return }
+                for _ in 0..<Self.pulses {
+                    for swelling in [true, false] {
+                        guard !Task.isCancelled else { return }
+                        withAnimation(.easeInOut(duration: Self.pulseDuration / 2)) {
+                            isSwelling = swelling
+                        }
+                        try? await Task.sleep(for: .seconds(Self.pulseDuration / 2))
+                    }
+                }
+            }
     }
 }

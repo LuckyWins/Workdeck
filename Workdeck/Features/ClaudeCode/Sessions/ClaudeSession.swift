@@ -72,7 +72,8 @@ nonisolated struct ClaudeSession: Equatable, Sendable, Identifiable {
     var instance: String?
     var lastEventAt: Date
     var hasEnded = false
-    /// A new conversation (startup or `/clear`) with nothing in it yet, e.g. an empty VS Code tab; not listed.
+    /// A conversation with nothing new in it yet, not listed: a new one (startup or `/clear`), e.g. an empty VS Code tab, or
+    /// a resumed one, e.g. a chat tab VS Code revived when its window opened.
     var isBlank = false
     /// The agent whose permission prompt made the session wait (`nil` for the main agent).
     var waitingAgentID: String?

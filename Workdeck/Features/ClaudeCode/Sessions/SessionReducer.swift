@@ -47,7 +47,7 @@ nonisolated enum SessionReducer {
                 hostBundleID: session.hostBundleID,
                 termProgram: session.termProgram,
                 lastEventAt: event.time,
-                isBlank: event.source == "startup" || event.source == "clear",
+                isBlank: ["startup", "clear", "resume"].contains(event.source),
                 turn: TurnEdits(startedAt: event.time)
             )
         } else if event.name != .sessionStart {

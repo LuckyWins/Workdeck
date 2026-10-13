@@ -36,7 +36,7 @@ Ideas from [Coucou](https://github.com/Louis-CFM/coucou), a similar MIT-licensed
 - **Answer permission prompts from the notch (low priority).** Allow / Deny / Always buttons for a Claude Code permission request. The hook would wait for the click over a Unix socket and exit at once when Workdeck is not running, so Claude Code is never blocked. It breaks today's rule that the hook always exits fast, decides on the user's behalf, and needs a security review. Less useful with auto mode on.
 - **Answer `AskUserQuestion` from the notch (low priority).** Options as buttons, single and multiple choice. Same hook mechanism as above. Real questions are often long or visual, so the terminal stays the better place for most of them.
 - **Demo mode.** A scripted session with limits, sessions, agents and alerts, without Claude Code and without writing anything to disk. For README screenshots and GIFs and for checking the notch layout.
-- **Flash or expand, per alert type.** A Settings choice for each alert (limit threshold, limit reset, session finished, needs you): only flash the compact notch, or expand it with the alert's text as before. Today "needs you" expands and the rest flash (`specs/2026-10-13-notch-flash-design.md` §2.1).
+- **Flash or expand, per alert type.** A Settings choice for each alert (limit threshold, limit reset, session finished, needs you): only flash the compact notch, or expand it with the alert's text as before. Today every alert expands, then flashes (`specs/2026-10-13-notch-flash-design.md` §2.1).
 - **Small things:**
   - choose the display for the notch (real or virtual);
   - keyboard shortcuts: expand or collapse the notch, open the latest session;

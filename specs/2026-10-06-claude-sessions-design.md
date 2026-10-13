@@ -266,7 +266,7 @@ Stopped agents: an agent stopped by the main agent's `TaskStop` tool sends no `S
 
 ### 10.5 Alerts
 
-> Superseded in part by `specs/2026-10-13-notch-flash-design.md`: "finished" flashes the session dot green instead of expanding the notch; "needs you" still expands the notch and also blinks the dot.
+> Amended by `specs/2026-10-13-notch-flash-design.md` §2.1: every session alert still expands the notch with its text, then flashes the session dot ("finished" green; "needs you" blinks it orange three times).
 
 - New `LimitsAlert` cases: `sessionFinished(project:worked:)` → "✓ Workdeck finished" / "worked 14m" (green); `sessionNeedsYou(project:)` → "! vitastir needs you" / "permission prompt" (orange). They use the existing notch alert (6 seconds, one at a time) and require the indicator to be on.
 - `SessionAlertPolicy` (pure) compares the previous and current session lists:
@@ -339,7 +339,7 @@ Unit: the split keeps every existing test's assertions (only constructors and th
 Observed: the VS Code extension keeps a separate `claude` process for a new conversation tab. It sends `SessionStart` (`source: startup`) and nothing else until the first prompt, and Claude Code writes no transcript for it. The notch listed it as a second idle row with the same project name, which read as a duplicate.
 
 - A session started with `source` `startup` or `clear` is blank until any event other than `SessionStart` arrives. A blank session is tracked (its file, PID and liveness checks as usual) but not listed, so it is not counted, alerted on or activated. It appears with its first prompt.
-- `resume` sessions are not blank: they reopen a conversation that has content. A `SessionStart` without a `source`, or a session whose first seen event is not a start (hooks connected mid-session), is not blank either.
+- `resume` sessions are blank too (amended 2026-10-13): VS Code revives remembered chat tabs when a window opens, and each starts a resumed session that just sits there, listed as a second row with the same project name. A resumed chat appears with its first prompt; this holds for a terminal too (`claude --resume`, `--continue`, an in-process `/resume`), which earlier showed the resumed chat as idle at once. A `SessionStart` without a `source`, or a session whose first seen event is not a start (hooks connected mid-session), is not blank.
 - The PID rule runs before this filter: after `/clear` in a terminal the previous session is dropped and the new blank one stays hidden until used.
 
 ## 15. Amendment: Event File Size Limit (2026-10-07)

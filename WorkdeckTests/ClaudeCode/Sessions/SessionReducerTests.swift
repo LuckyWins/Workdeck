@@ -93,9 +93,14 @@ struct SessionReducerTests {
         }
     }
 
-    @Test func resumedOrUnknownStartIsNotBlank() throws {
+    @Test func aResumedStartIsBlankUntilSomethingHappens() throws {
+        // VS Code revives remembered chat tabs when a window opens; each one starts a resumed session that just sits there.
         let resume = hookEvent(.sessionStart, at: 0) { $0.source = "resume" }
-        #expect(try #require(SessionReducer.reduce([resume])).isBlank == false)
+        #expect(try #require(SessionReducer.reduce([resume])).isBlank)
+        #expect(try #require(SessionReducer.reduce([resume, hookEvent(.userPromptSubmit, at: 5)])).isBlank == false)
+    }
+
+    @Test func anUnknownStartIsNotBlank() throws {
         #expect(try #require(SessionReducer.reduce([start])).isBlank == false)
         // Hooks connected mid-session: the first event seen is not a start.
         #expect(try #require(SessionReducer.reduce([hookEvent(.postToolUse, at: 0)])).isBlank == false)
