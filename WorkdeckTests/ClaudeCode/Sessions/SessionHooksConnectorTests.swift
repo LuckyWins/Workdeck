@@ -198,4 +198,51 @@ struct SessionHooksConnectorTests {
         #expect(try commands("Stop") == ["'\(current)'"])
         #expect(try String(contentsOf: backupURL, encoding: .utf8) == "original")
     }
+
+    @Test func plannedHooksMatchWhatTheWritesProduce() throws {
+        let binary = try makeFakeBinary()
+        try writeSettings(["hooks": ["Stop": [foreignStop]], "model": "opus"])
+        let before = try Data(contentsOf: settingsURL)
+        let connect = try #require(try connector(binary).plannedConnect())
+        #expect(try Data(contentsOf: settingsURL) == before)
+        #expect(connect.isReformatted)
+        #expect(connect.after.contains("~/bin/notify.sh"))
+        try connector(binary).connect()
+        #expect(connect.after == String(decoding: try Data(contentsOf: settingsURL), as: UTF8.self))
+        let disconnect = try #require(try connector(binary).plannedDisconnect())
+        #expect(!disconnect.after.contains("workdeck-hook"))
+        #expect(disconnect.after.contains("~/bin/notify.sh"))
+        try connector(binary).disconnect()
+        #expect(disconnect.after == String(decoding: try Data(contentsOf: settingsURL), as: UTF8.self))
+    }
+
+    @Test func hooksWithNothingToChangeHaveNoPlan() throws {
+        let binary = try makeFakeBinary()
+        #expect(try connector(binary).plannedDisconnect() == nil)
+        try writeSettings(["hooks": ["Stop": [foreignStop]]])
+        #expect(try connector(binary).plannedDisconnect() == nil)
+        try connector(binary).connect()
+        #expect(try connector(binary).plannedConnect() == nil)
+    }
+
+    @Test func plannedHooksRefuseAMissingBinary() {
+        #expect(throws: ClaudeConnectorError.binaryMissing) { try connector("/nonexistent/workdeck-hook").plannedConnect() }
+    }
+
+    @Test func reviewedHookWritesRefuseAFileChangedSinceTheReview() throws {
+        let binary = try makeFakeBinary()
+        try writeSettings(["model": "opus"])
+        let connect = try #require(try connector(binary).plannedConnect())
+        try writeSettings(["model": "sonnet"])
+        #expect(throws: ClaudeConnectorError.changedSinceReview) { try connector(binary).connect(reviewed: connect) }
+        #expect(try readSettings()["hooks"] == nil)
+        try connector(binary).connect()
+        let disconnect = try #require(try connector(binary).plannedDisconnect())
+        var settings = try readSettings()
+        settings["model"] = "opus"
+        try writeSettings(settings)
+        #expect(throws: ClaudeConnectorError.changedSinceReview) { try connector(binary).disconnect(reviewed: disconnect) }
+        #expect(try readSettings()["hooks"] != nil)
+    }
+
 }

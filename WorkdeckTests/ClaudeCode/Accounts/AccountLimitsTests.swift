@@ -159,4 +159,70 @@ struct AccountLimitsTests {
         activity.send(false)
         #expect(extraPoller.pausedValues.last == true)
     }
+
+    @Test func theReviewHoldsEveryAccountTheActionChanges() {
+        mainConnector.plan = sampleChange("main")
+        extraConnector.plan = sampleChange("personal")
+        let (controller, _) = makeController()
+        controller.start()
+        controller.reviewConnect()
+        #expect(controller.review?.changes.map(\.account) == ["main", "personal"])
+        controller.confirmReview()
+        #expect(extraConnector.status == .connected)
+    }
+
+    @Test func aMissingFolderGetsNoTab() {
+        mainConnector.plan = sampleChange("main")
+        extraConnector.plan = sampleChange("personal")
+        let (controller, _) = makeController(createFolder: false)
+        controller.start()
+        controller.reviewConnect()
+        #expect(controller.review?.changes.map(\.account) == ["main"])
+    }
+
+    @Test func anInvalidExtraFileReportsItsErrorAndKeepsMainsTab() {
+        mainConnector.plan = sampleChange("main")
+        extraConnector.planError = ClaudeConnectorError.invalidSettings
+        let (controller, _) = makeController()
+        controller.start()
+        controller.reviewConnect()
+        #expect(controller.review?.changes.map(\.account) == ["main"])
+        #expect(controller.account(named: "personal")?.connectError == ClaudeConnectorError.invalidSettingsMessage(directory: personal.directory))
+    }
+
+    @Test func anInstanceSharingMainsSettingsGetsNoTab() throws {
+        let mainSettings = root.appending(path: ".claude/settings.json")
+        try FileManager.default.createDirectory(at: mainSettings.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: mainSettings)
+        try FileManager.default.createDirectory(at: personal.directory, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: personal.directory.appending(path: "settings.json"), withDestinationURL: mainSettings)
+        mainConnector.plan = sampleChange("main")
+        extraConnector.plan = sampleChange("personal")
+        let (controller, _) = makeController()
+        controller.start()
+        controller.reviewConnect()
+        #expect(controller.review?.changes.map(\.account) == ["main"])
+    }
+
+    @Test func mainsInvalidFileDoesNotBlockDisconnectingTheOthers() {
+        mainConnector.status = .connected
+        mainConnector.planError = ClaudeConnectorError.invalidSettings
+        extraConnector.plan = sampleChange("personal")
+        let (controller, _) = makeController()
+        controller.start()
+        controller.reviewDisconnect()
+        #expect(controller.review?.changes.map(\.account) == ["personal"])
+        #expect(controller.connectError == ClaudeConnectorError.invalidSettings.localizedDescription)
+    }
+
+    @Test func confirmingWritesOnlyTheReviewedFilesWithTheirReview() {
+        mainConnector.plan = sampleChange("main")
+        let (controller, _) = makeController()
+        controller.start()
+        controller.reviewConnect()
+        controller.confirmReview()
+        #expect(mainConnector.reviewedConnects == [sampleChange("main")])
+        // The extra had nothing to change, so it is not written.
+        #expect(extraConnector.reviewedConnects.isEmpty)
+    }
 }

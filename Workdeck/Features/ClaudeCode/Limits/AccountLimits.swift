@@ -85,7 +85,7 @@ final class AccountLimits {
 
     /// Returns whether it connected; a failure stays on this account and does not stop the others.
     @discardableResult
-    func connect() -> Bool {
+    func connect(reviewed: SettingsChange? = nil) -> Bool {
         if sharesMainSettings {
             connectError = ClaudeSettingsFile.sharedSettingsMessage
             return false
@@ -95,7 +95,7 @@ final class AccountLimits {
             return false
         }
         do {
-            try connector.connect()
+            try connector.connect(reviewed: reviewed)
             connectError = nil
             connectionStatus = connector.status
             return true
@@ -106,17 +106,41 @@ final class AccountLimits {
         }
     }
 
-    func disconnect() {
+    func disconnect(reviewed: SettingsChange? = nil) {
         // The shared file is main's: its entries are main's to remove.
         guard !sharesMainSettings else { return }
         do {
-            try connector.disconnect()
+            try connector.disconnect(reviewed: reviewed)
             connectError = nil
         } catch {
             connectError = message(for: error)
             WorkdeckLog.limits.error("Status line (\(self.label, privacy: .public)): \(error.localizedDescription, privacy: .public)")
         }
         connectionStatus = connector.status
+    }
+
+    /// What connecting or disconnecting would change in this account's `settings.json`; `nil` when nothing would,
+    /// or when `connect()` would skip this account (a file shared with main, a missing folder).
+    func plannedChange(_ action: SettingsReviewAction) throws -> SettingsChange? {
+        guard !sharesMainSettings else { return nil }
+        if let directory, !FileManager.default.fileExists(atPath: directory.path) {
+            return nil
+        }
+        let change = try action == .connect ? connector.plannedConnect() : connector.plannedDisconnect()
+        // The file reads fine now: an earlier error about it is out of date.
+        connectError = nil
+        return change
+    }
+
+    /// Reads the connection from the file again, e.g. after it changed outside Workdeck.
+    func refreshStatus() {
+        guard !sharesMainSettings else { return }
+        connectionStatus = connector.status
+    }
+
+    /// Shows a planning error where a connect error shows.
+    func report(_ error: any Error) {
+        connectError = message(for: error)
     }
 
     private func message(for error: any Error) -> String {

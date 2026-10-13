@@ -118,4 +118,62 @@ struct SessionInstancesTests {
         controller.removeInstance(named: "personal")
         #expect(controller.viewState.rows.isEmpty)
     }
+
+    @Test func theHooksReviewHoldsEveryInstanceTheActionChanges() {
+        mainHooks.plan = sampleChange("main")
+        extraHooks.plan = sampleChange("personal")
+        let controller = makeController()
+        controller.start()
+        controller.reviewHooksConnect()
+        #expect(controller.hooksReview?.changes.map(\.account) == ["main", "personal"])
+        controller.confirmHooksReview()
+        #expect(extraHooks.status == .connected)
+        controller.reviewHooksDisconnect()
+        #expect(controller.hooksReview?.action == .disconnect)
+        controller.confirmHooksReview()
+        #expect(extraHooks.status == .notConnected)
+    }
+
+    @Test func aMissingFolderGetsNoHooksTab() {
+        mainHooks.plan = sampleChange("main")
+        extraHooks.plan = sampleChange("personal")
+        let controller = makeController(createFolder: false)
+        controller.start()
+        controller.reviewHooksConnect()
+        #expect(controller.hooksReview?.changes.map(\.account) == ["main"])
+    }
+
+    @Test func mainsInvalidFileDoesNotBlockDisconnectingTheOtherHooks() {
+        mainHooks.status = .connected
+        mainHooks.planError = ClaudeConnectorError.invalidSettings
+        extraHooks.plan = sampleChange("personal")
+        let controller = makeController()
+        controller.start()
+        controller.reviewHooksDisconnect()
+        #expect(controller.hooksReview?.changes.map(\.account) == ["personal"])
+        #expect(controller.hooksError == ClaudeConnectorError.invalidSettings.localizedDescription)
+    }
+
+    @Test func aSuccessfulPlanClearsAnExtrasEarlierError() {
+        mainHooks.plan = sampleChange("main")
+        extraHooks.planError = ClaudeConnectorError.invalidSettings
+        let controller = makeController()
+        controller.start()
+        controller.reviewHooksConnect()
+        #expect(controller.instanceHooks["personal"]?.error != nil)
+        extraHooks.planError = nil
+        extraHooks.plan = sampleChange("personal")
+        controller.reviewHooksConnect()
+        #expect(controller.instanceHooks["personal"]?.error == nil)
+    }
+
+    @Test func confirmingWritesOnlyTheReviewedHooksFiles() {
+        mainHooks.plan = sampleChange("main")
+        let controller = makeController()
+        controller.start()
+        controller.reviewHooksConnect()
+        controller.confirmHooksReview()
+        #expect(mainHooks.reviewedConnects == [sampleChange("main")])
+        #expect(extraHooks.reviewedConnects.isEmpty)
+    }
 }

@@ -2,6 +2,10 @@ import Foundation
 import Testing
 @testable import Workdeck
 
+func sampleChange(_ account: String = "main", after: String = "{\n  \"x\" : 1\n}") -> SettingsChange {
+    SettingsChange(account: account, url: URL(filePath: "/tmp/\(account)/settings.json"), original: Data("{}".utf8), before: "{\n}", after: after, isReformatted: false)
+}
+
 @MainActor
 final class FakeConnector: ClaudeCodeConnecting {
     var status: ClaudeConnectionStatus = .notConnected
@@ -10,17 +14,35 @@ final class FakeConnector: ClaudeCodeConnecting {
     var connectError: (any Error)?
     private(set) var repairCount = 0
 
-    func connect() throws {
+    private(set) var reviewedConnects: [SettingsChange?] = []
+    private(set) var reviewedDisconnects: [SettingsChange?] = []
+
+    func connect(reviewed: SettingsChange?) throws {
+        reviewedConnects.append(reviewed)
         if let connectError { throw connectError }
         status = .connected
     }
 
-    func disconnect() throws {
+    func disconnect(reviewed: SettingsChange?) throws {
+        reviewedDisconnects.append(reviewed)
         status = .notConnected
     }
 
     func repairPathIfNeeded() {
         repairCount += 1
+    }
+
+    var plan: SettingsChange?
+    var planError: (any Error)?
+
+    func plannedConnect() throws -> SettingsChange? {
+        if let planError { throw planError }
+        return plan
+    }
+
+    func plannedDisconnect() throws -> SettingsChange? {
+        if let planError { throw planError }
+        return plan
     }
 }
 
@@ -119,17 +141,35 @@ final class FakeHooksConnector: SessionHooksConnecting {
     var connectError: (any Error)?
     private(set) var repairs: [Bool] = []
 
-    func connect() throws {
+    private(set) var reviewedConnects: [SettingsChange?] = []
+    private(set) var reviewedDisconnects: [SettingsChange?] = []
+
+    func connect(reviewed: SettingsChange?) throws {
+        reviewedConnects.append(reviewed)
         if let connectError { throw connectError }
         status = .connected
     }
 
-    func disconnect() throws {
+    func disconnect(reviewed: SettingsChange?) throws {
+        reviewedDisconnects.append(reviewed)
         status = .notConnected
     }
 
     func repairPathIfNeeded(addingMissingEvents: Bool) {
         repairs.append(addingMissingEvents)
+    }
+
+    var plan: SettingsChange?
+    var planError: (any Error)?
+
+    func plannedConnect() throws -> SettingsChange? {
+        if let planError { throw planError }
+        return plan
+    }
+
+    func plannedDisconnect() throws -> SettingsChange? {
+        if let planError { throw planError }
+        return plan
     }
 }
 
@@ -190,10 +230,12 @@ struct ClaudeCodeControllerTests {
         try UsageSnapshotFile.write(snapshot, to: fileURL)
     }
 
-    @Test func enablingWhileDisconnectedAsksForConfirmation() {
+    @Test func enablingWhileDisconnectedOpensTheConnectReview() {
+        connector.plan = sampleChange()
         let (controller, _) = makeController()
         controller.setEnabled(true)
-        #expect(controller.limits.isConfirmingConnect)
+        #expect(controller.limits.review?.action == .connect)
+        #expect(controller.limits.review?.kind == .statusLine)
         #expect(!settings.isEnabled)
     }
 
@@ -324,7 +366,7 @@ struct ClaudeCodeControllerTests {
         settings.fetchFromAPI = true
         let (controller, _) = makeController()
         controller.setEnabled(true)
-        #expect(!controller.limits.isConfirmingConnect)
+        #expect(controller.limits.review == nil)
         #expect(settings.isEnabled)
     }
 
@@ -464,7 +506,7 @@ struct ClaudeCodeControllerTests {
         let (controller, _) = makeController()
         controller.start()
         controller.setEnabled(true)
-        #expect(!controller.limits.isConfirmingConnect)
+        #expect(controller.limits.review == nil)
         #expect(settings.isEnabled)
     }
 
@@ -863,5 +905,146 @@ struct ClaudeCodeControllerTests {
         presenter.projectAction?("Workdeck")
         presenter.projectAction?("unknown")
         #expect(activator.activated == ["s1"])
+    }
+
+    @Test func confirmingAnUnchangedReviewConnects() {
+        connector.plan = sampleChange()
+        let (controller, _) = makeController()
+        controller.limits.reviewConnect()
+        controller.limits.confirmReview()
+        #expect(controller.limits.isConnected)
+        #expect(settings.isEnabled)
+        #expect(controller.limits.review == nil)
+    }
+
+    @Test func aFileChangedAfterReviewIsNotWritten() throws {
+        connector.plan = sampleChange()
+        let (controller, _) = makeController()
+        controller.limits.reviewConnect()
+        connector.plan = sampleChange(after: "{\n  \"y\" : 2\n}")
+        controller.limits.confirmReview()
+        #expect(!controller.limits.isConnected)
+        let review = try #require(controller.limits.review)
+        #expect(review.changedSinceShown)
+        #expect(review.changes.first?.after == "{\n  \"y\" : 2\n}")
+        // The new diff can then be confirmed.
+        controller.limits.confirmReview()
+        #expect(controller.limits.isConnected)
+    }
+
+    @Test func cancellingTheReviewWritesNothing() {
+        connector.plan = sampleChange()
+        let (controller, _) = makeController()
+        controller.limits.reviewConnect()
+        controller.limits.cancelReview()
+        #expect(controller.limits.review == nil)
+        #expect(!controller.limits.isConnected)
+    }
+
+    @Test func mainsInvalidSettingsShowInsteadOfAReview() {
+        connector.planError = ClaudeConnectorError.invalidSettings
+        let (controller, _) = makeController()
+        controller.limits.reviewConnect()
+        #expect(controller.limits.review == nil)
+        #expect(controller.limits.connectError == ClaudeConnectorError.invalidSettings.localizedDescription)
+    }
+
+    @Test func nothingToChangeOpensNoReview() {
+        let (controller, _) = makeController()
+        controller.limits.reviewConnect()
+        #expect(controller.limits.review == nil)
+    }
+
+    @Test func disconnectIsReviewedToo() {
+        connector.status = .connected
+        connector.plan = sampleChange()
+        let (controller, _) = makeController()
+        controller.start()
+        controller.limits.reviewDisconnect()
+        #expect(controller.limits.review?.action == .disconnect)
+        #expect(controller.limits.isConnected)
+        controller.limits.confirmReview()
+        #expect(!controller.limits.isConnected)
+    }
+
+    @Test func hooksAreReviewedBeforeConnecting() throws {
+        hooksConnector.plan = sampleChange()
+        let (controller, _) = makeController()
+        controller.sessions.reviewHooksConnect()
+        #expect(controller.sessions.hooksReview?.kind == .hooks)
+        #expect(!controller.sessions.isHooksConnected)
+        hooksConnector.plan = sampleChange(after: "{\n  \"y\" : 2\n}")
+        controller.sessions.confirmHooksReview()
+        #expect(!controller.sessions.isHooksConnected)
+        #expect(try #require(controller.sessions.hooksReview).changedSinceShown)
+        controller.sessions.confirmHooksReview()
+        #expect(controller.sessions.isHooksConnected)
+        #expect(controller.sessions.hooksReview == nil)
+    }
+
+    @Test func mainsInvalidHooksFileShowsInsteadOfAReview() {
+        hooksConnector.planError = ClaudeConnectorError.invalidSettings
+        let (controller, _) = makeController()
+        controller.sessions.reviewHooksConnect()
+        #expect(controller.sessions.hooksReview == nil)
+        #expect(controller.sessions.hooksError == ClaudeConnectorError.invalidSettings.localizedDescription)
+    }
+
+    @Test func disconnectWithNothingLeftToRemoveStillDisconnects() {
+        // Workdeck's status line was removed outside Workdeck: no diff, but Disconnect… must still take effect.
+        connector.status = .connected
+        let (controller, _) = makeController()
+        controller.start()
+        controller.limits.reviewDisconnect()
+        #expect(controller.limits.review == nil)
+        #expect(!controller.limits.isConnected)
+    }
+
+    @Test func connectingWhenTheFileIsAlreadyConnectedRefreshesTheStatus() {
+        let (controller, _) = makeController()
+        controller.start()
+        // The file got Workdeck's command outside Workdeck: nothing to review.
+        connector.status = .connected
+        controller.setEnabled(true)
+        #expect(controller.limits.review == nil)
+        #expect(controller.limits.isConnected)
+        #expect(settings.isEnabled)
+    }
+
+    @Test func hooksDisconnectWithNothingLeftToRemoveStillDisconnects() {
+        hooksConnector.status = .connected
+        let (controller, _) = makeController()
+        controller.start()
+        controller.sessions.reviewHooksDisconnect()
+        #expect(controller.sessions.hooksReview == nil)
+        #expect(!controller.sessions.isHooksConnected)
+    }
+
+    @Test func hooksConnectWhenAlreadyConnectedRefreshesTheStatus() {
+        let (controller, _) = makeController()
+        controller.start()
+        hooksConnector.status = .connected
+        controller.sessions.reviewHooksConnect()
+        #expect(controller.sessions.hooksReview == nil)
+        #expect(controller.sessions.isHooksConnected)
+    }
+
+    @Test func aSuccessfulPlanClearsAnEarlierError() {
+        connector.planError = ClaudeConnectorError.invalidSettings
+        hooksConnector.planError = ClaudeConnectorError.invalidSettings
+        let (controller, _) = makeController()
+        controller.limits.reviewConnect()
+        controller.sessions.reviewHooksConnect()
+        // The user fixed the file.
+        connector.planError = nil
+        connector.plan = sampleChange()
+        hooksConnector.planError = nil
+        hooksConnector.plan = sampleChange()
+        controller.limits.reviewConnect()
+        controller.sessions.reviewHooksConnect()
+        #expect(controller.limits.review != nil)
+        #expect(controller.limits.connectError == nil)
+        #expect(controller.sessions.hooksReview != nil)
+        #expect(controller.sessions.hooksError == nil)
     }
 }

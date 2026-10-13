@@ -55,6 +55,21 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 420)
+        // One review block at a time; closing Settings cancels it (settings diff spec §2.1).
+        .onChange(of: claudeCode.limits.review != nil) { _, isOpen in
+            if isOpen {
+                claudeCode.sessions.cancelHooksReview()
+            }
+        }
+        .onChange(of: claudeCode.sessions.hooksReview != nil) { _, isOpen in
+            if isOpen {
+                claudeCode.limits.cancelReview()
+            }
+        }
+        .onDisappear {
+            claudeCode.limits.cancelReview()
+            claudeCode.sessions.cancelHooksReview()
+        }
         .onChange(of: settings.batteryThreshold) {
             controller.scheduleSafeguardCheck()
         }

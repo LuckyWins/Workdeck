@@ -3,9 +3,23 @@ import Foundation
 protocol SessionHooksConnecting {
     var status: ClaudeConnectionStatus { get }
     var canConnect: Bool { get }
-    func connect() throws
-    func disconnect() throws
+    /// `reviewed` is the change the user confirmed: the file is written only if it is still as reviewed.
+    func connect(reviewed: SettingsChange?) throws
+    func disconnect(reviewed: SettingsChange?) throws
     func repairPathIfNeeded(addingMissingEvents: Bool)
+    /// What `connect()` / `disconnect()` would write, without writing; `nil` when nothing would change.
+    func plannedConnect() throws -> SettingsChange?
+    func plannedDisconnect() throws -> SettingsChange?
+}
+
+extension SessionHooksConnecting {
+    func connect() throws {
+        try connect(reviewed: nil)
+    }
+
+    func disconnect() throws {
+        try disconnect(reviewed: nil)
+    }
 }
 
 /// Adds Workdeck's hook entries to Claude Code's user settings, and removes them again (spec §5.3).
@@ -45,20 +59,47 @@ struct SessionHooksConnector: SessionHooksConnecting {
         return complete ? .connected : .notConnected
     }
 
-    func connect() throws {
-        try install(events: Self.events, backingUp: true)
+    func connect(reviewed: SettingsChange?) throws {
+        try install(events: Self.events, backingUp: true, reviewed: reviewed)
     }
 
-    func disconnect() throws {
-        guard var root = try file.read(), let hooks = root["hooks"] as? [String: Any] else { return }
-        let cleaned = Self.removingWorkdeckHooks(from: hooks)
-        guard !NSDictionary(dictionary: cleaned).isEqual(to: hooks) else { return }
+    func disconnect(reviewed: SettingsChange?) throws {
+        let current = try file.readWithData()
+        try ClaudeSettingsFile.ensure(current, matches: reviewed)
+        guard let current, let cleaned = Self.uninstalling(from: current.root) else { return }
+        try file.write(cleaned)
+    }
+
+    func plannedConnect() throws -> SettingsChange? {
+        guard canConnect else { throw ClaudeConnectorError.binaryMissing }
+        let current = try file.readWithData()
+        return try file.change(account: instance ?? ClaudeInstance.mainName, from: current, to: installing(Self.events, in: current?.root ?? [:]))
+    }
+
+    func plannedDisconnect() throws -> SettingsChange? {
+        guard let current = try file.readWithData(), let after = Self.uninstalling(from: current.root) else { return nil }
+        return try file.change(account: instance ?? ClaudeInstance.mainName, from: current, to: after)
+    }
+
+    private func installing(_ events: [String], in root: [String: Any]) -> [String: Any] {
+        var root = root
+        let hooks = root["hooks"] as? [String: Any] ?? [:]
+        root["hooks"] = Self.adding(Self.hook(for: binaryPath, instance: instance), to: Self.removingWorkdeckHooks(from: hooks), events: events)
+        return root
+    }
+
+    /// The settings without Workdeck's hooks; `nil` when there are none.
+    static func uninstalling(from root: [String: Any]) -> [String: Any]? {
+        guard let hooks = root["hooks"] as? [String: Any] else { return nil }
+        let cleaned = removingWorkdeckHooks(from: hooks)
+        guard !NSDictionary(dictionary: cleaned).isEqual(to: hooks) else { return nil }
+        var root = root
         if cleaned.isEmpty {
             root.removeValue(forKey: "hooks")
         } else {
             root["hooks"] = cleaned
         }
-        try file.write(root)
+        return root
     }
 
     /// Points the hooks at this app bundle and, once per new Workdeck version, adds events it newly
@@ -76,15 +117,15 @@ struct SessionHooksConnector: SessionHooksConnecting {
         try? install(events: needsEvents ? Self.events : connected, backingUp: false)
     }
 
-    private func install(events: [String], backingUp: Bool) throws {
+    private func install(events: [String], backingUp: Bool, reviewed: SettingsChange? = nil) throws {
         guard canConnect else { throw ClaudeConnectorError.binaryMissing }
-        var root = try file.read() ?? [:]
+        let current = try file.readWithData()
+        try ClaudeSettingsFile.ensure(current, matches: reviewed)
+        let root = current?.root ?? [:]
         if backingUp {
             try file.backUp()
         }
-        let hooks = root["hooks"] as? [String: Any] ?? [:]
-        root["hooks"] = Self.adding(Self.hook(for: binaryPath, instance: instance), to: Self.removingWorkdeckHooks(from: hooks), events: events)
-        try file.write(root)
+        try file.write(installing(events, in: root))
     }
 
     static func isWorkdeckCommand(_ command: String) -> Bool {

@@ -9,11 +9,14 @@ struct ClaudeSessionsSettingsSection: View {
         Section {
             LabeledContent("Session hooks") {
                 if controller.isHooksConnected {
-                    Button("Disconnect") { controller.disconnectHooks() }
+                    Button("Disconnect…") { controller.reviewHooksDisconnect() }
                 } else {
-                    Button("Connect…") { controller.isConfirmingHooksConnect = true }
+                    Button("Connect…") { controller.reviewHooksConnect() }
                         .disabled(!controller.canConnectHooks)
                 }
+            }
+            if let review = controller.hooksReview {
+                SettingsChangeReview(review: review, onCancel: controller.cancelHooksReview, onConfirm: controller.confirmHooksReview)
             }
             if controller.isHooksConnected {
                 Toggle("Keep Mac awake while Claude works", isOn: $settings.keepAwakeWhileWorking)
@@ -41,12 +44,6 @@ struct ClaudeSessionsSettingsSection: View {
         } footer: {
             Text(footer)
                 .foregroundStyle(controller.hooksError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
-        }
-        .alert("Connect session hooks?", isPresented: $controller.isConfirmingHooksConnect) {
-            Button("Connect") { controller.connectHooks() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Workdeck will add hooks to ~/.claude/settings.json that record when Claude Code sessions and agents start, stop and which tool they run. A backup will be saved next to it.")
         }
         .onChange(of: settings.keepAwakeWhileWorking) { controller.settingsChanged() }
     }

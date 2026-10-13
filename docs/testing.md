@@ -41,8 +41,8 @@ Watch the snapshot with `cat ~/Library/Application\ Support/Workdeck/claude-usag
 
 | # | Scenario | Steps | Expected |
 |---|---|---|---|
-| L1 | Connect from popover | Turn on Claude Code in the popover. | "Connect Claude Code?" alert appears; Connect adds `statusLine` pointing at `…/Contents/Helpers/workdeck-statusline`; backup file exists. |
-| L2 | Connect from Settings | Disconnect, then click Connect… in Settings. | Same alert and result as L1. |
+| L1 | Connect from popover | Turn on Claude Code in the popover. | Settings opens with "Changes to settings.json" under Status line: the diff adds `statusLine` (with the reformat note if the file was not written by Workdeck before); Connect adds `statusLine` pointing at `…/Contents/Helpers/workdeck-statusline`; backup file exists. |
+| L2 | Connect from Settings | Click Disconnect… in Settings, then Disconnect; then click Connect…. | Disconnect… shows the diff removing `statusLine`; after Disconnect, Connect… shows the same block as L1. |
 | L3 | Data arrives | Run a Claude Code session (Pro/Max) and send a message. | Claude Code's status line shows `5h N%`; the notch shows the same; popover row shows both windows and "updated just now". |
 | L4 | Hover | Hover the compact notch, then move away. | Expands with both windows, reset times and age; collapses on exit. |
 | L5 | Threshold alert | In Settings, set "First alert at" below the current usage. | The compact ring flashes orange once (red for the second threshold); the notch does not expand; the indicator turns orange. Hovering still expands and collapses correctly. |
@@ -92,7 +92,10 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | S21 | Edit counts | Ask a session to edit a file (a few lines), overwrite another with Write, and create a new one; hover the notch while it works and after it stops. | Each edit shows `+N −M` matching Claude Code's "Added N lines, removed M lines" (a new file only `+N`); the session ends with `this turn · 3 files +… −…`, which becomes `last turn` after the Stop and disappears on the next prompt without edits. An agent's edit shows its counts on the agent's second line. |
 | S22 | Step ticker | Give a session a task with several tool calls and hover the notch. | Under the session, up to three steps: the oldest faintest, the current one bright with `▸`; each new step slides in at the bottom while the oldest fades out; the row's right side says `working`. |
 | S23 | Focus | Give two sessions tasks a few seconds apart and hover the notch while both work. | Only the session started last has the ticker; it does not move to the other session on each action, and moves only when that session stops. The other session shows its action and counts in its row. |
-| S8 | Disconnect | Disconnect in Settings. | Only Workdeck's hook entries are removed; your own hooks stay; the sessions disappear from the notch. |
+| S24 | Diff tabs and secrets | With `personal` added, put `"env": {"ANTHROPIC_API_KEY": "sk-test"}` in `~/.claude/settings.json`, disconnect the hooks, then Connect…. | Tabs `main` and `personal`; each shows its own file; the key's value shows as `"…"`; after Connect the file still holds `sk-test`. |
+| S25 | File changed while reviewing | Open Connect… for the hooks, then edit `~/.claude/settings.json` in a text editor and save; click Connect. | Nothing is written; the block shows "settings.json changed since this preview. Review the new changes." with the new diff; Connect then works. |
+| S26 | One block at a time | Open Connect… for the status line, then Connect… for the hooks; close Settings with a block open and reopen it. | Opening the second closes the first; reopened Settings shows no block and nothing was written. |
+| S8 | Disconnect | Disconnect… in Settings, check the diff, then Disconnect. | The diff removes only Workdeck's hook entries; your own hooks stay; the sessions disappear from the notch. |
 
 ## Claude Code Instances and Chats Checklist
 

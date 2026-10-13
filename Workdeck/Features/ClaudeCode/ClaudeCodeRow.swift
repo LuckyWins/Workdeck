@@ -4,6 +4,7 @@ import SwiftUI
 struct ClaudeCodeRow: View {
     @Bindable var controller: ClaudeCodeController
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -30,32 +31,19 @@ struct ClaudeCodeRow: View {
 
             Toggle("Claude Code", isOn: Binding(
                 get: { controller.settings.isEnabled && controller.hasAnySource },
-                set: { controller.setEnabled($0) }
+                set: { enabled in
+                    let needsConnecting = enabled && !controller.hasAnySource
+                    controller.setEnabled(enabled)
+                    if needsConnecting {
+                        // The status line's review, or the reason it cannot open, waits in Settings (settings diff spec §2.1).
+                        openSettings()
+                        NSApp.activate()
+                    }
+                }
             ))
             .toggleStyle(.switch)
             .labelsHidden()
             .controlSize(.small)
-        }
-        .claudeConnectConfirmation(controller.limits)
-    }
-}
-
-extension View {
-    /// The confirmation shown before Workdeck edits `~/.claude/settings.json`.
-    func claudeConnectConfirmation(_ controller: ClaudeLimitsController) -> some View {
-        modifier(ClaudeConnectConfirmation(controller: controller))
-    }
-}
-
-private struct ClaudeConnectConfirmation: ViewModifier {
-    @Bindable var controller: ClaudeLimitsController
-
-    func body(content: Content) -> some View {
-        content.alert("Connect Claude Code?", isPresented: $controller.isConfirmingConnect) {
-            Button("Connect") { controller.connect() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Workdeck will add a status line command to ~/.claude/settings.json. A backup will be saved next to it.")
         }
     }
 }

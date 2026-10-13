@@ -11,11 +11,14 @@ struct ClaudeLimitsSettingsSection: View {
         Section {
             LabeledContent("Status line") {
                 if controller.isConnected {
-                    Button("Disconnect") { controller.disconnect() }
+                    Button("Disconnect…") { controller.reviewDisconnect() }
                 } else {
-                    Button("Connect…") { controller.isConfirmingConnect = true }
+                    Button("Connect…") { controller.reviewConnect() }
                         .disabled(!controller.canConnect)
                 }
+            }
+            if let review = controller.review {
+                SettingsChangeReview(review: review, onCancel: controller.cancelReview, onConfirm: controller.confirmReview)
             }
             Toggle("Fetch usage from Anthropic (unofficial)", isOn: Binding(
                 get: { settings.fetchFromAPI },
@@ -70,7 +73,6 @@ struct ClaudeLimitsSettingsSection: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
             hasCameraHousing = NotchPresenter.hasCameraHousingScreen()
         }
-        .claudeConnectConfirmation(controller)
     }
 
     private var footer: String {

@@ -8,11 +8,14 @@ enum ClaudeConnectionStatus: Equatable {
 enum ClaudeConnectorError: LocalizedError, Equatable {
     case invalidSettings
     case binaryMissing
+    /// The file changed after the user reviewed its diff (settings diff spec §2.3).
+    case changedSinceReview
 
     var errorDescription: String? {
         switch self {
         case .invalidSettings: "Fix ~/.claude/settings.json first: it is not valid JSON."
         case .binaryMissing: "The status line command is missing from the app bundle."
+        case .changedSinceReview: SettingsReviewText.changedSinceShown
         }
     }
 
@@ -26,9 +29,23 @@ protocol ClaudeCodeConnecting {
     var status: ClaudeConnectionStatus { get }
     var canConnect: Bool { get }
     var backupPath: String { get }
-    func connect() throws
-    func disconnect() throws
+    /// `reviewed` is the change the user confirmed: the file is written only if it is still as reviewed.
+    func connect(reviewed: SettingsChange?) throws
+    func disconnect(reviewed: SettingsChange?) throws
     func repairPathIfNeeded()
+    /// What `connect()` / `disconnect()` would write, without writing; `nil` when nothing would change.
+    func plannedConnect() throws -> SettingsChange?
+    func plannedDisconnect() throws -> SettingsChange?
+}
+
+extension ClaudeCodeConnecting {
+    func connect() throws {
+        try connect(reviewed: nil)
+    }
+
+    func disconnect() throws {
+        try disconnect(reviewed: nil)
+    }
 }
 
 /// Adds Workdeck's status line command to Claude Code's user settings, and removes it again.
@@ -89,9 +106,11 @@ struct ClaudeCodeConnector: ClaudeCodeConnecting {
         return .connected
     }
 
-    func connect() throws {
+    func connect(reviewed: SettingsChange?) throws {
         guard canConnect else { throw ClaudeConnectorError.binaryMissing }
-        var settings = try readSettings() ?? Settings(root: [:])
+        let current = try file.readWithData()
+        try ClaudeSettingsFile.ensure(current, matches: reviewed)
+        var settings = Settings(root: current?.root ?? [:])
 
         try file.backUp()
         if let original = settings.root["statusLine"], let command = settings.statusLineCommand, !Self.isWorkdeckCommand(command) {
@@ -105,18 +124,55 @@ struct ClaudeCodeConnector: ClaudeCodeConnecting {
         try write(settings)
     }
 
-    func disconnect() throws {
-        if var settings = try readSettings(), let command = settings.statusLineCommand, Self.isWorkdeckCommand(command) {
-            let config = StatusLineConfig.read(from: configURL)
-            if let json = config?.originalStatusLineJSON,
-               let original = try? JSONSerialization.jsonObject(with: Data(json.utf8)) {
-                settings.root["statusLine"] = original
+    func disconnect(reviewed: SettingsChange?) throws {
+        let current = try file.readWithData()
+        try ClaudeSettingsFile.ensure(current, matches: reviewed)
+        if let current, let command = Settings(root: current.root).statusLineCommand, Self.isWorkdeckCommand(command) {
+            var settings = Settings(root: current.root)
+            if let chained = chainedStatusLine() {
+                settings.root["statusLine"] = chained
             } else {
                 settings.root.removeValue(forKey: "statusLine")
             }
             try write(settings)
         }
         try? FileManager.default.removeItem(at: configURL)
+    }
+
+    func plannedConnect() throws -> SettingsChange? {
+        guard canConnect else { throw ClaudeConnectorError.binaryMissing }
+        let current = try file.readWithData()
+        var settings = Settings(root: current?.root ?? [:])
+        let hasOwn = settings.statusLineCommand.map { !Self.isWorkdeckCommand($0) } ?? false
+        settings.root["statusLine"] = ["type": "command", "command": expectedCommand]
+        var change = try file.change(account: accountName, from: current, to: settings.root)
+        change?.hasOwnStatusLine = hasOwn
+        return change
+    }
+
+    func plannedDisconnect() throws -> SettingsChange? {
+        guard let current = try file.readWithData() else { return nil }
+        var settings = Settings(root: current.root)
+        guard let command = settings.statusLineCommand, Self.isWorkdeckCommand(command) else { return nil }
+        let chained = chainedStatusLine()
+        if let chained {
+            settings.root["statusLine"] = chained
+        } else {
+            settings.root.removeValue(forKey: "statusLine")
+        }
+        var change = try file.change(account: accountName, from: current, to: settings.root)
+        change?.hasOwnStatusLine = chained != nil
+        return change
+    }
+
+    private var accountName: String {
+        instance ?? ClaudeInstance.mainName
+    }
+
+    /// The user's own status line that connecting chained, if any.
+    private func chainedStatusLine() -> Any? {
+        guard let json = StatusLineConfig.read(from: configURL)?.originalStatusLineJSON else { return nil }
+        return try? JSONSerialization.jsonObject(with: Data(json.utf8))
     }
 
     /// Points the status line at this app bundle if it was connected from another location.

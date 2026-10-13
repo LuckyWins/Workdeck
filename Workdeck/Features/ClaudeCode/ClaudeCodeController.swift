@@ -162,8 +162,9 @@ final class ClaudeCodeController {
 
     func setEnabled(_ enabled: Bool) {
         if enabled, !hasAnySource {
-            limits.isConfirmingConnect = true
-            return
+            limits.reviewConnect()
+            // A status line connected outside Workdeck has nothing to review.
+            guard hasAnySource else { return }
         }
         settings.isEnabled = enabled
         refresh()

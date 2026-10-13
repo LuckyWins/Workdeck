@@ -148,6 +148,127 @@ struct ClaudeCodeConnectorTests {
         #expect(ClaudeCodeConnector.isTemporaryLocation("/Volumes/Workdeck/Workdeck.app/Contents/Helpers/workdeck-statusline"))
         #expect(!ClaudeCodeConnector.isTemporaryLocation("/Applications/Workdeck.app/Contents/Helpers/workdeck-statusline"))
     }
+
+    @Test func planningNeverWrites() throws {
+        let binary = try makeFakeBinary()
+        try writeSettings(["model": "opus", "statusLine": ["type": "command", "command": "~/bin/prompt.sh"]])
+        let before = try Data(contentsOf: settingsURL)
+        _ = try connector(binaryPath: binary).plannedConnect()
+        _ = try connector(binaryPath: binary).plannedDisconnect()
+        #expect(try Data(contentsOf: settingsURL) == before)
+        #expect(!FileManager.default.fileExists(atPath: connector().backupURL.path))
+        #expect(StatusLineConfig.read(from: paths.statusLineConfigURL) == nil)
+    }
+
+    @Test func plannedConnectOnAMissingFileAddsEverything() throws {
+        let binary = try makeFakeBinary()
+        let change = try #require(try connector(binaryPath: binary).plannedConnect())
+        #expect(change.account == "main")
+        #expect(change.url == settingsURL)
+        #expect(change.original == nil)
+        #expect(change.before == "")
+        #expect(change.after.contains("workdeck-statusline"))
+        #expect(!change.isReformatted)
+        #expect(!change.hasOwnStatusLine)
+    }
+
+    @Test func planningRecordsTheBytesItWasBuiltFrom() throws {
+        let binary = try makeFakeBinary()
+        try writeSettings(["model": "opus"])
+        let change = try #require(try connector(binaryPath: binary).plannedConnect())
+        #expect(change.original == (try Data(contentsOf: settingsURL)))
+    }
+
+    @Test func plannedConnectMatchesWhatConnectWrites() throws {
+        let binary = try makeFakeBinary()
+        try writeSettings(["model": "opus", "statusLine": ["type": "command", "command": "~/bin/prompt.sh"]])
+        let change = try #require(try connector(binaryPath: binary).plannedConnect())
+        #expect(change.hasOwnStatusLine)
+        try connector(binaryPath: binary).connect()
+        #expect(change.after == String(decoding: try Data(contentsOf: settingsURL), as: UTF8.self))
+    }
+
+    @Test func reformattingIsNotedOnlyWhenTheFileIsNotInWorkdecksFormat() throws {
+        let binary = try makeFakeBinary()
+        // `writeSettings` writes compact JSON, not Workdeck's format.
+        try writeSettings(["model": "opus"])
+        #expect(try #require(try connector(binaryPath: binary).plannedConnect()).isReformatted)
+        try ClaudeSettingsFile(url: settingsURL).write(["model": "opus"])
+        #expect(try #require(try connector(binaryPath: binary).plannedConnect()).isReformatted == false)
+    }
+
+    @Test func plannedDisconnectRestoresTheChainedStatusLine() throws {
+        let binary = try makeFakeBinary()
+        try writeSettings(["statusLine": ["type": "command", "command": "~/bin/prompt.sh"]])
+        try connector(binaryPath: binary).connect()
+        let change = try #require(try connector(binaryPath: binary).plannedDisconnect())
+        #expect(change.hasOwnStatusLine)
+        #expect(change.after.contains("~/bin/prompt.sh"))
+        #expect(!change.after.contains("workdeck-statusline"))
+        try connector(binaryPath: binary).disconnect()
+        #expect(change.after == String(decoding: try Data(contentsOf: settingsURL), as: UTF8.self))
+    }
+
+    @Test func nothingToChangeIsNoPlan() throws {
+        let binary = try makeFakeBinary()
+        #expect(try connector(binaryPath: binary).plannedDisconnect() == nil)
+        try writeSettings(["model": "opus"])
+        #expect(try connector(binaryPath: binary).plannedDisconnect() == nil)
+        try connector(binaryPath: binary).connect()
+        #expect(try connector(binaryPath: binary).plannedConnect() == nil)
+    }
+
+    @Test func planningRefusesWhatConnectingRefuses() throws {
+        #expect(throws: ClaudeConnectorError.binaryMissing) { try connector(binaryPath: "/nonexistent/workdeck-statusline").plannedConnect() }
+        let binary = try makeFakeBinary()
+        try FileManager.default.createDirectory(at: settingsURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("not json".utf8).write(to: settingsURL)
+        #expect(throws: ClaudeConnectorError.invalidSettings) { try connector(binaryPath: binary).plannedConnect() }
+    }
+
+    @Test func theDiffHidesSecretsButTheFileKeepsThem() throws {
+        let binary = try makeFakeBinary()
+        try writeSettings(["env": ["ANTHROPIC_API_KEY": "sk-ant-secret"], "model": "opus"])
+        let change = try #require(try connector(binaryPath: binary).plannedConnect())
+        let shown = (change.blocks ?? []).flatMap { block -> [String] in
+            if case .lines(let lines) = block { return lines.map(\.text) }
+            return []
+        }
+        #expect(!shown.joined().contains("sk-ant-secret"))
+        #expect(change.after.contains("sk-ant-secret"))
+    }
+
+    @Test func aReviewedConnectRefusesAFileChangedSinceTheReview() throws {
+        let binary = try makeFakeBinary()
+        try writeSettings(["model": "opus"])
+        let change = try #require(try connector(binaryPath: binary).plannedConnect())
+        try writeSettings(["model": "sonnet"])
+        let edited = try Data(contentsOf: settingsURL)
+        #expect(throws: ClaudeConnectorError.changedSinceReview) { try connector(binaryPath: binary).connect(reviewed: change) }
+        #expect(try Data(contentsOf: settingsURL) == edited)
+        #expect(!FileManager.default.fileExists(atPath: connector().backupURL.path))
+    }
+
+    @Test func aReviewedDisconnectRefusesAFileChangedSinceTheReview() throws {
+        let binary = try makeFakeBinary()
+        try connector(binaryPath: binary).connect()
+        let change = try #require(try connector(binaryPath: binary).plannedDisconnect())
+        var settings = try readSettings()
+        settings["model"] = "opus"
+        try writeSettings(settings)
+        let edited = try Data(contentsOf: settingsURL)
+        #expect(throws: ClaudeConnectorError.changedSinceReview) { try connector(binaryPath: binary).disconnect(reviewed: change) }
+        #expect(try Data(contentsOf: settingsURL) == edited)
+    }
+
+    @Test func anUnchangedReviewedConnectWritesThePlan() throws {
+        let binary = try makeFakeBinary()
+        try writeSettings(["model": "opus"])
+        let change = try #require(try connector(binaryPath: binary).plannedConnect())
+        try connector(binaryPath: binary).connect(reviewed: change)
+        #expect(String(decoding: try Data(contentsOf: settingsURL), as: UTF8.self) == change.after)
+    }
+
 }
 
 @MainActor

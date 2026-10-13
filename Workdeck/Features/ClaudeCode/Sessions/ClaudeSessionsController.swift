@@ -14,8 +14,8 @@ final class ClaudeSessionsController {
 
     private(set) var hooksStatus: ClaudeConnectionStatus = .notConnected
     private(set) var hooksError: String?
-    /// Drives the "Connect session hooks?" confirmation.
-    var isConfirmingHooksConnect = false
+    /// A Connect or Disconnect of the hooks waiting in Settings for the user to confirm its diff.
+    var hooksReview: SettingsReview?
 
     struct InstanceHooks: Equatable {
         var status: ClaudeConnectionStatus
@@ -107,9 +107,16 @@ final class ClaudeSessionsController {
         onChange?()
     }
 
-    func connectHooks() {
+    /// With `reviewed`, writes only the reviewed files, each only if it is still as reviewed (settings diff spec §2.3).
+    func connectHooks(reviewed: [SettingsChange]? = nil) {
         do {
-            try hooksConnector.connect()
+            if let reviewed {
+                if let change = reviewed.first(where: { $0.account == ClaudeInstance.mainName }) {
+                    try hooksConnector.connect(reviewed: change)
+                }
+            } else {
+                try hooksConnector.connect()
+            }
             hooksError = nil
             settings.isEnabled = true
         } catch {
@@ -119,26 +126,123 @@ final class ClaudeSessionsController {
         hooksStatus = hooksConnector.status
         if isHooksConnected {
             for name in extraConnectors.keys {
-                connectExtra(name)
+                if let reviewed {
+                    if let change = reviewed.first(where: { $0.account == name }) {
+                        connectExtra(name, reviewed: change)
+                    }
+                } else {
+                    connectExtra(name)
+                }
             }
         }
         onChange?()
     }
 
-    func disconnectHooks() {
+    /// With `reviewed`, writes only the reviewed files, each only if it is still as reviewed (settings diff spec §2.3).
+    func disconnectHooks(reviewed: [SettingsChange]? = nil) {
         do {
-            try hooksConnector.disconnect()
+            if let reviewed {
+                if let change = reviewed.first(where: { $0.account == ClaudeInstance.mainName }) {
+                    try hooksConnector.disconnect(reviewed: change)
+                }
+            } else {
+                try hooksConnector.disconnect()
+            }
             hooksError = nil
         } catch {
             hooksError = error.localizedDescription
             WorkdeckLog.sessions.error("Session hooks: \(error.localizedDescription, privacy: .public)")
         }
         for (name, entry) in extraConnectors where !sharesMainSettings(entry.directory) {
-            try? entry.connector.disconnect()
+            if let reviewed {
+                guard let change = reviewed.first(where: { $0.account == name }) else { continue }
+                try? entry.connector.disconnect(reviewed: change)
+            } else {
+                try? entry.connector.disconnect()
+            }
             instanceHooks[name] = InstanceHooks(status: entry.connector.status, error: nil)
         }
         hooksStatus = hooksConnector.status
         onChange?()
+    }
+
+    func reviewHooksConnect() {
+        hooksReview = makeHooksReview(.connect)
+        if hooksReview == nil {
+            // Nothing to write: the file may already hold Workdeck's hooks, put there outside Workdeck.
+            hooksStatus = hooksConnector.status
+        }
+        onChange?()
+    }
+
+    func reviewHooksDisconnect() {
+        hooksReview = makeHooksReview(.disconnect)
+        if hooksReview == nil {
+            // Nothing to write: Workdeck's hooks are already gone; disconnecting still updates the state.
+            disconnectHooks()
+        }
+        onChange?()
+    }
+
+    func cancelHooksReview() {
+        hooksReview = nil
+    }
+
+    /// Runs the reviewed action if every file is as its diff showed; otherwise shows the new diff (settings diff spec §2.3).
+    func confirmHooksReview() {
+        guard let shown = hooksReview else { return }
+        var current = makeHooksReview(shown.action)
+        guard current?.changes == shown.changes else {
+            current?.changedSinceShown = true
+            hooksReview = current
+            onChange?()
+            return
+        }
+        hooksReview = nil
+        switch shown.action {
+        case .connect: connectHooks(reviewed: shown.changes)
+        case .disconnect: disconnectHooks(reviewed: shown.changes)
+        }
+    }
+
+    /// Main and the extra instances the action would change, as `connectHooks()` and `disconnectHooks()` pick them.
+    private func makeHooksReview(_ action: SettingsReviewAction) -> SettingsReview? {
+        var changes: [SettingsChange] = []
+        do {
+            if let change = try action == .connect ? hooksConnector.plannedConnect() : hooksConnector.plannedDisconnect() {
+                changes.append(change)
+            }
+            // The file reads fine now: an earlier error about it is out of date.
+            hooksError = nil
+        } catch {
+            hooksError = error.localizedDescription
+            // Main's file must be fixed before connecting; disconnecting still reviews the others, as
+            // `disconnectHooks()` goes on with them.
+            if action == .connect {
+                return nil
+            }
+        }
+        for name in extraConnectors.keys {
+            guard let entry = extraConnectors[name],
+                  !sharesMainSettings(entry.directory),
+                  FileManager.default.fileExists(atPath: entry.directory.path)
+            else { continue }
+            do {
+                if let change = try action == .connect ? entry.connector.plannedConnect() : entry.connector.plannedDisconnect() {
+                    changes.append(change)
+                }
+                instanceHooks[name]?.error = nil
+            } catch {
+                instanceHooks[name] = InstanceHooks(status: entry.connector.status, error: message(for: error, directory: entry.directory))
+            }
+        }
+        return changes.isEmpty ? nil : SettingsReview(kind: .hooks, action: action, changes: SettingsReview.ordered(changes))
+    }
+
+    private func message(for error: any Error, directory: URL) -> String {
+        (error as? ClaudeConnectorError) == .invalidSettings
+            ? ClaudeConnectorError.invalidSettingsMessage(directory: directory)
+            : error.localizedDescription
     }
 
     /// Hook connectors for the extra instances that exist at launch; call before `start()`.
@@ -187,7 +291,7 @@ final class ClaudeSessionsController {
         ClaudeSettingsFile.isSameFile(directory.appending(path: "settings.json"), as: mainSettingsURL)
     }
 
-    private func connectExtra(_ name: String) {
+    private func connectExtra(_ name: String, reviewed: SettingsChange? = nil) {
         guard let entry = extraConnectors[name] else { return }
         guard !sharesMainSettings(entry.directory) else {
             instanceHooks[name] = InstanceHooks(status: .notConnected, error: ClaudeSettingsFile.sharedSettingsMessage)
@@ -198,13 +302,10 @@ final class ClaudeSessionsController {
             return
         }
         do {
-            try entry.connector.connect()
+            try entry.connector.connect(reviewed: reviewed)
             instanceHooks[name] = InstanceHooks(status: entry.connector.status, error: nil)
         } catch {
-            let message = (error as? ClaudeConnectorError) == .invalidSettings
-                ? ClaudeConnectorError.invalidSettingsMessage(directory: entry.directory)
-                : error.localizedDescription
-            instanceHooks[name] = InstanceHooks(status: entry.connector.status, error: message)
+            instanceHooks[name] = InstanceHooks(status: entry.connector.status, error: message(for: error, directory: entry.directory))
             WorkdeckLog.sessions.error("Session hooks (\(name, privacy: .public)): \(error.localizedDescription, privacy: .public)")
         }
     }

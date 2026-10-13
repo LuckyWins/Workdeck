@@ -10,8 +10,8 @@ final class ClaudeLimitsController {
     let main: AccountLimits
     /// Extra instances, in the order they were added.
     private(set) var extras: [AccountLimits] = []
-    /// Drives the "Connect Claude Code?" confirmation.
-    var isConfirmingConnect = false
+    /// A Connect or Disconnect of the status line waiting in Settings for the user to confirm its diff.
+    var review: SettingsReview?
 
     /// Limits data or their settings changed; the composer redraws.
     @ObservationIgnored var onChange: (() -> Void)?
@@ -203,25 +203,106 @@ final class ClaudeLimitsController {
         onChange?()
     }
 
-    func connect() {
-        if main.connect() {
+    /// With `reviewed`, writes only the reviewed files, each only if it is still as reviewed (settings diff spec §2.3).
+    func connect(reviewed: [SettingsChange]? = nil) {
+        func connect(_ account: AccountLimits) -> Bool {
+            guard let reviewed else { return account.connect() }
+            guard let change = reviewed.first(where: { $0.account == account.label }) else {
+                // Nothing to write for this account: its file may already hold Workdeck's command.
+                account.refreshStatus()
+                return account.isConnected
+            }
+            return account.connect(reviewed: change)
+        }
+        if connect(main) {
             settings.connectedAt = store.now
             settings.isEnabled = true
             for account in extras where !account.isConnected {
-                account.connect()
+                _ = connect(account)
             }
         }
         onChange?()
     }
 
-    func disconnect() {
+    /// With `reviewed`, writes only the reviewed files, each only if it is still as reviewed (settings diff spec §2.3).
+    func disconnect(reviewed: [SettingsChange]? = nil) {
         for account in accounts {
-            account.disconnect()
+            if let reviewed {
+                if let change = reviewed.first(where: { $0.account == account.label }) {
+                    account.disconnect(reviewed: change)
+                } else {
+                    account.refreshStatus()
+                }
+            } else {
+                account.disconnect()
+            }
         }
         if main.connectError == nil {
             settings.connectedAt = nil
         }
         onChange?()
+    }
+
+    func reviewConnect() {
+        review = makeReview(.connect)
+        if review == nil {
+            // Nothing to write: the files may already hold Workdeck's command, put there outside Workdeck.
+            for account in accounts {
+                account.refreshStatus()
+            }
+        }
+        onChange?()
+    }
+
+    func reviewDisconnect() {
+        review = makeReview(.disconnect)
+        if review == nil {
+            // Nothing to write: Workdeck's entries are already gone; disconnecting still updates the state.
+            disconnect()
+        }
+        onChange?()
+    }
+
+    func cancelReview() {
+        review = nil
+    }
+
+    /// Runs the reviewed action if every file is as its diff showed; otherwise shows the new diff (settings diff spec §2.3).
+    func confirmReview() {
+        guard let shown = review else { return }
+        var current = makeReview(shown.action)
+        guard current?.changes == shown.changes else {
+            current?.changedSinceShown = true
+            review = current
+            onChange?()
+            return
+        }
+        review = nil
+        switch shown.action {
+        case .connect: connect(reviewed: shown.changes)
+        case .disconnect: disconnect(reviewed: shown.changes)
+        }
+    }
+
+    /// Main and the extra accounts the action would change, as `connect()` and `disconnect()` pick them.
+    private func makeReview(_ action: SettingsReviewAction) -> SettingsReview? {
+        let candidates = action == .connect ? [main] + extras.filter { !$0.isConnected } : accounts
+        var changes: [SettingsChange] = []
+        for account in candidates {
+            do {
+                if let change = try account.plannedChange(action) {
+                    changes.append(change)
+                }
+            } catch {
+                account.report(error)
+                // Main's file must be fixed before connecting; disconnecting still reviews the others, as
+                // `disconnect()` goes on with them. An extra's error shows in Instances.
+                if account === main, action == .connect {
+                    return nil
+                }
+            }
+        }
+        return changes.isEmpty ? nil : SettingsReview(kind: .statusLine, action: action, changes: SettingsReview.ordered(changes))
     }
 
     /// Threshold and reset alerts since the previous call, per account and labeled with it; none while the
