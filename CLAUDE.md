@@ -53,6 +53,11 @@ Workdeck is a macOS menu bar toolbox for developers. Each tool is one row in the
 
 ## Git
 
+- Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): description`.
+  - Types: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `style`, `build`, `ci`, `chore`, `revert`.
+  - Scopes are the area touched: `lid`, `helper`, `notch`, `limits`, `usage-api`, `statusline`, `sessions`, `hooks`, `instances`, `chats`, `accounts`, `settings`, `popover`, `app`; omit the scope when a change spans many areas.
+  - The header is at most 72 characters, imperative, lowercase after the colon, no trailing period. Details go in the body, wrapped at 72 characters, after a blank line.
+  - A breaking change adds `!` after the type or scope and a `BREAKING CHANGE:` footer.
 - No `Co-Authored-By` trailers and no mention of Claude or AI tools in commit messages or PR descriptions.
 
 ## Verification
