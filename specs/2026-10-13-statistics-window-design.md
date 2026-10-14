@@ -82,7 +82,7 @@ Chosen in the browser: a single-column window in the style of Screen Time (one b
 - Colors by `RecapPalette` (§5): the week's top three projects in indigo, cyan and yellow, every other project gray.
 - A green dashed line at the daily average (§3.2), labeled `avg`, as in Screen Time.
 - Days after today on the current week are drawn as faint empty columns; today's label is bold.
-- Hovering a bar shows that day's total and its projects with their times.
+- Hovering a bar shows that day in the header as Screen Time does (changed 2026-10-14): `Coding time · Tue, Oct 13`, the day's total in large type, `3 projects · 22m above the daily average` (`about the daily average` within a minute); the other bars dim, and a tooltip beside the bar lists the day's projects with their times. The pointer leaving brings the week back.
 
 ### 3.4 Lists
 

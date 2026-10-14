@@ -44,6 +44,7 @@ The focused session's three steps (`specs/2026-10-13-edit-counts-and-step-ticker
 
 - When a new step arrives, the previous current step moves up one line, shrinks to about 92 % and shifts 4 pt left (0.38 s, `timingCurve(0.4, 0, 0.2, 1)`); its `▸` turns into `✓` in `Terminal.faint`. The oldest step fades and rises out of the top. The new step slides in from below and fades in.
 - Earlier steps keep `Terminal.faint` text; the current one `Terminal.text`.
+- A running agent's current action (its card's second line) shimmers the same way (added 2026-10-14); before its first action, `starting…` stays dim.
 - The current step's text shimmers: a light band (`Terminal.text` over `Terminal.dim`) sweeps across it every 2.2 s, only while the notch is expanded and the session works.
 - The list fades out at its top (about 16 % of its height) and bottom (about 8 %) with a gradient mask.
 - Only the mark and text step back; the counts keep their column, at 40 % opacity on finished steps. Counts (`+N −M`) and the agent launch rule (no current marker while the latest step launched an agent) are unchanged.

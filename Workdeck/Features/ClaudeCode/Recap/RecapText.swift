@@ -39,6 +39,19 @@ nonisolated enum RecapText {
         format("EEE", date, calendar: calendar)
     }
 
+    /// "Tue, Oct 13": the hovered day in the Statistics window's header.
+    static func dayDate(_ date: Date, calendar: Calendar) -> String {
+        format("EEE, MMM d", date, calendar: calendar)
+    }
+
+    /// "3 projects · 22m above the daily average"; within a minute, "about the daily average".
+    static func dayDetail(projects: Int, seconds: Double, average: Double) -> String {
+        let count = "\(projects) \(projects == 1 ? "project" : "projects")"
+        let difference = seconds - average
+        guard abs(difference) >= 60 else { return "\(count) · about the daily average" }
+        return "\(count) · \(duration(abs(difference))) \(difference > 0 ? "above" : "below") the daily average"
+    }
+
     /// "▲ 18% from the same days last week" (statistics spec §3.2); `nil` without a comparison.
     static func comparison(_ change: Double?) -> String? {
         guard let change else { return nil }

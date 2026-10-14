@@ -246,9 +246,21 @@ struct SessionsList: View {
 
     @ViewBuilder
     private func stepText(_ step: StepRow, isCurrent: Bool, at date: Date) -> some View {
-        if isCurrent && !reduceMotion {
-            let phase = TickerShimmer.phase(at: date)
+        if isCurrent {
+            shimmeringText(step.action, at: date)
+        } else {
             Text(step.action)
+                .foregroundStyle(Terminal.faint)
+        }
+    }
+
+    /// What is running now: a light band crosses the text every `TickerShimmer.period` (notch polish spec §4);
+    /// with Reduce Motion, plain bright text.
+    @ViewBuilder
+    private func shimmeringText(_ text: String, at date: Date) -> some View {
+        if !reduceMotion {
+            let phase = TickerShimmer.phase(at: date)
+            Text(text)
                 .foregroundStyle(
                     LinearGradient(
                         stops: [
@@ -261,8 +273,8 @@ struct SessionsList: View {
                     )
                 )
         } else {
-            Text(step.action)
-                .foregroundStyle(isCurrent ? Terminal.text : Terminal.faint)
+            Text(text)
+                .foregroundStyle(Terminal.text)
         }
     }
 
@@ -317,8 +329,7 @@ struct SessionsList: View {
                 Text(isLast ? " " : "│")
                     .foregroundStyle(Terminal.faint)
                 Text(" ")
-                Text(agent.detail)
-                    .foregroundStyle(Terminal.dim)
+                agentDetail(agent, at: date)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 if let lines = agent.actionLines {
@@ -333,6 +344,18 @@ struct SessionsList: View {
         }
         .font(Terminal.font(10))
         .help([agent.type, agent.description, agent.model, agent.isBackground ? "background" : "foreground"].compactMap { $0 }.joined(separator: " · "))
+    }
+
+    /// An agent's current action shimmers like the focused session's current step; its description, before the
+    /// first action, stays dim.
+    @ViewBuilder
+    private func agentDetail(_ agent: AgentRow, at date: Date) -> some View {
+        if agent.action != nil {
+            shimmeringText(agent.detail, at: date)
+        } else {
+            Text(agent.detail)
+                .foregroundStyle(Terminal.dim)
+        }
     }
 
     /// Working sessions pulse, sessions waiting for you blink slowly, idle ones stay still.

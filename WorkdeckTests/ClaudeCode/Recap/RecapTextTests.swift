@@ -50,4 +50,12 @@ struct RecapTextTests {
         #expect(RecapText.sessions(1) == "1 session")
         #expect(RecapText.sessions(1200) == "1\u{2009}200 sessions")
     }
+
+    @Test func aHoveredDaysHeader() {
+        let tuesday = RecapCalendar.date(ofKey: "2026-10-13", calendar: calendar)!
+        #expect(RecapText.dayDate(tuesday, calendar: calendar) == "Tue, Oct 13")
+        #expect(RecapText.dayDetail(projects: 3, seconds: 3180, average: 1860) == "3 projects · 22m above the daily average")
+        #expect(RecapText.dayDetail(projects: 1, seconds: 600, average: 1860) == "1 project · 21m below the daily average")
+        #expect(RecapText.dayDetail(projects: 2, seconds: 1890, average: 1860) == "2 projects · about the daily average")
+    }
 }

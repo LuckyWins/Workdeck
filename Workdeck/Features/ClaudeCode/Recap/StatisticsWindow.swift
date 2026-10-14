@@ -48,10 +48,11 @@ struct StatisticsContent: View {
     @State private var selectedProject: String?
     @State private var hoveredProject: String?
 
-    /// `selectedProject` starts a page already filtered (snapshots).
-    init(controller: StatisticsController, selectedProject: String? = nil) {
+    /// `selectedProject` and `selectedDay` start a page already filtered or hovered (snapshots).
+    init(controller: StatisticsController, selectedProject: String? = nil, selectedDay: String? = nil) {
         self.controller = controller
         _selectedProject = State(initialValue: selectedProject)
+        _selectedDay = State(initialValue: selectedDay)
     }
 
     private var summary: WeeklyRecapSummary {
@@ -86,7 +87,32 @@ struct StatisticsContent: View {
 
     // MARK: Header (§3.2, §3.5)
 
+    /// The day under the pointer, while it has work; the header shows it instead of the week, as Screen Time does.
+    private var hoveredDay: RecapDaySplit? {
+        guard let selectedDay, let day = summary.days.first(where: { dayLabel($0) == selectedDay }), !isFuture(day), day.seconds > 0 else {
+            return nil
+        }
+        return day
+    }
+
     private var header: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            if let day = hoveredDay {
+                Text("Coding time · \(RecapText.dayDate(day.date, calendar: controller.calendar))")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text(RecapText.duration(day.seconds))
+                    .font(.system(size: 30, weight: .semibold))
+                Text(RecapText.dayDetail(projects: day.projects.count, seconds: day.seconds, average: controller.pace.average))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                weekHeader
+            }
+        }
+    }
+
+    private var weekHeader: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(controller.isCurrentWeek ? "Coding time · so far" : "Coding time")
                 .font(.subheadline)
@@ -131,9 +157,12 @@ struct StatisticsContent: View {
                     BarMark(x: .value("Day", label), y: .value("Hours", top), width: .ratio(0.8))
                         .foregroundStyle(Color.gray.opacity(0.08))
                 } else {
+                    // While a day is hovered, the other days step back.
+                    let isDimmed = hoveredDay.map { $0.date != day.date } ?? false
                     ForEach(RecapPalette.stack(day, in: summary), id: \.name) { part in
                         BarMark(x: .value("Day", label), y: .value("Hours", part.seconds / 3600), width: .ratio(0.8))
                             .foregroundStyle(RecapPalette.color(RecapPalette.slot(of: part.name, in: summary)))
+                            .opacity(isDimmed ? 0.35 : 1)
                     }
                 }
             }
@@ -145,10 +174,11 @@ struct StatisticsContent: View {
                         Text("avg").font(.caption2).foregroundStyle(.green)
                     }
             }
-            if let selectedDay, let day = summary.days.first(where: { dayLabel($0) == selectedDay }), !isFuture(day), day.seconds > 0 {
-                RuleMark(x: .value("Day", selectedDay))
+            if let day = hoveredDay {
+                RuleMark(x: .value("Day", dayLabel(day)))
                     .foregroundStyle(.clear)
-                    .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                    // Past the bar's edge (the rule is at its center), inside the plot, so it never covers the header's day total.
+                    .annotation(position: .trailing, alignment: .top, spacing: 28, overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
                         tooltip(day)
                     }
             }
@@ -180,8 +210,8 @@ struct StatisticsContent: View {
     }
 
     private func tooltip(_ day: RecapDaySplit) -> some View {
+        // The day's total is in the header meanwhile; the tooltip lists its projects.
         VStack(alignment: .leading, spacing: 2) {
-            Text("\(dayLabel(day)) · \(RecapText.duration(day.seconds))").font(.caption.weight(.semibold))
             ForEach(RecapPalette.stack(day, in: summary), id: \.name) { part in
                 HStack(spacing: 4) {
                     Circle().fill(RecapPalette.color(RecapPalette.slot(of: part.name, in: summary))).frame(width: 6, height: 6)
