@@ -683,6 +683,84 @@ struct NotchPresenterTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
+    func expandForHoldsTheNotchWithoutACountdown() async throws {
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.expand(for: .milliseconds(300))
+        await waitFor { presenter.appliedTarget == .expanded }
+        // Nothing in normal use expands this way, so it has no bar to explain.
+        #expect(presenter.model.countdown == nil)
+        await waitFor { presenter.appliedTarget == .compact }
+        #expect(presenter.model.countdown == nil)
+        #expect(!surface.overlapped)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func clearAlertsDropsAlertsHoldsAndFlashes() async throws {
+        let (presenter, _) = makePresenter(flashDuration: .milliseconds(100), alertDuration: .seconds(5))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.expand(for: .seconds(5))
+        presenter.flash([.sessionFinished(project: "a", worked: 60)])
+        await waitFor { !presenter.model.alerts.isEmpty }
+        presenter.clearAlerts()
+        #expect(presenter.model.alerts.isEmpty)
+        #expect(presenter.model.countdown == nil)
+        await waitFor { presenter.appliedTarget == .compact }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(presenter.model.flash == nil)
+        // A new alert after the clear shows and closes as usual.
+        presenter.flash([.sessionNeedsYou(project: "b")])
+        await waitFor { presenter.model.alerts == [.sessionNeedsYou(project: "b")] }
+        #expect(presenter.model.countdown != nil)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aRecapForAShorterTimeCountsThatDown() async throws {
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.showRecap(WeeklyRecapSummary(weekStart: fixedNow), for: .milliseconds(300))
+        await waitFor { presenter.appliedTarget == .expanded }
+        let countdown = try #require(presenter.model.countdown)
+        #expect(abs(countdown.end.timeIntervalSince(countdown.start) - 0.3) < 0.001)
+        await waitFor { presenter.appliedTarget == .compact }
+        #expect(presenter.model.recap != nil)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aRecapForNoTimeShowsOnlyItsMark() async throws {
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.showRecap(WeeklyRecapSummary(weekStart: fixedNow), for: .zero)
+        await settle(presenter)
+        #expect(presenter.model.recap != nil)
+        #expect(!presenter.isRecapExpanded)
+        #expect(!surface.calls.contains("expand"))
+        presenter.showRecap(WeeklyRecapSummary(weekStart: fixedNow))
+        await waitFor { presenter.appliedTarget == .expanded }
+        #expect(presenter.isRecapExpanded)
+        presenter.showRecap(nil)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func showRecapNilEndsAHoveredRecap() async throws {
+        let (presenter, _) = makePresenter(hoverEnterDelay: .zero)
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.showRecap(WeeklyRecapSummary(weekStart: fixedNow))
+        await waitFor { presenter.appliedTarget == .expanded }
+        surface.onHoverChange?(true)
+        await waitFor { presenter.model.isHovering }
+        presenter.showRecap(nil)
+        surface.onHoverChange?(false)
+        await waitFor { presenter.appliedTarget == .compact }
+        #expect(presenter.model.recap == nil)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
     func theCountdownEndsWithTheAlert() async throws {
         let (presenter, _) = makePresenter(alertDuration: .milliseconds(300))
         presenter.show(state(.notch(.normal)))

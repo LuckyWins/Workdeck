@@ -6,6 +6,7 @@ struct SettingsView: View {
     let controller: LidSleepController
     let claudeCode: ClaudeCodeController
     let instances: ClaudeInstancesController
+    let demo: DemoMode
 
     @State private var diagnosticsState = DiagnosticsCopyState.idle
 
@@ -16,8 +17,27 @@ struct SettingsView: View {
                     get: { settings.launchAtLogin },
                     set: { settings.setLaunchAtLogin($0) }
                 ))
+                LabeledContent("Demo") {
+                    HStack {
+                        if demo.isActive {
+                            Text("\(demo.secondsLeft) s left")
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                        Button(demo.isActive ? "Stop Demo" : "Try Demo") {
+                            if demo.isActive {
+                                demo.stop()
+                            } else {
+                                demo.start()
+                            }
+                        }
+                    }
+                }
             } header: {
                 SettingsHeader("General", symbol: "gearshape.fill", color: .gray)
+            } footer: {
+                Text("The demo plays a one-minute scripted tour in the notch, then stops: limits, two accounts, sessions with agents, alerts and a weekly recap. Nothing is written to disk; your real sessions are still tracked.")
+                    .foregroundStyle(.secondary)
             }
 
             Section {

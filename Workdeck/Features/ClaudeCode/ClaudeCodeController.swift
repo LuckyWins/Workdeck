@@ -37,6 +37,14 @@ final class ClaudeCodeController {
     let statistics: StatisticsController
     /// Opens the Statistics window (the app hands it `WindowOpener`).
     @ObservationIgnored var onOpenStatistics: (() -> Void)?
+    /// Demo mode: the script replaces what the notch and Statistics show (demo mode spec §2.3).
+    @ObservationIgnored private(set) var isDemoActive = false
+    @ObservationIgnored private var demoElapsed: TimeInterval = 0
+    @ObservationIgnored private var demoDays: [RecapDay] = []
+    /// The demo's recap while it is up.
+    @ObservationIgnored private var demoRecap: WeeklyRecapSummary?
+    /// A real recap was expanded when the demo started; at stop it expands again, otherwise only its mark returns.
+    @ObservationIgnored private var realRecapWasExpanded = false
 
     init(
         settings: ClaudeCodeSettings,
@@ -85,14 +93,24 @@ final class ClaudeCodeController {
         limits.onChange = { [weak self] in self?.refresh() }
         sessions.onChange = { [weak self] in self?.refresh() }
         sessions.onAlerts = { [weak self] alerts in
-            guard let self, !alerts.isEmpty else { return }
+            // During the demo real alerts are dropped, not kept for later (demo mode spec §2.3).
+            guard let self, !alerts.isEmpty, !isDemoActive else { return }
             noteAlerts()
             refresh()
             flash(alerts)
         }
-        presenter.setSessionAction { [weak self] id in self?.sessions.activateSession(id: id) }
-        presenter.setProjectAction { [weak self] name in self?.sessions.activateProject(named: name) }
-        presenter.setRefreshAction { [weak self] in self?.limits.refreshNow() }
+        presenter.setSessionAction { [weak self] id in
+            guard let self, !isDemoActive else { return }
+            sessions.activateSession(id: id)
+        }
+        presenter.setProjectAction { [weak self] name in
+            guard let self, !isDemoActive else { return }
+            sessions.activateProject(named: name)
+        }
+        presenter.setRefreshAction { [weak self] in
+            guard let self, !isDemoActive else { return }
+            limits.refreshNow()
+        }
         presenter.setToggleAccountsAction { [weak self] in
             guard let self else { return }
             settings.collapsesOtherAccounts.toggle()
@@ -104,7 +122,7 @@ final class ClaudeCodeController {
             refresh()
         }
         presenter.setChatsAction { [weak self] account in
-            guard let self else { return }
+            guard let self, !isDemoActive else { return }
             onOpenChats?(sessions.latestSessionID(ofAccount: account))
         }
         screenObserver = NotificationCenter.default.addObserver(
@@ -204,6 +222,16 @@ final class ClaudeCodeController {
         sessions.updateKeepAwake()
         // Limit alerts come first: in "When active" an alert counts as activity, so a hidden notch shows (flash spec §2.3).
         let limitAlerts = limits.takeAlerts()
+        // Real limit alerts during the demo are dropped with it (demo mode spec §2.3).
+        if isDemoActive {
+            for alert in limitAlerts {
+                WorkdeckLog.alerts.notice("\(LimitsText.alertTitle(alert, showsAccount: true), privacy: .public), alert dropped during the demo")
+            }
+            // "When active" keeps timing real work, so its linger is right after the stop.
+            _ = lingers(isActive: sessions.viewState.activeCount > 0)
+            showDemoFrame()
+            return
+        }
         if !limitAlerts.isEmpty {
             noteAlerts()
         }
@@ -301,11 +329,20 @@ final class ClaudeCodeController {
             return
         }
         pendingRecap = summary
-        presenter.showRecap(summary)
+        if !isDemoActive {
+            presenter.showRecap(summary)
+        }
         refresh()
     }
 
     func dismissRecap() {
+        if isDemoActive {
+            // The demo's recap is made up: closing it keeps nothing (demo mode spec §2.3).
+            guard demoRecap != nil else { return }
+            demoRecap = nil
+            presenter.showRecap(nil)
+            return
+        }
         guard let recap = pendingRecap else { return }
         settings.dismissedRecapWeek = RecapCalendar.dayKey(recap.weekStart, calendar: calendar)
         pendingRecap = nil
@@ -321,13 +358,58 @@ final class ClaudeCodeController {
 
     /// `Details…`: the recap is done with, its week opens in the window.
     private func openRecapDetails() {
-        let week = pendingRecap?.weekStart
+        let week = isDemoActive ? demoRecap?.weekStart : pendingRecap?.weekStart
         dismissRecap()
         openStatistics(week: week)
     }
 
     private func updateStatistics() {
-        statistics.update(days: recorder?.days ?? [], isHooksConnected: sessions.isHooksConnected, thresholds: settings.thresholds)
+        statistics.update(
+            days: isDemoActive ? demoDays : recorder?.days ?? [],
+            isHooksConnected: isDemoActive || sessions.isHooksConnected,
+            thresholds: settings.thresholds
+        )
+    }
+
+    /// The notch state from the demo script, built like the real one (demo mode spec §2.3).
+    private func showDemoFrame() {
+        let now = clock()
+        let thresholds = settings.thresholds
+        let frame = ClaudeCodeDemoScript.frame(at: demoElapsed, now: now, thresholds: thresholds)
+        let withSessions = Set(frame.sessions.map { $0.instance ?? ClaudeInstance.mainName })
+        let blocks = frame.accounts.map { account in
+            AccountLimitsViewState(
+                name: account.name,
+                windows: account.windows,
+                age: account.age,
+                forecasts: demoForecasts(account.windows, now: now),
+                plan: account.plan,
+                isActive: withSessions.contains(account.name)
+            )
+        }
+        let main = blocks[0]
+        let pressing = UsageFormatting.mostPressing(main.windows.filter { $0.resetsAt > now })
+        state = LimitsViewState(
+            display: .notch(LimitsPresentation.displayLevel(pressing: pressing, hasData: true, thresholds: thresholds)),
+            windows: main.windows,
+            now: now,
+            age: main.age,
+            thresholds: thresholds,
+            forecasts: main.forecasts,
+            sessions: SessionsPresentation.viewState(sessions: frame.sessions, now: now, showsAccounts: true),
+            accounts: blocks,
+            collapsesOtherAccounts: settings.collapsesOtherAccounts
+        )
+        presenter.show(state)
+    }
+
+    private func demoForecasts(_ windows: [UsageWindow], now: Date) -> [UsageWindowKind: Date] {
+        guard settings.showForecast else { return [:] }
+        var forecasts: [UsageWindowKind: Date] = [:]
+        for window in windows where window.resetsAt > now {
+            forecasts[window.kind] = UsageForecast.exhaustion(window: window, now: now)
+        }
+        return forecasts
     }
 
     /// Writes the recorded days now (on quit) or at most once a minute (from `refresh()`).
@@ -446,5 +528,54 @@ final class ClaudeCodeController {
             return account
         }
         return shown.first(where: \.hasData) ?? shown[0]
+    }
+}
+
+extension ClaudeCodeController: DemoParticipant {
+    var demoLength: TimeInterval {
+        ClaudeCodeDemoScript.length
+    }
+
+    func demoDidStart() {
+        isDemoActive = true
+        demoElapsed = 0
+        demoDays = ClaudeCodeDemoScript.days(now: clock(), calendar: calendar)
+        // Neither side's alerts carry over: real ones leave at the start, demo ones at the stop.
+        presenter.clearAlerts()
+        // A real recap steps aside and comes back at stop.
+        realRecapWasExpanded = pendingRecap != nil && presenter.isRecapExpanded
+        if pendingRecap != nil {
+            presenter.showRecap(nil)
+        }
+        refresh()
+    }
+
+    func demoTick(elapsed: TimeInterval, previous: TimeInterval?) {
+        demoElapsed = elapsed
+        // Only the demo moves on a tick; real changes refresh on their own.
+        showDemoFrame()
+        for event in ClaudeCodeDemoScript.events(after: previous, upTo: elapsed, now: clock(), thresholds: settings.thresholds) {
+            switch event {
+            case let .expand(seconds):
+                presenter.expand(for: .seconds(seconds))
+            case let .alert(alert):
+                presenter.flash([alert])
+            case .showRecap:
+                let recap = ClaudeCodeDemoScript.recap(now: clock(), calendar: calendar)
+                demoRecap = recap
+                presenter.showRecap(recap, for: .seconds(ClaudeCodeDemoScript.recapSeconds))
+            }
+        }
+    }
+
+    func demoDidStop() {
+        isDemoActive = false
+        demoDays = []
+        presenter.clearAlerts()
+        if demoRecap != nil || pendingRecap != nil {
+            demoRecap = nil
+            presenter.showRecap(pendingRecap, for: realRecapWasExpanded ? nil : .zero)
+        }
+        refresh()
     }
 }

@@ -6,14 +6,14 @@ struct WorkdeckApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            PopoverView(controller: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode)
+            PopoverView(controller: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode, demo: appDelegate.demo)
         } label: {
             MenuBarLabel(lidSleep: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode)
         }
         .menuBarExtraStyle(.window)
 
         Settings {
-            SettingsView(settings: appDelegate.settings, controller: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode, instances: appDelegate.instances)
+            SettingsView(settings: appDelegate.settings, controller: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode, instances: appDelegate.instances, demo: appDelegate.demo)
         }
 
         Window("Claude Code Chats", id: ChatsWindow.id) {

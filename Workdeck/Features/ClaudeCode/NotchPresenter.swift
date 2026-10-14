@@ -9,6 +9,8 @@ protocol LimitsPresenting: AnyObject {
     /// Expands the notch with the text of alerts that happened together, then flashes its ring or dot once
     /// (flash spec §2.1).
     func flash(_ alerts: [LimitsAlert])
+    /// Expands the notch for `duration`, then lets it rest (demo mode spec §2.1).
+    func expand(for duration: Duration)
     /// What the refresh button in the expanded notch does.
     func setRefreshAction(_ action: @escaping () -> Void)
     /// What clicking a session in the expanded notch does.
@@ -19,8 +21,13 @@ protocol LimitsPresenting: AnyObject {
     func setChatsAction(_ action: @escaping (String) -> Void)
     /// What the control that hides or shows the other accounts' limits does.
     func setToggleAccountsAction(_ action: @escaping () -> Void)
-    /// Shows last week's recap expanded for a while, then as `◆`; `nil` removes it (recap spec §3.2).
-    func showRecap(_ recap: WeeklyRecapSummary?)
+    /// Shows last week's recap expanded for `duration` (`nil`: the usual minute), then as `◆`; `nil` removes it
+    /// (recap spec §3.2).
+    func showRecap(_ recap: WeeklyRecapSummary?, for duration: Duration?)
+    /// Drops alerts and holds on screen or waiting, and their flash: the demo's start and stop (demo mode spec §2.1).
+    func clearAlerts()
+    /// The recap is expanded or about to expand, not only its `◆` mark.
+    var isRecapExpanded: Bool { get }
     /// What `Got it` on the recap does.
     func setRecapDismissAction(_ action: @escaping () -> Void)
     /// What `Details…` on the recap does (statistics spec §4).
@@ -29,6 +36,12 @@ protocol LimitsPresenting: AnyObject {
     func setPeekAction(_ action: @escaping (Bool) -> Void)
     /// Whether the pointer is on the notch or at its place right now.
     func isPointerOnNotch() -> Bool
+}
+
+extension LimitsPresenting {
+    func showRecap(_ recap: WeeklyRecapSummary?) {
+        showRecap(recap, for: nil)
+    }
 }
 
 /// The notch operations the presenter needs; DynamicNotchKit in the app, a fake in tests.
@@ -86,6 +99,9 @@ final class NotchPresenter: LimitsPresenting {
     private let alertDuration: Duration
     private let recapDuration: Duration
     private var isShowingRecap = false
+    /// `expand(for:)` holds the notch open.
+    private var isHolding = false
+    private var holdTask: Task<Void, Never>?
     private var recapTask: Task<Void, Never>?
     private let rebuildDelay: Duration
     private let workspaceSettleDelay: Duration
@@ -193,7 +209,7 @@ final class NotchPresenter: LimitsPresenting {
 
     /// True while a flash, a rebuild, or notch operations are still pending.
     var isBusy: Bool {
-        reconcileTask != nil || flashTask != nil || alertTask != nil || recapTask != nil || rebuildTask != nil || workspaceTask != nil || hoverTask != nil || peekTask != nil
+        reconcileTask != nil || flashTask != nil || alertTask != nil || recapTask != nil || rebuildTask != nil || workspaceTask != nil || hoverTask != nil || peekTask != nil || holdTask != nil
     }
 
     func show(_ state: LimitsViewState) {
@@ -287,6 +303,8 @@ final class NotchPresenter: LimitsPresenting {
                     try? await Task.sleep(until: deadline, clock: .continuous)
                 }
             }
+            // `clearAlerts()` already cleaned up, and a newer alert may be on screen.
+            guard !Task.isCancelled else { return }
             pendingAlerts.removeAll()
             alertDeadline = nil
             model.countdown = nil
@@ -303,10 +321,51 @@ final class NotchPresenter: LimitsPresenting {
         model.countdown = NotchCountdown(start: Date(), duration: alertDuration)
     }
 
-    func showRecap(_ recap: WeeklyRecapSummary?) {
+    var isRecapExpanded: Bool {
+        isShowingRecap || recapTask != nil
+    }
+
+    func clearAlerts() {
+        holdTask?.cancel()
+        holdTask = nil
+        isHolding = false
+        alertTask?.cancel()
+        alertTask = nil
+        pendingAlerts.removeAll()
+        alertDeadline = nil
+        model.alerts = []
+        isShowingAlert = false
+        flashTask?.cancel()
+        flashTask = nil
+        pendingFlash = nil
+        model.flash = nil
+        if !isShowingRecap {
+            model.countdown = nil
+        }
+        requestReconcile()
+    }
+
+    func expand(for duration: Duration) {
+        holdTask?.cancel()
+        guard screen() != nil else { return }
+        // No countdown bar: nothing in normal use expands this way.
+        isHolding = true
+        requestReconcile()
+        holdTask = Task {
+            try? await Task.sleep(for: duration)
+            guard !Task.isCancelled else { return }
+            isHolding = false
+            holdTask = nil
+            requestReconcile()
+        }
+    }
+
+    func showRecap(_ recap: WeeklyRecapSummary?, for duration: Duration?) {
+        let recapDuration = duration ?? self.recapDuration
         endRecapExpansion()
         model.recap = recap
-        guard recap != nil, screen() != nil else {
+        // A zero duration shows only the mark.
+        guard recap != nil, recapDuration > .zero, screen() != nil else {
             requestReconcile()
             return
         }
@@ -496,11 +555,13 @@ final class NotchPresenter: LimitsPresenting {
         let isNotch: Bool = if case .notch = model.state.display { true } else { false }
         // The recap shows only while the notch does: turning the indicator off ends it (recap spec §3.1).
         let showsRecap = isShowingRecap && isNotch
-        let mayRest = isNotch && !isShowingAlert && !showsRecap
+        // A hold (the demo's start) expands like an alert, only while the notch shows.
+        let holds = isHolding && isNotch
+        let mayRest = isNotch && !isShowingAlert && !showsRecap && !holds
         let target = Self.target(
             display: model.state.display,
             isHovering: isHovering,
-            isShowingAlert: isShowingAlert || showsRecap,
+            isShowingAlert: isShowingAlert || showsRecap || holds,
             hasScreen: screen != nil,
             hidesResting: mayRest && screen.map { $0.isVirtual && fullScreen.isFullScreen($0.screen) } ?? false
         )

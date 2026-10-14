@@ -2,6 +2,7 @@ import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let settings = AppSettings()
+    let demo = DemoMode()
     private(set) lazy var lidSleep = LidSleepController(
         helper: HelperClient(),
         installer: HelperInstaller(),
@@ -12,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
     private(set) lazy var claudeCode: ClaudeCodeController = {
         let settings = ClaudeCodeSettings()
+        let demo = self.demo
         return ClaudeCodeController(
             settings: settings,
             limits: ClaudeLimitsController(
@@ -51,7 +53,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 makeHooksConnector: { SessionHooksConnector.forInstance($0) },
                 mainSettingsURL: ClaudeSettingsFile.standard().url
             ),
-            presenter: NotchPresenter(screen: { NotchPresenter.targetScreen(notchless: settings.notchlessDisplay) }),
+            // The demo always draws a notch, the virtual one on a screen without one (demo mode spec §2.3).
+            presenter: NotchPresenter(screen: { [demo] in
+                NotchPresenter.targetScreen(notchless: demo.isActive ? .virtualNotch : settings.notchlessDisplay)
+            }),
             recapStore: RecapStore.standard()
         )
     }()
@@ -86,10 +91,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { await instances.refreshAccounts() }
         claudeCode.setInstances(instances.instances)
         claudeCode.start()
-
+        demo.register(claudeCode)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        demo.stop()
         claudeCode.saveRecap()
         lidSleep.prepareForTermination()
     }

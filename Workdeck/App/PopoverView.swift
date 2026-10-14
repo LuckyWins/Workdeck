@@ -4,12 +4,27 @@ import SwiftUI
 struct PopoverView: View {
     let controller: LidSleepController
     let claudeCode: ClaudeCodeController
+    let demo: DemoMode
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("Workdeck")
                     .font(.headline)
+                if demo.isActive {
+                    HStack(spacing: 4) {
+                        Text("Demo · \(demo.secondsLeft) s")
+                            .monospacedDigit()
+                        Button("Stop") {
+                            demo.stop()
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(.tint.opacity(0.15), in: Capsule())
+                }
                 Spacer()
                 SettingsLink {
                     Image(systemName: "gearshape")

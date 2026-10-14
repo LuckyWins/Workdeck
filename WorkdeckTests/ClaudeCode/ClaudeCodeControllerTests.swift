@@ -96,9 +96,26 @@ final class FakePresenter: LimitsPresenting {
         chatsAction = action
     }
 
+    private(set) var expansions: [Duration] = []
+    func expand(for duration: Duration) {
+        expansions.append(duration)
+    }
+
     private(set) var recaps: [WeeklyRecapSummary?] = []
-    func showRecap(_ recap: WeeklyRecapSummary?) {
+    private(set) var recapDurations: [Duration?] = []
+    func showRecap(_ recap: WeeklyRecapSummary?, for duration: Duration?) {
         recaps.append(recap)
+        recapDurations.append(duration)
+    }
+
+    var recapExpanded = false
+    var isRecapExpanded: Bool {
+        recapExpanded
+    }
+
+    private(set) var clears = 0
+    func clearAlerts() {
+        clears += 1
     }
 
     private(set) var recapDismissAction: (() -> Void)?
@@ -611,6 +628,28 @@ struct ClaudeCodeControllerTests {
         now = fixedNow.addingTimeInterval(75)
         controller.refresh()
         #expect(controller.state.display == .notch(.normal))
+    }
+
+    @Test func aLingerRunsOnThroughTheDemo() throws {
+        connector.status = .connected
+        hooksConnector.status = .connected
+        settings.isEnabled = true
+        settings.mode = .whenActive
+        try writeUsage(fiveHour: 10)
+        addLiveSession()
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "s1"), to: sessionsDirectory)
+        var now = fixedNow
+        let (controller, store) = makeController(clock: { now })
+        controller.start()
+        store.reload()
+        controller.demoDidStart()
+        // The real session stops during the demo; the demo ends more than a minute later.
+        writeSessionEvent(hookEvent(.stop, at: 2, session: "s1"), to: sessionsDirectory)
+        controller.sessions.store.reload()
+        controller.refresh()
+        now = fixedNow.addingTimeInterval(65)
+        controller.demoDidStop()
+        #expect(controller.state.display == .hidden)
     }
 
     @Test(.timeLimit(.minutes(1)))
