@@ -109,4 +109,32 @@ struct LimitsPresentationTests {
         #expect(!LimitsPresentation.showsLimits(isConnected: true, mode: .whenActive, level: .normal))
         #expect(LimitsPresentation.showsLimits(isConnected: true, mode: .whenActive, level: .warning))
     }
+
+    @Test func activeAccountsGetBlocksAndTheOthersLines() {
+        var state = LimitsViewState(display: .notch(.normal), windows: [], now: Date(), age: nil, thresholds: [80, 95])
+        state.accounts = [
+            AccountLimitsViewState(name: "main", windows: [], age: 60, isActive: false),
+            AccountLimitsViewState(name: "personal", windows: [], age: 60, isActive: true),
+            AccountLimitsViewState(name: "work", windows: [], age: 60, isActive: false),
+        ]
+        #expect(state.fullBlocks.map(\.name) == ["personal"])
+        #expect(state.quietBlocks.map(\.name) == ["main", "work"])
+    }
+
+    @Test func aSingleAccountIsAlwaysABlock() {
+        var state = LimitsViewState(display: .notch(.normal), windows: [], now: Date(), age: nil, thresholds: [80, 95])
+        state.accounts = [AccountLimitsViewState(name: "main", windows: [], age: 60, isActive: false)]
+        #expect(state.fullBlocks.map(\.name) == ["main"])
+        #expect(state.quietBlocks.isEmpty)
+    }
+
+    @Test func withNoActiveAccountEveryAccountIsABlock() {
+        var state = LimitsViewState(display: .notch(.normal), windows: [], now: Date(), age: nil, thresholds: [80, 95])
+        state.accounts = [
+            AccountLimitsViewState(name: "main", windows: [], age: 60, isActive: false),
+            AccountLimitsViewState(name: "personal", windows: [], age: 60, isActive: false),
+        ]
+        #expect(state.fullBlocks.map(\.name) == ["main", "personal"])
+        #expect(state.quietBlocks.isEmpty)
+    }
 }

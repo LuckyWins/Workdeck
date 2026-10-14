@@ -135,6 +135,7 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | A3 | Session tag | Start a session with `claude-personal`. | Its row in the notch has a purple `personal` tag; main sessions have none. |
 | A4 | Limit alert | Lower the first threshold below an account's usage. | The notch expands with the alert and the account (`· personal`) for about 6 s, a click opens Chats on that account's latest session; then the compact ring flashes orange once. |
 | A5 | Remove | Settings → Remove… personal. | Its entries leave `~/.claude-personal/settings.json` (previous status line restored), `claude-usage-personal.json` is deleted, and its block and tag disappear. |
+| A6 | Account without sessions | With two accounts, work in one of them only and hover the notch. | The working account has its full block; the other is one dim line after it (`personal  7d 34% · 5h 12%` and its age, e.g. `13h ago`), without a waiting or refresh line. With no session at all, the compact notch's account has the full block. |
 
 ## Virtual Notch Checklist
 

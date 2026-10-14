@@ -67,6 +67,9 @@ nonisolated struct AccountLimitsViewState: Equatable, Sendable, Identifiable {
     var isWaiting = false
     /// "Pro", "Team 5x", from the account's `.claude.json`.
     var plan: String?
+    /// The account has a listed session, or it is the compact notch's account while no account has one; the others
+    /// are shown as one dim line.
+    var isActive = true
 
     var id: String { name }
 
@@ -104,6 +107,19 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
     var limitBlocks: [AccountLimitsViewState] {
         guard accounts.isEmpty else { return accounts }
         return [AccountLimitsViewState(name: ClaudeInstance.mainName, windows: windows, age: age, forecasts: forecasts, refresh: refresh)]
+    }
+
+    /// Full blocks: the active accounts, or every account when there is only one or none is active.
+    var fullBlocks: [AccountLimitsViewState] {
+        let blocks = limitBlocks
+        let active = blocks.filter(\.isActive)
+        return blocks.count == 1 || active.isEmpty ? blocks : active
+    }
+
+    /// The accounts without sessions, one dim line each after the full blocks.
+    var quietBlocks: [AccountLimitsViewState] {
+        let full = Set(fullBlocks.map(\.id))
+        return limitBlocks.filter { !full.contains($0.id) }
     }
 
     static let hidden = LimitsViewState(display: .hidden, windows: [], now: .distantPast, age: nil, thresholds: [80, 95])

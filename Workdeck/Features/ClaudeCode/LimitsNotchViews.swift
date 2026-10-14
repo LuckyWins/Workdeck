@@ -289,8 +289,9 @@ struct LimitsExpandedView: View {
                             .flashGlow(model.flash, color: ringFlash(for: account))
                     }
                 } else {
-                    ForEach(blocks) { account in
-                        let isFirst = account.id == blocks.first?.id
+                    let full = model.state.fullBlocks
+                    ForEach(full) { account in
+                        let isFirst = account.id == full.first?.id
                         if blocks.count > 1, isFirst {
                             accountsHeader(title: LimitsPresentation.blockTitle(account, isOnlyBlock: false), plan: account.plan, collapsed: false)
                                 .flashGlow(model.flash, color: ringFlash(for: account))
@@ -310,6 +311,19 @@ struct LimitsExpandedView: View {
                         if account.age != nil || account.refresh != .hidden || account.isWaiting {
                             ageRow(account)
                         }
+                    }
+                    // Accounts without sessions: one dim line each, with how old their figures are.
+                    let quiet = model.state.quietBlocks
+                    if !quiet.isEmpty {
+                        let width = quiet.map(\.name.count).max() ?? 0
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(quiet) { account in
+                                summaryRow(account, nameWidth: width, showsAge: true)
+                                    .opacity(0.45)
+                                    .flashGlow(model.flash, color: ringFlash(for: account))
+                            }
+                        }
+                        .padding(.top, 4)
                     }
                 }
             }
@@ -362,7 +376,7 @@ struct LimitsExpandedView: View {
     }
 
     /// An account in the short view: "main      7d 96% · 5h 41%", each percent in its level's color.
-    private func summaryRow(_ account: AccountLimitsViewState, nameWidth: Int) -> some View {
+    private func summaryRow(_ account: AccountLimitsViewState, nameWidth: Int, showsAge: Bool = false) -> some View {
         let windows = LimitsPresentation.summaryWindows(account, now: model.state.now)
         return HStack(spacing: 6) {
             Text(account.name.padding(toLength: nameWidth, withPad: " ", startingAt: 0))
@@ -385,6 +399,10 @@ struct LimitsExpandedView: View {
                     .help(account.problem ?? "")
             }
             Spacer(minLength: 0)
+            if showsAge, let age = account.age {
+                Text(LimitsText.shortAge(age))
+                    .foregroundStyle(Terminal.dim)
+            }
         }
     }
 

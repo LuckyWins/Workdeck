@@ -211,6 +211,9 @@ final class ClaudeCodeController {
         let shown = withData.isEmpty ? [limits.main] : withData
         let compact = compactAccount(among: shown)
         let plans = planLabels()
+        // Accounts with a listed session get full blocks; with no session anywhere, the compact notch's account does.
+        let withSessions = Set(sessions.store.sessions.map { $0.instance ?? ClaudeInstance.mainName })
+        let activeLabels = withSessions.isEmpty ? [compact.label] : withSessions
         let store = compact.store
         let pressing = UsageFormatting.mostPressing(store.currentWindows)
         let hasData = store.age != nil
@@ -268,7 +271,8 @@ final class ClaudeCodeController {
                     refresh: limits.refreshState(for: account),
                     problem: usageProblem(of: account),
                     isWaiting: isWaiting(account),
-                    plan: plans[account.label]
+                    plan: plans[account.label],
+                    isActive: activeLabels.contains(account.label)
                 )
             },
             compactLabel: label,

@@ -211,4 +211,21 @@ struct AccountsCompositionTests {
         controller.instanceRemoving(personal)
         #expect(controller.limits.accounts.map(\.label) == ["main"])
     }
+
+    @Test func accountsWithSessionsAreActive() throws {
+        let controller = makeController()
+        try usage(20, account: nil)
+        try usage(60, account: "personal")
+        session("p1", instance: "personal", pid: 2, at: 20)
+        reload(controller)
+        #expect(controller.state.accounts.map(\.isActive) == [false, true])
+    }
+
+    @Test func withoutSessionsTheCompactAccountIsActive() throws {
+        let controller = makeController()
+        try usage(20, account: nil)
+        try usage(60, account: "personal")
+        reload(controller)
+        #expect(controller.state.accounts.map(\.isActive) == [true, false])
+    }
 }
