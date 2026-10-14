@@ -8,7 +8,7 @@ struct MenuBarLabel: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: iconName)
+            Image(MenuBarIcon.name(level: claudeCode.menuBarLevel, isLidActive: lidSleep.isActive))
             if let text = claudeCode.menuBarText {
                 Text(text)
                     .monospacedDigit()
@@ -17,14 +17,17 @@ struct MenuBarLabel: View {
         .accessibilityLabel("Workdeck")
         .onAppear { WindowOpener.shared.openWindow = openWindow }
     }
+}
 
-    /// Menu bar items are rendered as templates, so threshold state is shown by the symbol rather than color.
-    private var iconName: String {
-        switch claudeCode.menuBarLevel {
+/// The menu bar glyph: the app icon's deck in one line (template images in the asset catalog). Menu bar items are
+/// templates, so state is shown by the shape rather than color.
+nonisolated enum MenuBarIcon {
+    static func name(level: LimitsLevel, isLidActive: Bool) -> String {
+        switch level {
         case .warning, .critical:
-            "exclamationmark.triangle.fill"
+            "MenuBarIconWarning"
         case .noData, .normal:
-            lidSleep.isActive ? "rectangle.stack.fill" : "rectangle.stack"
+            isLidActive ? "MenuBarIconOn" : "MenuBarIcon"
         }
     }
 }

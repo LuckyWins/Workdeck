@@ -15,6 +15,7 @@ Agreed on 2026-10-13, partly inspired by [Coucou](https://github.com/Louis-CFM/c
 
 ## Distribution
 
+- **README media.** A demo GIF and MP4 for the README's header and screenshots (compact notch, sessions with an agent, an alert, the recap, the Statistics window) in `docs/media/`, recorded from the demo on the MacBook notch. `screencapture` needs Screen Recording permission for the app that runs it; Terminal works without restarting VS Code. Without screen recording, the notch views can be rendered with `ImageRenderer` from the demo script.
 - **Auto-update with Sparkle.** Sparkle (MIT, free) checks an appcast XML feed, downloads the new version, and replaces the app. Needs:
   - an EdDSA key pair for signing updates; the private key stays out of the repo;
   - Developer ID signing and notarization (Apple Developer Program, $99 per year);

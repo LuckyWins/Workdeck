@@ -53,6 +53,7 @@ Workdeck is a macOS menu bar toolbox for developers. Each tool is one row in the
 ## Documentation Layout
 
 - `specs/` design specs, `plans/` implementation plans, `docs/` other documentation, `README.md`, `CLAUDE.md`, and `TODO.md` (ideas and deferred work) in the root.
+- `README.md` is the short overview (features, install, setup, privacy); feature details live in `docs/claude-code.md` and `docs/closed-lid-mode.md`, images in `docs/media/`. A user-visible change updates the matching docs page, and the README when it changes the overview.
 
 ## Git
 
