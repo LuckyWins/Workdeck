@@ -6,12 +6,12 @@ Ideas and deferred work. **Planned** lists what is agreed and in what order; eac
 
 Agreed on 2026-10-13, partly inspired by [Coucou](https://github.com/Louis-CFM/coucou).
 
-1. ~~**Notch hover delays and "When active".**~~ Done (`73961e8`). Spec: `specs/2026-10-13-notch-hover-and-when-active-design.md`.
-2. ~~**Flashes and a livelier notch.**~~ Done (`ce3b1b9`). Alerts flash the compact notch's ring (and the session dot) once in their color instead of expanding it; session and agent rows animate in and out. Spec: `specs/2026-10-13-notch-flash-design.md`.
-3. ~~**Edit line counts and a step ticker.**~~ Done (`9cd6a74`). Each Edit/Write action shows `+N −M` (green and red), counted in the hook from the diff in Claude Code's tool response without storing any text; a session row shows the turn's total (`this turn · 5 files +84 −21`). The focused (most recent working) session shows its last three steps, older ones dimmer, the current one bright.
-4. ~~**A diff before connecting.**~~ Done (`a002421`). Connect and Disconnect show the real diff of each `settings.json` they change (context lines, red and green backgrounds, one tab per account) instead of the text-only confirmation.
-5. ~~**Open a session's exact terminal tab.**~~ Done (`f7cb92b`). Clicking a terminal session focuses its window and tab (by TTY in Terminal and iTerm), not just the app.
-6. ~~**Weekly recap.**~~ Done. Stage 1 (`8f83e42`): on the first unlock of a week the notch shows last week's card (coding time with a Monday–Sunday chart by project, sessions, files, lines, commands, agents, longest work, top projects, 5-hour limit hits and weekly peak per account) until Got it; spec `specs/2026-10-13-weekly-recap-design.md`. Stage 2: "Statistics…" in the popover and "Details…" on the card open a window with any of the last 12 weeks; spec `specs/2026-10-13-statistics-window-design.md`. Stats are kept locally, counts and names only. No share image for now.
+1. ~~**Notch hover delays and "When active".**~~ Done (`9844f92`). Spec: `specs/2026-10-13-notch-hover-and-when-active-design.md`.
+2. ~~**Flashes and a livelier notch.**~~ Done (`2fe51fe`). Alerts flash the compact notch's ring (and the session dot) once in their color instead of expanding it; session and agent rows animate in and out. Spec: `specs/2026-10-13-notch-flash-design.md`.
+3. ~~**Edit line counts and a step ticker.**~~ Done (`b5d4ae0`). Each Edit/Write action shows `+N −M` (green and red), counted in the hook from the diff in Claude Code's tool response without storing any text; a session row shows the turn's total (`this turn · 5 files +84 −21`). The focused (most recent working) session shows its last three steps, older ones dimmer, the current one bright.
+4. ~~**A diff before connecting.**~~ Done (`4de5a46`). Connect and Disconnect show the real diff of each `settings.json` they change (context lines, red and green backgrounds, one tab per account) instead of the text-only confirmation.
+5. ~~**Open a session's exact terminal tab.**~~ Done (`9f7fb39`). Clicking a terminal session focuses its window and tab (by TTY in Terminal and iTerm), not just the app.
+6. ~~**Weekly recap.**~~ Done. Stage 1 (`eff9599`): on the first unlock of a week the notch shows last week's card (coding time with a Monday–Sunday chart by project, sessions, files, lines, commands, agents, longest work, top projects, 5-hour limit hits and weekly peak per account) until Got it; spec `specs/2026-10-13-weekly-recap-design.md`. Stage 2: "Statistics…" in the popover and "Details…" on the card open a window with any of the last 12 weeks; spec `specs/2026-10-13-statistics-window-design.md`. Stats are kept locally, counts and names only. No share image for now.
 
 ## Distribution
 
