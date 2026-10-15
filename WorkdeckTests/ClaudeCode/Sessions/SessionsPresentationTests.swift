@@ -102,7 +102,7 @@ struct SessionsPresentationTests {
         #expect(agents[1].name == "Review auth module")
         #expect(agents[1].customType == "code-reviewer")
         #expect(agents[1].detail == "starting…")
-        #expect(SessionsPresentation.builtInAgentTypes == ["general-purpose", "Explore", "Plan"])
+        #expect(SessionsPresentation.builtInAgentTypes == ["general-purpose", "Explore", "Plan", "Agent"])
     }
 
     @Test func anAgentWithoutADescriptionIsNamedByItsType() throws {
@@ -233,5 +233,28 @@ struct SessionsTextTests {
         #expect(SessionsText.turn(TurnRow(isFinished: false, fileCount: 5, lines: lines)) == "this turn · 5 files")
         #expect(SessionsText.turn(TurnRow(isFinished: true, fileCount: 1, lines: lines)) == "last turn · 1 file")
         #expect(SessionsText.turn(TurnRow(isFinished: false, fileCount: 0, lines: lines)) == "this turn")
+    }
+
+    @Test func codexAgentsReadLikeClaudes() throws {
+        var codex = session("c", .working, agents: [
+            RunningAgent(id: "a1", type: "default", description: "swift_file_inventory", startedAt: fixedNow),
+            RunningAgent(id: "a2", type: "default", startedAt: fixedNow.addingTimeInterval(1)),
+        ])
+        codex.agent = .codex
+        let agents = try #require(SessionsPresentation.viewState(sessions: [codex], now: fixedNow).rows.first?.agents)
+        #expect(agents.map(\.name) == ["Swift file inventory", "Agent"])
+        #expect(agents.map(\.customType) == [nil, nil])
+    }
+
+    @Test func claudeAgentNamesStayAsTheyAre() throws {
+        let claude = session("a", .working, agents: [RunningAgent(id: "a1", type: "default", description: "keep_this_name", startedAt: fixedNow)])
+        let agents = try #require(SessionsPresentation.viewState(sessions: [claude], now: fixedNow).rows.first?.agents)
+        #expect(agents.first?.name == "keep_this_name")
+        #expect(agents.first?.customType == "default")
+    }
+
+    @Test(arguments: [("swift_file_inventory", "Swift file inventory"), ("money_c1_review", "Money c1 review"), ("Already fine", "Already fine"), ("_", "_")])
+    func readableTaskNames(raw: String, expected: String) {
+        #expect(SessionsPresentation.readableTaskName(raw) == expected)
     }
 }

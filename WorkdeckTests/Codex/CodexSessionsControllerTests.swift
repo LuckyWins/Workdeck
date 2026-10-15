@@ -13,7 +13,7 @@ struct CodexSessionsControllerTests {
 
     private func makeController() -> CodexSessionsController {
         let store = ClaudeSessionStore(directory: directory, liveness: liveness, agent: .codex, oneSessionPerProcess: false) { fixedNow.addingTimeInterval(30) }
-        let controller = CodexSessionsController(store: store, hooksConnector: hooks, activator: activator, sleepPreventer: sleepPreventer, notch: notch, root: makeTemporaryDirectory(), frontmostBundleID: { nil })
+        let controller = CodexSessionsController(store: store, hooksConnector: hooks, activator: activator, sleepPreventer: sleepPreventer, notch: notch, frontmostBundleID: { nil })
         controller.isEnabled = { true }
         return controller
     }

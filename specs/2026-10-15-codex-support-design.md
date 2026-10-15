@@ -61,6 +61,8 @@ The data sources come from two probes on 2026-10-14 and 2026-10-15 on Codex CLI 
 
 ### 3.3 Codex Sessions
 
+> Edits, agent names and the session file path changed on 2026-10-16: see `specs/2026-10-16-codex-sessions-full-design.md`.
+
 - **Connecting.** Settings → Codex → **Connect…** shows the diff of `~/.codex/hooks.json` (created when missing) in the existing review sheet (`SettingsReview`), backs it up to `~/.codex/hooks.json.workdeck-backup`, and adds `"<app>/Contents/Helpers/workdeck-hook" --agent codex` to the ten events of §2.2 with a 5 s timeout. **Disconnect…** shows its diff and removes only Workdeck's entries. A file that changed since the review is refused, as for `settings.json`. Sessions already running pick up the hooks at their next start.
 - **Storage.** `workdeck-hook --agent codex` writes to `~/Library/Application Support/Workdeck/sessions-codex/`, one file per session, in today's event format with the same trimming and deletion.
 - **Payload filter (allowlist).** Kept: event name, session, turn, agent and tool call IDs, `agent_type`, the project folder (`cwd`), `transcript_path`, `source`, `reason`, `stop_hook_active`, the host app (§3.3 last item), the PID and, on `SubagentStart`, `model` (the agent's model, shown in its row). Actions: `Bash` → `Bash <first 30 characters of the command>` with secret-looking values masked as for Claude; `collaborationspawn_agent` → an agent launch with the first 30 characters of `task_name`; `collaborationwait_agent` → `Waiting for agent`; any other tool → its name only. Never kept: `prompt`, `last_assistant_message`, `tool_response`, `message`, `description`.

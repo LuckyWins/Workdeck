@@ -17,8 +17,8 @@ Connect **Session hooks** in Settings → Codex to list Codex sessions next to C
 
 - A session works, waits for you (a permission request, until you answer) or is idle; its agents appear as a tree with their own steps and model.
 - The VS Code extension runs every chat of a window in one Codex process that outlives a closed chat, so silence ends a session: after 30 minutes without events it shows as idle (without a "finished" alert), after 3 hours it leaves the list.
-- Steps come from Codex's tool calls (`Bash rg -n …`); patches Codex applies show as `Edit index.md +4 −1`, counted from the `patch_apply_end` lines of its session file; edits made through the shell are not counted.
-- The hook keeps only the event, IDs, the project folder, the host app, the `codex` process and the session file's path; never prompts, answers or command output. Events live in `~/Library/Application Support/Workdeck/sessions-codex`.
+- Steps come from Codex's tool calls (`Bash rg -n …`, `Web`); patches Codex applies show as `Edit index.md +4 −1`, or `Edit 3 files +12 −4` for one patch of several files, and join the turn's total, the recap and Statistics. The hook counts them from the patch in `apply_patch`'s hook event and keeps only the counts and file names; edits made through the shell are not counted. Agents are named after their task (`Swift file inventory`) and show their model.
+- The hook keeps only the event, IDs, the project folder, the host app, the `codex` process, an agent's task name and model, and a patch's counts and file names; never prompts, answers, patch text or command output. Workdeck reads Codex's session files only for limits. Events live in `~/Library/Application Support/Workdeck/sessions-codex`.
 - "Notify when a session finishes", "needs you" and "Keep Mac awake" in Settings → Notch apply to Codex sessions too. Clicking a Codex session brings forward its VS Code window or Terminal or iTerm2 tab.
 
 ## Recap and Statistics

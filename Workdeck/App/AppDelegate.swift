@@ -81,8 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hooksConnector: CodexHooksConnector.standard(),
             activator: WindowActivator(workspace: SystemWorkspace()),
             sleepPreventer: PowerAssertionSleepPreventer(),
-            notch: notch.settings,
-            root: CodexSessionFiles.root()
+            notch: notch.settings
         ),
         composer: notch
     )

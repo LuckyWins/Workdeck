@@ -1,20 +1,24 @@
 import Foundation
 
-/// What `workdeck-hook` keeps from a payload. For Claude Code, `transcriptPath` only locates the agent's description and is
-/// never stored; for Codex, the session file's path is kept so the app can count its patches, and `model` names a new
-/// agent's model (Claude's comes from the agent's `meta.json`).
+/// What `workdeck-hook` reads from a payload besides the event. `transcriptPath` only locates a Claude Code agent's
+/// description and is never stored; `model` names a new Codex agent's model (Claude's comes from the agent's
+/// `meta.json`).
 nonisolated struct HookPayload: Equatable, Sendable {
     var event: HookEvent
     var transcriptPath: String?
     var model: String?
 }
 
-/// Copies an allowlist of fields from Claude Code's hook JSON. Everything else, including prompts, answers, and tool
-/// input and output, is never stored: from tool input only the action summary and an edit's file name, from an edit's
-/// response only its line counts.
+/// Copies an allowlist of fields from Claude Code's and Codex's hook JSON. Everything else, including prompts, answers,
+/// and tool input and output, is never stored: from tool input only the action summary, an edit's file name and a
+/// Codex spawn's task name, from an applied edit or Codex patch only its line counts and file names. Codex's tools are
+/// recognized by their names, which Claude Code never uses.
 nonisolated enum HookPayloadFilter {
     static let maxFieldLength = 100
     static let maxActionLength = 30
+    static let maxEditedFiles = 20
+    /// Codex's own tools, named as a person would.
+    static let codexToolNames = ["webrun": "Web", "clockcurr_time": "Clock"]
 
     /// The tool and a short target (spec §10.1); the rest of the tool input is never read.
     static func action(toolName: String, input: [String: Any]?) -> String {
@@ -24,6 +28,12 @@ nonisolated enum HookPayloadFilter {
         }
         if toolName == "collaborationwait_agent" {
             return "Waiting for agent"
+        }
+        if toolName == "apply_patch" {
+            return truncated(CodexPatchText.parse(input?["command"] as? String ?? "")?.action ?? toolName)
+        }
+        if let name = codexToolNames[toolName] {
+            return name
         }
         if toolName.hasPrefix("mcp__") {
             let server = toolName.components(separatedBy: "__").dropFirst().first ?? ""
@@ -151,6 +161,22 @@ nonisolated enum HookPayloadFilter {
             event.linesAdded = counts.added
             event.linesRemoved = counts.removed
             event.editedFile = fileName((root["tool_input"] as? [String: Any])?["file_path"]).map { String($0.prefix(maxFieldLength)) }
+        }
+        // Codex's patches: counts and file names once applied; the text is never kept (Codex sessions spec §4).
+        if name == .postToolUse, root["tool_name"] as? String == "apply_patch",
+           let response = root["tool_response"] as? String,
+           response.split(maxSplits: 1, omittingEmptySubsequences: false, whereSeparator: \.isNewline).first == "Exit code: 0",
+           let patch = CodexPatchText.parse((root["tool_input"] as? [String: Any])?["command"] as? String ?? "") {
+            event.linesAdded = patch.added
+            event.linesRemoved = patch.removed
+            event.editedFiles = patch.files.prefix(maxEditedFiles).map { String($0.name.prefix(maxFieldLength)) }
+        }
+        // A spawn names the agent that starts next only once it started one: its response then holds the task's name.
+        if name == .postToolUse, root["tool_name"] as? String == "collaborationspawn_agent",
+           let response = (root["tool_response"] as? String).flatMap({ try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] }),
+           response["task_name"] is String,
+           let task = firstLine((root["tool_input"] as? [String: Any])?["task_name"]) {
+            event.agentTaskName = String(task.prefix(maxFieldLength))
         }
         if name == .stop, agentID == nil, let tasks = root["background_tasks"] as? [[String: Any]] {
             event.backgroundAgentIDs = tasks

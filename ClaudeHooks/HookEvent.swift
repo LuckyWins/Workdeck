@@ -40,6 +40,8 @@ nonisolated struct HookEvent: Codable, Equatable, Sendable {
     var notificationType: String?
     var agentID: String?
     var agentType: String?
+    /// Codex's spawn call: the new agent's task name, which names the agent that starts next (Codex sessions spec §3.2).
+    var agentTaskName: String?
     var agentDescription: String?
     /// From the agent's `meta.json`: a model alias such as "opus", and whether it runs in the background. For Codex, the
     /// model ID its `SubagentStart` names.
@@ -58,9 +60,12 @@ nonisolated struct HookEvent: Codable, Equatable, Sendable {
     var linesAdded: Int?
     var linesRemoved: Int?
     var editedFile: String?
+    /// Codex's `apply_patch`: the base names of the files an applied patch changed (at most 20).
+    var editedFiles: [String]?
     /// The extra instance whose hook wrote this event (`--instance <name>`); `nil` for the main one.
     var instance: String?
-    /// Codex only: its session file, where the app counts the lines of applied patches (Codex spec §3.3).
+    /// Codex's session file, written by hooks before 2026-10-16; still decoded from old event files, never read (Codex
+    /// sessions spec §4).
     var transcriptPath: String?
 
     /// The counts of an applied edit; `nil` for every other event.

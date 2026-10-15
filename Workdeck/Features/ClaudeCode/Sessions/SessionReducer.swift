@@ -50,7 +50,6 @@ nonisolated enum SessionReducer {
                 isBlank: ["startup", "clear", "resume"].contains(event.source),
                 turn: TurnEdits(startedAt: event.time)
             )
-            session.transcriptPath = current?.transcriptPath
         } else if event.name != .sessionStart {
             session.isBlank = false
         }
@@ -68,7 +67,6 @@ nonisolated enum SessionReducer {
         session.hostBundleID = event.hostBundleID ?? session.hostBundleID
         session.termProgram = event.termProgram ?? session.termProgram
         session.instance = event.instance ?? session.instance
-        session.transcriptPath = event.transcriptPath ?? session.transcriptPath
         session.lastEventAt = max(session.lastEventAt, event.time)
 
         switch event.name {
@@ -78,6 +76,7 @@ nonisolated enum SessionReducer {
                 setStatus(session.statusBeforeCompact == .idle ? .idle : .working, at: event.time, on: &session)
             }
         case .userPromptSubmit:
+            session.pendingAgentNames.removeAll()
             session.steps = []
             session.turn = TurnEdits(startedAt: event.time)
             session.earlyLines = []
@@ -98,6 +97,10 @@ nonisolated enum SessionReducer {
                 setStatus(.working, at: event.time, on: &session)
             }
         case .postToolUse:
+            // A Codex spawn that started an agent; its SubagentStart follows (Codex sessions spec §3.2).
+            if let task = event.agentTaskName {
+                session.pendingAgentNames.append(task)
+            }
             // The finished command stays on screen until the next one starts; only mark the agent as heard from.
             markSeen(event.agentID, at: event.time, on: &session)
             if let lines = event.lineCounts {
@@ -125,6 +128,7 @@ nonisolated enum SessionReducer {
                 break
             }
         case .stop:
+            session.pendingAgentNames.removeAll()
             session.action = nil
             session.lastStopAt = event.time
             // Claude Code lists the background agents alive at this Stop; foreground agents have finished,
@@ -140,6 +144,7 @@ nonisolated enum SessionReducer {
             session.waitEndsOnNextCall = true
         case .interrupt:
             // Foreground agents end with the interrupted turn; background ones go on.
+            session.pendingAgentNames.removeAll()
             session.action = nil
             session.agents.removeAll { !$0.isBackground }
             setStatus(.idle, at: event.time, on: &session)
@@ -154,7 +159,7 @@ nonisolated enum SessionReducer {
                 var agent = RunningAgent(
                     id: agentID,
                     type: event.agentType ?? "Agent",
-                    description: event.agentDescription,
+                    description: event.agentDescription ?? takeAgentName(from: &session),
                     startedAt: event.time
                 )
                 agent.model = event.agentModel
@@ -189,12 +194,20 @@ nonisolated enum SessionReducer {
         }
     }
 
+    /// The oldest waiting spawn name, for an agent its hook did not describe (Codex).
+    private static func takeAgentName(from session: inout ClaudeSession) -> String? {
+        session.pendingAgentNames.isEmpty ? nil : session.pendingAgentNames.removeFirst()
+    }
+
     /// An applied edit joins the turn, and the step or agent action of the same tool call (spec §2.3).
     private static func addEdit(_ lines: LineCounts, of event: HookEvent, to session: inout ClaudeSession) {
         session.turn.edits += 1
         session.turn.added += lines.added
         session.turn.removed += lines.removed
         if let file = event.editedFile {
+            session.turn.files.insert(file)
+        }
+        for file in event.editedFiles ?? [] {
             session.turn.files.insert(file)
         }
         guard let toolUseID = event.toolUseID else { return }

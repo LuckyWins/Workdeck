@@ -88,6 +88,26 @@ struct SessionFileTrimmerTests {
         #expect(SessionFileTrimmer.kept(all, session: session, tailSize: size(all)) == all)
     }
 
+    @Test func trimmedLinesKeepCodexAgentNames() throws {
+        let history = [
+            start,
+            hookEvent(.userPromptSubmit, at: 10),
+            hookEvent(.postToolUse, at: 11) { $0.agentTaskName = "count_swift"; $0.toolUseID = "call_1" },
+            hookEvent(.subagentStart, at: 12) { $0.agentID = "a1"; $0.agentType = "default" },
+            hookEvent(.subagentStop, at: 13) { $0.agentID = "a1" },
+            hookEvent(.postToolUse, at: 14) { $0.agentTaskName = "count_docs"; $0.toolUseID = "call_2" },
+            hookEvent(.subagentStart, at: 15) { $0.agentID = "a2"; $0.agentType = "default" },
+        ] + (0..<40).map { index in hookEvent(.postToolUse, at: 20 + Double(index)) }
+        let all = try lines(history)
+        var original = try #require(SessionReducer.reduce(history))
+        original.agent = .codex
+        #expect(original.agents.map(\.description) == ["count_docs"])
+        let kept = SessionFileTrimmer.kept(all, session: original, tailSize: size(all.suffix(5)))
+        let rebuilt = try #require(SessionReducer.reduce(try events(kept)))
+        #expect(rebuilt.agents.map(\.id) == ["a2"])
+        #expect(rebuilt.agents.map(\.description) == ["count_docs"])
+    }
+
     @Test func trimmedLinesRebuildTheSameTurn() throws {
         let counted: (TimeInterval, String) -> HookEvent = { seconds, file in
             hookEvent(.postToolUse, at: seconds) { $0.toolUseID = "t\(Int(seconds))"; $0.linesAdded = 5; $0.linesRemoved = 2; $0.editedFile = file }

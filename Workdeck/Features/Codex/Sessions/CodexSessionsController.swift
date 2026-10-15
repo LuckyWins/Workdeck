@@ -21,7 +21,6 @@ final class CodexSessionsController {
     @ObservationIgnored private let activator: any WindowActivating
     @ObservationIgnored private let sleepPreventer: any SleepPreventing
     @ObservationIgnored private let notch: NotchSettings
-    @ObservationIgnored private let patches: CodexPatchReader
     @ObservationIgnored private let frontmostBundleID: @MainActor () -> String?
     @ObservationIgnored private var previousSessions: [ClaudeSession] = []
     @ObservationIgnored private var isWatching = false
@@ -32,7 +31,6 @@ final class CodexSessionsController {
         activator: any WindowActivating,
         sleepPreventer: any SleepPreventing,
         notch: NotchSettings,
-        root: URL,
         frontmostBundleID: @escaping @MainActor () -> String? = { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
     ) {
         self.store = store
@@ -40,7 +38,6 @@ final class CodexSessionsController {
         self.activator = activator
         self.sleepPreventer = sleepPreventer
         self.notch = notch
-        patches = CodexPatchReader(root: root)
         self.frontmostBundleID = frontmostBundleID
     }
 
@@ -52,8 +49,8 @@ final class CodexSessionsController {
         hooksConnector.canConnect
     }
 
-    /// The store's sessions with the lines of their applied patches; none without hooks. Read again on each store
-    /// change (an event, or the minute tick), not on every redraw.
+    /// The store's sessions; none without hooks. Read again on each store change (an event, or the minute tick), not
+    /// on every redraw.
     private(set) var listedSessions: [ClaudeSession] = []
 
     func start() {
@@ -149,8 +146,7 @@ final class CodexSessionsController {
     }
 
     private func updateListedSessions() {
-        listedSessions = isHooksConnected ? store.sessions.map(patches.enrich) : []
-        patches.forgetFiles(except: listedSessions)
+        listedSessions = isHooksConnected ? store.sessions : []
     }
 
     private func makeReview(_ action: SettingsReviewAction) -> SettingsReview? {

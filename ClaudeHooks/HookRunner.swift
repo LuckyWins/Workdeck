@@ -40,10 +40,6 @@ nonisolated struct HookRunner: Sendable {
             payload.event.agentTranscriptPath = AgentDescriptionReader.transcriptURL(forMeta: url).path
         }
         if isCodex {
-            // Only a session file's path is kept, never its content; the app checks where it points.
-            if let path = payload.transcriptPath, path.hasSuffix(".jsonl"), path.count <= 512 {
-                payload.event.transcriptPath = path
-            }
             payload.event.pid = codexPID()
             if payload.event.name == .subagentStart {
                 payload.event.agentModel = payload.model

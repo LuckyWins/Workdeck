@@ -104,7 +104,16 @@ nonisolated enum SessionsPresentation {
     static let maxSessions = 3
     static let maxAgentsPerSession = 2
     /// Claude Code's own agent types say little about the task, so the description stands in for them.
-    static let builtInAgentTypes: Set<String> = ["general-purpose", "Explore", "Plan"]
+    static let builtInAgentTypes: Set<String> = ["general-purpose", "Explore", "Plan", "Agent"]
+    /// Codex's type for every agent it spawns; its rows show the task's name instead.
+    static let codexDefaultAgentType = "default"
+
+    /// `swift_file_inventory` → `Swift file inventory`; a name of only underscores stays as it is.
+    static func readableTaskName(_ name: String) -> String {
+        let spaced = name.replacingOccurrences(of: "_", with: " ").trimmingCharacters(in: .whitespaces)
+        guard let first = spaced.first else { return name }
+        return first.uppercased() + spaced.dropFirst()
+    }
 
     /// `sessions` arrive in display order from `ClaudeSessionStore`.
     static func viewState(sessions: [ClaudeSession], now: Date, showsAccounts: Bool = false) -> SessionsViewState {
@@ -122,8 +131,8 @@ nonisolated enum SessionsPresentation {
                 agents: agents.prefix(maxAgentsPerSession).map { agent in
                     AgentRow(
                         id: agent.id,
-                        type: agent.type,
-                        description: agent.description,
+                        type: session.agent == .codex && agent.type == codexDefaultAgentType ? "Agent" : agent.type,
+                        description: session.agent == .codex ? agent.description.map(readableTaskName) : agent.description,
                         action: agent.action,
                         startedAt: agent.startedAt,
                         model: (agent.modelID ?? agent.model).map(ModelName.display),

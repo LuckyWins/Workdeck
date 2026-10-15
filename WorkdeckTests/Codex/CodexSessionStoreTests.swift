@@ -30,9 +30,73 @@ struct CodexSessionStoreTests {
         #expect(session.action == nil)
     }
 
-    @Test func theSessionFileIsKept() throws {
-        let session = try #require(SessionReducer.reduce([event(.userPromptSubmit, at: 1) { $0.transcriptPath = "/x/rollout-c1.jsonl" }]))
-        #expect(session.transcriptPath == "/x/rollout-c1.jsonl")
+    @Test func anOldEventWithASessionFileStillReads() throws {
+        let json = #"{"time":0,"name":"UserPromptSubmit","sessionID":"c1","transcriptPath":"/x/rollout-c1.jsonl"}"#
+        let event = try JSONDecoder().decode(HookEvent.self, from: Data(json.utf8))
+        let session = try #require(SessionReducer.reduce([event]))
+        #expect(session.status == .working)
+    }
+
+    @Test func aPatchCountsOnItsStepAndInTheTurn() throws {
+        let session = try #require(SessionReducer.reduce([
+            event(.userPromptSubmit, at: 1),
+            event(.preToolUse, at: 2) { $0.action = "Edit 2 files"; $0.toolUseID = "call_1" },
+            event(.postToolUse, at: 3) { $0.toolUseID = "call_1"; $0.linesAdded = 3; $0.linesRemoved = 1; $0.editedFiles = ["App.swift", "notes.md"] },
+        ]))
+        #expect(session.steps.last?.lines == LineCounts(added: 3, removed: 1))
+        #expect(session.turn.edits == 1)
+        #expect(session.turn.added == 3 && session.turn.removed == 1)
+        #expect(session.turn.files == ["App.swift", "notes.md"])
+    }
+
+    @Test func anAgentsPatchShowsOnItsRow() throws {
+        let session = try #require(SessionReducer.reduce([
+            event(.userPromptSubmit, at: 1),
+            event(.subagentStart, at: 2) { $0.agentID = "a1"; $0.agentType = "default" },
+            event(.preToolUse, at: 3) { $0.agentID = "a1"; $0.action = "Edit App.swift"; $0.toolUseID = "call_2" },
+            event(.postToolUse, at: 4) { $0.agentID = "a1"; $0.toolUseID = "call_2"; $0.linesAdded = 2; $0.linesRemoved = 0; $0.editedFiles = ["App.swift"] },
+        ]))
+        #expect(session.agents.first?.actionLines == LineCounts(added: 2, removed: 0))
+        #expect(session.turn.files == ["App.swift"])
+    }
+
+    @Test func spawnNamesGoToAgentsInOrder() throws {
+        let session = try #require(SessionReducer.reduce([
+            event(.userPromptSubmit, at: 1),
+            event(.preToolUse, at: 2) { $0.action = "Agent count_swift"; $0.toolUseID = "call_1" },
+            event(.postToolUse, at: 2.1) { $0.agentTaskName = "count_swift"; $0.toolUseID = "call_1" },
+            event(.preToolUse, at: 3) { $0.action = "Agent count_docs"; $0.toolUseID = "call_2" },
+            event(.postToolUse, at: 3.1) { $0.agentTaskName = "count_docs"; $0.toolUseID = "call_2" },
+            event(.subagentStart, at: 4) { $0.agentID = "a1"; $0.agentType = "default" },
+            event(.subagentStart, at: 5) { $0.agentID = "a2"; $0.agentType = "default" },
+        ]))
+        #expect(session.agents.map(\.description) == ["count_swift", "count_docs"])
+        #expect(session.pendingAgentNames.isEmpty)
+    }
+
+    @Test func aFailedSpawnNamesNoAgent() throws {
+        let session = try #require(SessionReducer.reduce([
+            event(.userPromptSubmit, at: 1),
+            event(.preToolUse, at: 2) { $0.action = "Agent refused_one"; $0.toolUseID = "call_1" },
+            event(.postToolUse, at: 2.1) { $0.toolUseID = "call_1" },
+            event(.preToolUse, at: 3) { $0.action = "Agent count_docs"; $0.toolUseID = "call_2" },
+            event(.postToolUse, at: 3.1) { $0.agentTaskName = "count_docs"; $0.toolUseID = "call_2" },
+            event(.subagentStart, at: 4) { $0.agentID = "a1"; $0.agentType = "default" },
+        ]))
+        #expect(session.agents.first?.description == "count_docs")
+    }
+
+    @Test func aPromptDropsWaitingNames() throws {
+        for end in [HookEventName.userPromptSubmit, .stop, .interrupt] {
+            let session = try #require(SessionReducer.reduce([
+                event(.userPromptSubmit, at: 1),
+                event(.postToolUse, at: 2) { $0.agentTaskName = "never_started"; $0.toolUseID = "call_1" },
+                event(end, at: 3),
+                event(.userPromptSubmit, at: 4),
+                event(.subagentStart, at: 5) { $0.agentID = "a1"; $0.agentType = "default" },
+            ]))
+            #expect(session.agents.first?.description == nil)
+        }
     }
 
     @Test func codexSessionsShareAProcess() {

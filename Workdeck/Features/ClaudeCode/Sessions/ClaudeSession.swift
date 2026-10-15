@@ -105,8 +105,8 @@ nonisolated struct ClaudeSession: Equatable, Sendable, Identifiable {
     var commands = 0
     /// Counts whose step was not seen yet: each hook stamps its own time, so a fast edit's PostToolUse can come first.
     var earlyLines: [EarlyLines] = []
-    /// Codex only: the session file the app counts patch lines in (Codex spec §3.3).
-    var transcriptPath: String?
+    /// Codex: task names of spawned agents that have not started yet, oldest first (Codex sessions spec §3.2).
+    var pendingAgentNames: [String] = []
     /// The agent the session belongs to (Codex spec §3.3).
     var agent: AgentKind = .claudeCode
 

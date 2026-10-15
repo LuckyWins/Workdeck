@@ -10,7 +10,8 @@ nonisolated enum SessionFileTrimmer {
 
     /// The newest lines that fit in `tailSize`, preceded by the older lines still needed: the session's start, the
     /// events that first reported its process, set its current status and started its current work, and each running
-    /// agent's start and latest event, and the current turn's prompt and its newest `maxKeptEdits` counted edits.
+    /// agent's start and latest event, the current turn's prompt and its newest `maxKeptEdits` counted edits, and the
+    /// turn's agent spawns, starts and stops.
     static func kept(_ lines: [Data], session: ClaudeSession, tailSize: Int) -> [Data] {
         var cut = lines.count
         var size = 0
@@ -40,6 +41,12 @@ nonisolated enum SessionFileTrimmer {
                 needed.insert(index)
             } else if session.turn.edits > 0, event.time >= session.turn.startedAt, event.lineCounts != nil {
                 turnEdits.append(index)
+            }
+            // Codex names its agents by order: the turn's spawns, and the starts and stops they pair with, stay
+            // together so a rebuilt agent keeps its name (Codex sessions spec §3.2).
+            if session.agent == .codex, event.time >= session.turn.startedAt,
+               event.agentTaskName != nil || event.name == .subagentStart || event.name == .subagentStop {
+                needed.insert(index)
             }
             if let agentID = event.agentID, running.contains(agentID) {
                 if event.name == .subagentStart {

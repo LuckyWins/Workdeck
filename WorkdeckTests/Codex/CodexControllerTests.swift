@@ -14,7 +14,7 @@ struct CodexControllerTests {
         CodexSessionsController(
             store: ClaudeSessionStore(directory: sessionsDirectory, liveness: FakeLiveness(), agent: .codex, oneSessionPerProcess: false) { fixedNow.addingTimeInterval(2) },
             hooksConnector: sessionsHooks, activator: FakeActivator(), sleepPreventer: FakeSleepPreventer(),
-            notch: notch, root: makeTemporaryDirectory(), frontmostBundleID: { nil }
+            notch: notch, frontmostBundleID: { nil }
         )
     }
 

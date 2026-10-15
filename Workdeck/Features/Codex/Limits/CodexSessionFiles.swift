@@ -9,10 +9,6 @@ nonisolated enum CodexSessionFiles {
         home.appending(path: ".codex/sessions")
     }
 
-    static func isSessionFile(_ url: URL, root: URL) -> Bool {
-        isSessionFile(url, resolvedRoot: root.resolvingSymlinksInPath().path)
-    }
-
     /// The name is checked first; only a session file's path is resolved. FSEvents reports real paths
     /// (`/private/var/…`), so both sides are compared resolved.
     private static func isSessionFile(_ url: URL, resolvedRoot: String) -> Bool {

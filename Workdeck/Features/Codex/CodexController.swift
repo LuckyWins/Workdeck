@@ -77,8 +77,7 @@ final class CodexController: AgentSource {
     }
 
     /// Codex's sessions count while its hooks are connected, whatever its popover switch; its limits, read passively,
-    /// only while the tool is on or its hooks are connected (Codex recap spec §3.3). Listed sessions carry the lines of
-    /// their applied patches.
+    /// only while the tool is on or its hooks are connected (Codex recap spec §3.3).
     var recapSample: AgentRecapSample {
         let now = clock()
         let windows = (limits.limits?.windows ?? []).filter { $0.resetsAt > now }

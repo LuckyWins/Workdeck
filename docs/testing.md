@@ -168,8 +168,9 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | X5 | Not installed | On a Mac without Codex (or rename `~/.codex` while Workdeck is quit), turn Codex on. | Row says `Codex not found`, no block, no crash. |
 | X6 | Connect hooks | Settings → Codex → Session hooks → Connect…; confirm the diff; start a new Codex session in the CLI and one in VS Code. | `~/.codex/hooks.json` has ten Workdeck entries and a backup exists; both sessions appear marked `◎` with their steps; clicking one brings its window or tab forward. |
 | X7 | Permission, agent, patch | In a Codex session ask for a network command (approve it), an agent that counts files, and an edit of a project file. | "needs you" (with `◎`) while the prompt is open, then working; the agent appears under the session with its own step; the edit shows `Edit <file> +N −M` and the turn total. |
-| X8 | Running sessions | Connect the hooks while a Codex session runs. | That session does not appear until it restarts; nothing else changes. |
-| X9 | Disconnect | Settings → Codex → Disconnect…; confirm. | Only Workdeck's entries leave `hooks.json`; other hooks stay; Codex sessions disappear from the notch. |
+| X8 | Full Codex rows | In a new Codex chat ask for an edit of one file, then one patch of two files, then two agents spawned in parallel. | `Edit <file> +N −M`, then `Edit 2 files +N −M`, the turn's total with both files; the agents named after their tasks (`Count swift files`), with their model, no `default`. |
+| X9 | Running sessions | Connect the hooks while a Codex session runs. | That session does not appear until it restarts; nothing else changes. |
+| X10 | Disconnect | Settings → Codex → Disconnect…; confirm. | Only Workdeck's entries leave `hooks.json`; other hooks stay; Codex sessions disappear from the notch. |
 
 ## Virtual Notch Checklist
 
