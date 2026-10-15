@@ -157,6 +157,43 @@ struct WindowActivatorTests {
         ])
         #expect(!notes.lines.joined().contains("/dev/"))
     }
+
+    /// Chats opens another account's project as a workspace file; the window holding it is the session's.
+    private func personalWorkspace(for folder: String) throws -> (directory: URL, file: URL) {
+        let directory = makeTemporaryDirectory()
+        let file = try VSCodeSetup.workspaceFile(for: URL(filePath: folder), instance: .extra(named: "personal", home: makeTemporaryDirectory()), in: directory)
+        return (directory, file)
+    }
+
+    @Test func anotherAccountsSessionOpensItsWorkspaceWindow() async throws {
+        workspace.applications["com.microsoft.VSCode"] = vscode
+        let personal = try personalWorkspace(for: "/p/Workdeck")
+        var work = session(host: "com.microsoft.VSCode", entrypoint: "claude-vscode")
+        work.instance = "personal"
+        var activator = activator()
+        activator.vscodeWorkspaces = personal.directory
+        await activator.bringForward(work)
+        #expect(workspace.opened.map(\.0) == [personal.file])
+    }
+
+    @Test func anotherAccountsSessionWithoutAWorkspaceOpensTheFolder() async {
+        workspace.applications["com.microsoft.VSCode"] = vscode
+        var work = session(host: "com.microsoft.VSCode")
+        work.instance = "personal"
+        var activator = activator()
+        activator.vscodeWorkspaces = makeTemporaryDirectory()
+        await activator.bringForward(work)
+        #expect(workspace.opened.map(\.0) == [URL(filePath: "/p/Workdeck", directoryHint: .isDirectory)])
+    }
+
+    @Test func theMainAccountsSessionOpensTheFolder() async throws {
+        workspace.applications["com.microsoft.VSCode"] = vscode
+        let personal = try personalWorkspace(for: "/p/Workdeck")
+        var activator = activator()
+        activator.vscodeWorkspaces = personal.directory
+        await activator.bringForward(session(host: "com.microsoft.VSCode"))
+        #expect(workspace.opened.map(\.0) == [URL(filePath: "/p/Workdeck", directoryHint: .isDirectory)])
+    }
 }
 
 /// Lines recorded from `@Sendable` closures in tests.

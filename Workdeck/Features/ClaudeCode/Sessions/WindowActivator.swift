@@ -27,6 +27,8 @@ struct WindowActivator: WindowActivating {
     var scripts: any ScriptRunning = SystemScriptRunner()
     var tty: @Sendable (Int32) -> String? = { ProcessTTY.path(of: $0) }
     var generation = ActivationGeneration()
+    /// Where Chats keeps the workspace files that open another account's project in VS Code (`nil`: none).
+    var vscodeWorkspaces: URL?
     /// Why a click fell back to activating the app; never a path or a TTY.
     var note: @Sendable (String) -> Void = { WorkdeckLog.sessions.notice("\($0, privacy: .public)") }
 
@@ -43,7 +45,8 @@ struct WindowActivator: WindowActivating {
               let application = workspace.applicationURL(forBundleID: bundleID)
         else { return }
         if Self.folderEditors.contains(bundleID), let cwd = session.cwd {
-            workspace.open(URL(filePath: cwd, directoryHint: .isDirectory), withApplicationAt: application)
+            let folder = URL(filePath: cwd, directoryHint: .isDirectory)
+            workspace.open(workspaceFile(of: session, folder: folder, bundleID: bundleID) ?? folder, withApplicationAt: application)
             return
         }
         guard bundleID == TerminalTabScript.terminal || bundleID == TerminalTabScript.iTerm else {
@@ -63,6 +66,14 @@ struct WindowActivator: WindowActivating {
         }
         guard generation.value == click else { return }
         workspace.activateApplication(at: application)
+    }
+
+    /// Another account's project opened from Chats lives in a workspace window: VS Code keeps a folder in one window,
+    /// so opening the bare folder would open a second window instead of focusing that one.
+    private func workspaceFile(of session: ClaudeSession, folder: URL, bundleID: String) -> URL? {
+        guard bundleID == SystemVSCodeLauncher.bundleIdentifier, let instance = session.instance, let vscodeWorkspaces else { return nil }
+        let file = VSCodeSetup.workspaceFileURL(for: folder, instanceName: instance, in: vscodeWorkspaces)
+        return FileManager.default.fileExists(atPath: file.path) ? file : nil
     }
 }
 

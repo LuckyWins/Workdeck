@@ -49,13 +49,18 @@ nonisolated enum VSCodeSetup {
     /// profile. Named "<folder> (<instance>)", which VS Code shows in the window title; a folder hash keeps two
     /// projects with one name apart.
     static func workspaceFile(for folder: URL, instance: ClaudeInstance, in directory: URL) throws -> URL {
-        let hash = SHA256.hash(data: Data(folder.path.utf8)).map { String(format: "%02x", $0) }.joined().prefix(8)
-        let parent = directory.appending(path: String(hash))
-        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        let file = parent.appending(path: "\(folder.lastPathComponent) (\(instance.name)).code-workspace")
+        let file = workspaceFileURL(for: folder, instanceName: instance.name, in: directory)
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         let data = try JSONSerialization.data(withJSONObject: ["folders": [["path": folder.path]]], options: [.prettyPrinted, .withoutEscapingSlashes])
         try data.write(to: file, options: .atomic)
         return file
+    }
+
+    /// Where `workspaceFile(for:instance:in:)` keeps the file, without creating it; a click on the instance's session
+    /// opens it to bring that window forward.
+    static func workspaceFileURL(for folder: URL, instanceName: String, in directory: URL) -> URL {
+        let hash = SHA256.hash(data: Data(folder.path.utf8)).map { String(format: "%02x", $0) }.joined().prefix(8)
+        return directory.appending(path: String(hash)).appending(path: "\(folder.lastPathComponent) (\(instanceName)).code-workspace")
     }
 
     /// What goes into the profile's User Settings (JSON).

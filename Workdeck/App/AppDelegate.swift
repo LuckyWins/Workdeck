@@ -60,7 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 settings: settings,
                 store: ClaudeSessionStore(directory: SessionsDirectory.standard(), liveness: SystemProcessLiveness(), interrupts: TranscriptInterruptReader.standard()),
                 hooksConnector: SessionHooksConnector.standard(),
-                activator: WindowActivator(workspace: SystemWorkspace()),
+                activator: WindowActivator(workspace: SystemWorkspace(), vscodeWorkspaces: WorkdeckPaths.standard().supportDirectory.appending(path: "vscode")),
                 sleepPreventer: PowerAssertionSleepPreventer(),
                 makeHooksConnector: { SessionHooksConnector.forInstance($0) },
                 mainSettingsURL: ClaudeSettingsFile.standard().url
