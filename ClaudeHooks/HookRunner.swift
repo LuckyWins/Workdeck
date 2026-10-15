@@ -45,6 +45,9 @@ nonisolated struct HookRunner: Sendable {
                 payload.event.transcriptPath = path
             }
             payload.event.pid = codexPID()
+            if payload.event.name == .subagentStart {
+                payload.event.agentModel = payload.model
+            }
         } else {
             payload.event.instance = instance
         }

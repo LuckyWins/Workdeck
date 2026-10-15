@@ -11,6 +11,14 @@ struct AgentModelTests {
         ("opus", "Opus"),
         ("haiku", "Haiku"),
         ("some-other-model", "some-other-model"),
+        ("gpt-6-luna", "Luna 6"),
+        ("gpt-6.1-sol", "Sol 6.1"),
+        ("gpt-6.1-mini", "Mini 6.1"),
+        ("gpt-6.1-codex-mini", "Codex Mini 6.1"),
+        ("gpt-5-2025-08-07", "GPT-5"),
+        ("gpt-6", "GPT-6"),
+        ("o4-mini", "o4-mini"),
+        ("codex-mini-latest", "codex-mini-latest"),
     ] as [(String, String)])
     func displayNames(id: String, expected: String) {
         #expect(ModelName.display(id) == expected)

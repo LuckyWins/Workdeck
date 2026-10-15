@@ -44,6 +44,28 @@ struct CodexHookTests {
         #expect(event.instance == nil)
     }
 
+    @Test func aCodexAgentKeepsItsModel() throws {
+        let directory = makeTemporaryDirectory()
+        let runner = HookRunner(directory: directory, isCodex: true, codexPID: { 4242 })
+        for name in ["SubagentStart", "PreToolUse"] {
+            runner.run(stdin: payload([
+                "hook_event_name": name, "session_id": "01a13e86-aaaa", "agent_id": "01a14148-bbbb", "agent_type": "default",
+                "model": "gpt-6.1-mini", "tool_name": "Bash", "tool_input": ["command": "ls"],
+            ]), environment: [:], now: fixedNow)
+        }
+        let events = try HookEventFile.read(from: HookEventFile.url(for: "01a13e86-aaaa", in: directory), offset: 0).events
+        #expect(events.map(\.agentModel) == ["gpt-6.1-mini", nil])
+    }
+
+    @Test func aClaudeAgentsModelComesOnlyFromItsMeta() throws {
+        let directory = makeTemporaryDirectory()
+        HookRunner(directory: directory).run(stdin: payload([
+            "hook_event_name": "SubagentStart", "session_id": "abc", "agent_id": "a1", "model": "claude-opus-5-5",
+        ]), environment: [:], now: fixedNow)
+        let event = try #require(try HookEventFile.read(from: HookEventFile.url(for: "abc", in: directory), offset: 0).events.first)
+        #expect(event.agentModel == nil)
+    }
+
     @Test func aClaudeEventKeepsNoSessionFile() throws {
         let directory = makeTemporaryDirectory()
         HookRunner(directory: directory).run(stdin: payload([

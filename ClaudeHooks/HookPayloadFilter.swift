@@ -1,10 +1,12 @@
 import Foundation
 
 /// What `workdeck-hook` keeps from a payload. For Claude Code, `transcriptPath` only locates the agent's description and is
-/// never stored; for Codex, the session file's path is kept so the app can count its patches.
+/// never stored; for Codex, the session file's path is kept so the app can count its patches, and `model` names a new
+/// agent's model (Claude's comes from the agent's `meta.json`).
 nonisolated struct HookPayload: Equatable, Sendable {
     var event: HookEvent
     var transcriptPath: String?
+    var model: String?
 }
 
 /// Copies an allowlist of fields from Claude Code's hook JSON. Everything else, including prompts, answers, and tool
@@ -156,7 +158,7 @@ nonisolated enum HookPayloadFilter {
                 .compactMap { $0["id"] as? String }
                 .filter(isSafeIdentifier)
         }
-        return HookPayload(event: event, transcriptPath: root["transcript_path"] as? String)
+        return HookPayload(event: event, transcriptPath: root["transcript_path"] as? String, model: short(root["model"]))
     }
 
     /// Session and agent IDs become file names, so only ASCII letters, digits and hyphens are accepted.

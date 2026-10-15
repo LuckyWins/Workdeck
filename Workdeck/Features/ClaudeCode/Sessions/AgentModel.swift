@@ -8,6 +8,9 @@ nonisolated enum ModelName {
             name = String(name[..<bracket])
         }
         var parts = name.split(separator: "-").map(String.init)
+        if parts.first == "gpt" {
+            return codexDisplay(parts.dropFirst()) ?? id
+        }
         if parts.first == "claude" {
             parts.removeFirst()
         }
@@ -16,6 +19,15 @@ nonisolated enum ModelName {
         let version = parts.dropFirst().prefix { $0.count <= 2 && Int($0) != nil }
         let title = family.prefix(1).uppercased() + family.dropFirst()
         return version.isEmpty ? title : "\(title) \(version.joined(separator: "."))"
+    }
+
+    /// Codex's `gpt-6.1-sol` reads like Claude's: the name, then the version ("Sol 6.1"); a bare or dated ID is "GPT-6".
+    private static func codexDisplay(_ parts: ArraySlice<String>) -> String? {
+        guard let version = parts.first, Double(version) != nil else { return nil }
+        let words = parts.dropFirst().filter { Int($0) == nil }
+        guard !words.isEmpty else { return "GPT-\(version)" }
+        let name = words.map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+        return "\(name) \(version)"
     }
 }
 

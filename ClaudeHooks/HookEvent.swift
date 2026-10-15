@@ -41,7 +41,8 @@ nonisolated struct HookEvent: Codable, Equatable, Sendable {
     var agentID: String?
     var agentType: String?
     var agentDescription: String?
-    /// From the agent's `meta.json`: a model alias such as "opus", and whether it runs in the background.
+    /// From the agent's `meta.json`: a model alias such as "opus", and whether it runs in the background. For Codex, the
+    /// model ID its `SubagentStart` names.
     var agentModel: String?
     var agentBackground: Bool?
     /// Where the agent's transcript is; the app reads only the model ID from it.
