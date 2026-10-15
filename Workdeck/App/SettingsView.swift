@@ -56,6 +56,12 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            NotchSettingsSection(
+                settings: claudeCode.settings.notch,
+                isNotchEnabled: claudeCode.settings.isEnabled,
+                onChange: claudeCode.notchSettingsChanged
+            )
+
             ClaudeLimitsSettingsSection(controller: claudeCode.limits)
             ClaudeSessionsSettingsSection(controller: claudeCode.sessions)
             InstancesSettingsSection(controller: instances, claudeCode: claudeCode)

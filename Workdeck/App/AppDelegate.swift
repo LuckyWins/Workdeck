@@ -11,9 +11,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings: settings,
         appVersion: HelperConstants.version(of: .main)
     )
-    private(set) lazy var claudeCode: ClaudeCodeController = {
-        let settings = ClaudeCodeSettings()
+    /// The notch every agent tool feeds (Codex spec §4).
+    private(set) lazy var notch: NotchComposer = {
+        let settings = NotchSettings()
         let demo = self.demo
+        return NotchComposer(
+            settings: settings,
+            // The demo always draws a notch, the virtual one on a screen without one (demo mode spec §2.3).
+            presenter: NotchPresenter(screen: { [demo] in
+                NotchPresenter.targetScreen(notchless: demo.isActive ? .virtualNotch : settings.notchlessDisplay)
+            })
+        )
+    }()
+
+    private(set) lazy var claudeCode: ClaudeCodeController = {
+        let settings = ClaudeCodeSettings(notch: notch.settings)
         return ClaudeCodeController(
             settings: settings,
             limits: ClaudeLimitsController(
@@ -53,10 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 makeHooksConnector: { SessionHooksConnector.forInstance($0) },
                 mainSettingsURL: ClaudeSettingsFile.standard().url
             ),
-            // The demo always draws a notch, the virtual one on a screen without one (demo mode spec §2.3).
-            presenter: NotchPresenter(screen: { [demo] in
-                NotchPresenter.targetScreen(notchless: demo.isActive ? .virtualNotch : settings.notchlessDisplay)
-            }),
+            composer: notch,
             recapStore: RecapStore.standard()
         )
     }()

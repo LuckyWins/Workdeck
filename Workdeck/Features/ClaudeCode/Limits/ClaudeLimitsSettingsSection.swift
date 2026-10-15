@@ -2,8 +2,6 @@ import SwiftUI
 
 struct ClaudeLimitsSettingsSection: View {
     @Bindable var controller: ClaudeLimitsController
-    /// Follows screen changes while Settings is open, e.g. the lid opening.
-    @State private var hasCameraHousing = NotchPresenter.hasCameraHousingScreen()
 
     var body: some View {
         @Bindable var settings = controller.settings
@@ -29,32 +27,6 @@ struct ClaudeLimitsSettingsSection: View {
                     .font(.caption)
                     .foregroundStyle(controller.pollerStatus.isProblem ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
             }
-            if !hasCameraHousing {
-                Picker("Without a notch", selection: $settings.notchlessDisplay) {
-                    ForEach(NotchlessDisplay.allCases) { display in
-                        Text(display.title).tag(display)
-                    }
-                }
-            }
-            if controller.hasDataSource {
-                Picker("Show", selection: $settings.mode) {
-                    ForEach(LimitsDisplayMode.allCases) { mode in
-                        Text(mode.title).tag(mode)
-                    }
-                }
-                Picker("First alert at", selection: $settings.firstThreshold) {
-                    ForEach(ClaudeCodeSettings.firstThresholdOptions, id: \.self) { value in
-                        Text("\(value)%").tag(value)
-                    }
-                }
-                Picker("Second alert at", selection: $settings.secondThreshold) {
-                    ForEach(ClaudeCodeSettings.secondThresholdOptions(above: settings.firstThreshold), id: \.self) { value in
-                        Text("\(value)%").tag(value)
-                    }
-                }
-                Toggle("Notify when a limit resets", isOn: $settings.notifyOnReset)
-                Toggle("Forecast when limits run out", isOn: $settings.showForecast)
-            }
         } header: {
             SettingsHeader("Claude Code · Limits", symbol: "gauge.with.dots.needle.50percent", color: .orange)
         } footer: {
@@ -64,14 +36,6 @@ struct ClaudeLimitsSettingsSection: View {
                 Text(Self.apiDisclaimer)
                     .foregroundStyle(.secondary)
             }
-        }
-        .onChange(of: settings.mode) { controller.settingsChanged() }
-        .onChange(of: settings.firstThreshold) { controller.settingsChanged() }
-        .onChange(of: settings.secondThreshold) { controller.settingsChanged() }
-        .onChange(of: settings.showForecast) { controller.settingsChanged() }
-        .onChange(of: settings.notchlessDisplay) { controller.settingsChanged() }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
-            hasCameraHousing = NotchPresenter.hasCameraHousingScreen()
         }
     }
 

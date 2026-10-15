@@ -72,7 +72,7 @@ Claude Code reports plan usage only for Pro and Max subscriptions. Details: [doc
 | Hover the notch | opens with both limit windows and every session |
 | Click a session in the notch | brings forward its editor window or terminal tab |
 | Click a limit alert | opens Chats on that account, to go on with another one |
-| Turn on **Notify when a session finishes** and start a long task | tells you when it is done, with how long it worked |
+| Turn on **Notify when a session finishes** in Settings → Notch and start a long task | tells you when it is done, with how long it worked |
 | Click **Statistics…** in the Claude Code row | shows this week's coding time by day and project |
 | Turn on Closed-Lid Mode and close the lid | keeps the build running |
 | Settings → General → **Try Demo** | plays the one-minute tour |

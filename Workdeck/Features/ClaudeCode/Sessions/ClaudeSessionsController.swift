@@ -69,11 +69,21 @@ final class ClaudeSessionsController {
         hooksConnector.canConnect
     }
 
+    /// Sessions of the main instance and of known instances; one of an instance Workdeck does not know (an old hook
+    /// entry) is not shown. Empty without hooks.
+    var listedSessions: [ClaudeSession] {
+        guard isHooksConnected else { return [] }
+        return store.sessions.filter { $0.instance.map { extraConnectors[$0] != nil } ?? true }
+    }
+
+    /// Session rows carry the account tag once there is an extra instance.
+    var showsAccounts: Bool {
+        !extraConnectors.isEmpty
+    }
+
     var viewState: SessionsViewState {
         guard isHooksConnected else { return .none }
-        // Sessions of an instance Workdeck does not know (an old hook entry) are not shown.
-        let known = store.sessions.filter { $0.instance.map { extraConnectors[$0] != nil } ?? true }
-        return SessionsPresentation.viewState(sessions: known, now: store.now, showsAccounts: !extraConnectors.isEmpty)
+        return SessionsPresentation.viewState(sessions: listedSessions, now: store.now, showsAccounts: showsAccounts)
     }
 
     /// The account of the session with the latest event; `nil` (main) without sessions.

@@ -147,6 +147,12 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | D4 | Stop | Stop from Settings, then start and stop from the popover; quit during the demo and relaunch. | The real notch comes back at once, no real alert bursts out; after a relaunch the demo is off. |
 | D5 | Real work during the demo | Run a Claude Code session while the demo plays, then stop. | The demo shows only its own sessions; after stop the real session is listed, and the Statistics window counts its time. |
 
+## Notch Settings Checklist
+
+| # | Case | Steps | Expected |
+|---|------|-------|----------|
+| N1 | Settings moved | Open Settings; check the Notch section; change Show, the alert thresholds, the forecast and Keep Mac awake; relaunch Workdeck. | The Notch section sits after Closed-Lid Mode with Show, Without a notch (lid closed only), both alert thresholds, reset alert, forecast, finished and needs-you alerts and keep-awake; the Claude Code sections no longer have them. Every change shows at once in the notch (and `pmset -g assertions` for keep-awake) and survives the relaunch, as do the values chosen before this version. |
+
 ## Virtual Notch Checklist
 
 | # | Case | Steps | Expected |

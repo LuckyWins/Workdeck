@@ -271,6 +271,25 @@ struct ClaudeCodeControllerTests {
         #expect(!settings.isEnabled)
     }
 
+    @Test func aClickOnAnUnknownSessionActivatesNothing() {
+        let (controller, _) = makeController()
+        controller.start()
+        presenter.sessionAction?("someone-else")
+        presenter.projectAction?("someone-else")
+        #expect(activator.activated.isEmpty)
+    }
+
+    @Test func chatsIgnoreAnAccountClaudeDoesNotKnow() {
+        let (controller, _) = makeController()
+        let opened = Box(0)
+        controller.onOpenChats = { _ in opened.value += 1 }
+        controller.start()
+        presenter.chatsAction?("codex")
+        #expect(opened.value == 0)
+        presenter.chatsAction?("main")
+        #expect(opened.value == 1)
+    }
+
     @Test func connectEnablesAndRecordsTime() {
         let (controller, _) = makeController()
         controller.limits.connect()

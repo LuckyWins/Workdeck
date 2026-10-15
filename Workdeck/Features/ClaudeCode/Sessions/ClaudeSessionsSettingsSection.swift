@@ -4,8 +4,6 @@ struct ClaudeSessionsSettingsSection: View {
     @Bindable var controller: ClaudeSessionsController
 
     var body: some View {
-        @Bindable var settings = controller.settings
-
         Section {
             LabeledContent("Session hooks") {
                 if controller.isHooksConnected {
@@ -18,34 +16,12 @@ struct ClaudeSessionsSettingsSection: View {
             if let review = controller.hooksReview {
                 SettingsChangeReview(review: review, onCancel: controller.cancelHooksReview, onConfirm: controller.confirmHooksReview)
             }
-            if controller.isHooksConnected {
-                Toggle("Keep Mac awake while Claude works", isOn: $settings.keepAwakeWhileWorking)
-                Group {
-                    Toggle("Notify when a session finishes", isOn: $settings.notifyWhenFinished)
-                    if settings.notifyWhenFinished {
-                        Picker("After working for", selection: $settings.finishedAfterMinutes) {
-                            ForEach(ClaudeCodeSettings.finishedAfterOptions, id: \.self) { minutes in
-                                Text("\(minutes) min").tag(minutes)
-                            }
-                        }
-                    }
-                    Toggle("Notify when a session needs you", isOn: $settings.notifyWhenNeedsYou)
-                }
-                // Alerts appear in the notch, which only shows while the indicator is on.
-                .disabled(!settings.isEnabled)
-                if !settings.isEnabled {
-                    Text("Turn on Claude Code in the menu bar popover to see alerts in the notch.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
         } header: {
             SettingsHeader("Claude Code · Sessions", symbol: "terminal.fill", color: .green)
         } footer: {
             Text(footer)
                 .foregroundStyle(controller.hooksError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
         }
-        .onChange(of: settings.keepAwakeWhileWorking) { controller.settingsChanged() }
     }
 
     private var footer: String {

@@ -9,20 +9,9 @@ final class ClaudeCodeController {
     let limits: ClaudeLimitsController
     let sessions: ClaudeSessionsController
 
-    private(set) var state = LimitsViewState.hidden
-
-    @ObservationIgnored private let presenter: any LimitsPresenting
-    /// Whether each connected display has a camera housing; with the setting it decides between a real or virtual
-    /// notch and the menu bar text.
-    @ObservationIgnored private let cameraHousings: @MainActor () -> [Bool]
-    @ObservationIgnored private var screenObserver: (any NSObjectProtocol)?
+    /// The notch this tool feeds; the app shares it with every agent tool (Codex spec §4).
+    @ObservationIgnored let composer: NotchComposer
     @ObservationIgnored private let clock: () -> Date
-    @ObservationIgnored private let linger: TimeInterval
-    /// When the last active session went idle; "When active" keeps the notch `linger` seconds after it.
-    @ObservationIgnored private var workEndedAt: Date?
-    @ObservationIgnored private var wasActive = false
-    @ObservationIgnored private var lingerTask: Task<Void, Never>?
-    @ObservationIgnored private var isPeeking = false
     /// Opens the Chats window on the latest session of the alert's account (`nil`: no session, All).
     @ObservationIgnored var onOpenChats: ((String?) -> Void)?
     /// Plan labels by account label ("main", "personal"), from the instances' `.claude.json`.
@@ -50,6 +39,27 @@ final class ClaudeCodeController {
         settings: ClaudeCodeSettings,
         limits: ClaudeLimitsController,
         sessions: ClaudeSessionsController,
+        composer: NotchComposer,
+        clock: @escaping () -> Date = { Date() },
+        recapStore: RecapStore? = nil,
+        calendar: Calendar = RecapCalendar.calendar()
+    ) {
+        self.settings = settings
+        self.limits = limits
+        self.sessions = sessions
+        self.composer = composer
+        self.clock = clock
+        self.recapStore = recapStore
+        self.calendar = calendar
+        statistics = StatisticsController(calendar: calendar, clock: clock)
+        composer.register(self)
+    }
+
+    /// A notch of its own, fed only by Claude Code: tests and a single-agent setup.
+    convenience init(
+        settings: ClaudeCodeSettings,
+        limits: ClaudeLimitsController,
+        sessions: ClaudeSessionsController,
         presenter: any LimitsPresenting,
         cameraHousings: @escaping @MainActor () -> [Bool] = { NSScreen.screens.map { $0.safeAreaInsets.top > 0 } },
         clock: @escaping () -> Date = { Date() },
@@ -57,16 +67,8 @@ final class ClaudeCodeController {
         recapStore: RecapStore? = nil,
         calendar: Calendar = RecapCalendar.calendar()
     ) {
-        self.settings = settings
-        self.limits = limits
-        self.sessions = sessions
-        self.presenter = presenter
-        self.cameraHousings = cameraHousings
-        self.clock = clock
-        self.linger = linger
-        self.recapStore = recapStore
-        self.calendar = calendar
-        statistics = StatisticsController(calendar: calendar, clock: clock)
+        let composer = NotchComposer(settings: settings.notch, presenter: presenter, cameraHousings: cameraHousings, clock: clock, linger: linger)
+        self.init(settings: settings, limits: limits, sessions: sessions, composer: composer, clock: clock, recapStore: recapStore, calendar: calendar)
     }
 
     /// The indicator has something to show: limits, sessions, or both.
@@ -80,63 +82,38 @@ final class ClaudeCodeController {
         return limits.hasDataSource ? "\(limits.subtitle) · \(summary)" : summary
     }
 
+    var state: LimitsViewState {
+        composer.state
+    }
+
     /// Text next to the Workdeck icon when no notch screen is available.
     var menuBarText: String? {
-        if case let .menuBar(text, _) = state.display { text } else { nil }
+        composer.menuBarText
     }
 
     var menuBarLevel: LimitsLevel {
-        if case let .menuBar(_, level) = state.display { level } else { .noData }
+        composer.menuBarLevel
+    }
+
+    /// A shared notch setting changed in Settings: alerts, the forecast and keep-awake follow at once.
+    func notchSettingsChanged() {
+        refresh()
     }
 
     func start() {
+        composer.start()
         limits.onChange = { [weak self] in self?.refresh() }
         sessions.onChange = { [weak self] in self?.refresh() }
         sessions.onAlerts = { [weak self] alerts in
             // During the demo real alerts are dropped, not kept for later (demo mode spec §2.3).
             guard let self, !alerts.isEmpty, !isDemoActive else { return }
-            noteAlerts()
+            composer.noteAlerts()
             refresh()
-            flash(alerts)
-        }
-        presenter.setSessionAction { [weak self] id in
-            guard let self, !isDemoActive else { return }
-            sessions.activateSession(id: id)
-        }
-        presenter.setProjectAction { [weak self] name in
-            guard let self, !isDemoActive else { return }
-            sessions.activateProject(named: name)
-        }
-        presenter.setRefreshAction { [weak self] in
-            guard let self, !isDemoActive else { return }
-            limits.refreshNow()
-        }
-        presenter.setToggleAccountsAction { [weak self] in
-            guard let self else { return }
-            settings.collapsesOtherAccounts.toggle()
-            refresh()
-        }
-        presenter.setPeekAction { [weak self] peeking in
-            guard let self else { return }
-            isPeeking = peeking
-            refresh()
-        }
-        presenter.setChatsAction { [weak self] account in
-            guard let self, !isDemoActive else { return }
-            onOpenChats?(sessions.latestSessionID(ofAccount: account))
-        }
-        screenObserver = NotificationCenter.default.addObserver(
-            forName: NSApplication.didChangeScreenParametersNotification,
-            object: nil,
-            queue: .main
-        ) { @Sendable [weak self] _ in
-            MainActor.assumeIsolated { self?.refresh() }
+            composer.flash(alerts)
         }
         if let recapStore {
             recorder = RecapRecorder(days: recapStore.load(now: clock(), calendar: calendar), calendar: calendar)
         }
-        presenter.setRecapDismissAction { [weak self] in self?.dismissRecap() }
-        presenter.setRecapDetailsAction { [weak self] in self?.openRecapDetails() }
         updateStatistics()
         limits.onActivityChange = { [weak self] active in
             if active {
@@ -215,105 +192,26 @@ final class ClaudeCodeController {
         refresh()
     }
 
-    /// Recomputes keep-awake, the notch state, and limit alerts from both parts.
+    /// Keep-awake, the recap and Statistics, then the notch with this tool's limit alerts.
     func refresh() {
         recordRecap()
         updateStatistics()
         sessions.updateKeepAwake()
-        // Limit alerts come first: in "When active" an alert counts as activity, so a hidden notch shows (flash spec §2.3).
         let limitAlerts = limits.takeAlerts()
         // Real limit alerts during the demo are dropped with it (demo mode spec §2.3).
         if isDemoActive {
             for alert in limitAlerts {
                 WorkdeckLog.alerts.notice("\(LimitsText.alertTitle(alert, showsAccount: true), privacy: .public), alert dropped during the demo")
             }
-            // "When active" keeps timing real work, so its linger is right after the stop.
-            _ = lingers(isActive: sessions.viewState.activeCount > 0)
-            showDemoFrame()
+            composer.refresh()
             return
         }
-        if !limitAlerts.isEmpty {
-            noteAlerts()
-        }
-        let withData = limits.accounts.filter { $0.hasData || usageProblem(of: $0) != nil || isWaiting($0) }
-        let shown = withData.isEmpty ? [limits.main] : withData
-        let compact = compactAccount(among: shown)
-        let plans = planLabels()
-        // Accounts with a listed session get full blocks; with no session anywhere, the compact notch's account does.
-        let withSessions = Set(sessions.store.sessions.map { $0.instance ?? ClaudeInstance.mainName })
-        let activeLabels = withSessions.isEmpty ? [compact.label] : withSessions
-        let store = compact.store
-        let pressing = UsageFormatting.mostPressing(store.currentWindows)
-        let hasData = store.age != nil
-        let sessionsView = sessions.viewState
-        // Main needs no letter; another account is always marked, even when it is the only one with data.
-        let label = compact.name.map { String($0.prefix(1)) }
-        let isActive = sessionsView.activeCount > 0
-        let isLingering = lingers(isActive: isActive)
-        let hasNotchScreen = NotchPresenter.targetIndex(cameraHousings: cameraHousings(), notchless: settings.notchlessDisplay) != nil
-        func decide() -> LimitsDisplay {
-            LimitsPresentation.display(
-                isEnabled: settings.isEnabled,
-                isConnected: limits.hasDataSource,
-                mode: settings.mode,
-                hasNotchScreen: hasNotchScreen,
-                pressing: pressing,
-                hasData: hasData,
-                thresholds: settings.thresholds,
-                hasSessions: isActive || (settings.mode == .whenActive && isLingering) || pendingRecap != nil,
-                isPeeking: isPeeking,
-                label: label
-            )
-        }
-        var display = decide()
-        let canPeek = settings.mode == .whenActive && settings.isEnabled && hasNotchScreen && hasAnySource
-        if !canPeek {
-            isPeeking = false
-        }
-        // A notch the pointer is on stays until the pointer leaves, even when its reason to show ends (spec §7).
-        if canPeek, display == .hidden, !isPeeking, presenter.isPointerOnNotch() {
-            isPeeking = true
-            display = decide()
-        }
-        let isPeekable = canPeek && display == .hidden
-        let level = LimitsPresentation.displayLevel(pressing: pressing, hasData: hasData, thresholds: settings.thresholds)
-        state = LimitsViewState(
-            display: display,
-            windows: store.allWindows,
-            now: store.now,
-            age: store.age,
-            thresholds: settings.thresholds,
-            forecasts: limits.forecasts(for: compact),
-            refresh: limits.refreshState(for: compact),
-            showsLimits: limits.hasDataSource,
-            isPeekable: isPeekable,
-            isPeeking: isPeeking,
-            sessions: sessionsView,
-            // Blocks keep the accounts' fixed order (main, then instances), so sessions on two accounts do not swap them.
-            accounts: shown.map { account in
-                AccountLimitsViewState(
-                    name: account.label,
-                    windows: account.store.allWindows,
-                    age: account.store.age,
-                    forecasts: limits.forecasts(for: account),
-                    refresh: limits.refreshState(for: account),
-                    problem: usageProblem(of: account),
-                    isWaiting: isWaiting(account),
-                    plan: plans[account.label],
-                    isActive: activeLabels.contains(account.label)
-                )
-            },
-            compactLabel: label,
-            collapsesOtherAccounts: settings.collapsesOtherAccounts
-        )
-        presenter.show(state)
-        flash(limitAlerts)
+        composer.refresh(alerts: limitAlerts)
     }
 
     /// Shows last week's recap if it is due: not dismissed, worth showing, and a notch to show it in (recap spec §3.1).
     func checkRecap() {
-        guard let recorder, settings.isEnabled,
-              NotchPresenter.targetIndex(cameraHousings: cameraHousings(), notchless: settings.notchlessDisplay) != nil,
+        guard let recorder, settings.isEnabled, composer.hasNotchScreen,
               let lastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: RecapCalendar.weekStart(of: clock(), calendar: calendar))
         else { return }
         // A recap left open gives way to the next week's.
@@ -330,7 +228,7 @@ final class ClaudeCodeController {
         }
         pendingRecap = summary
         if !isDemoActive {
-            presenter.showRecap(summary)
+            composer.presenter.showRecap(summary)
         }
         refresh()
     }
@@ -340,13 +238,13 @@ final class ClaudeCodeController {
             // The demo's recap is made up: closing it keeps nothing (demo mode spec §2.3).
             guard demoRecap != nil else { return }
             demoRecap = nil
-            presenter.showRecap(nil)
+            composer.presenter.showRecap(nil)
             return
         }
         guard let recap = pendingRecap else { return }
         settings.dismissedRecapWeek = RecapCalendar.dayKey(recap.weekStart, calendar: calendar)
         pendingRecap = nil
-        presenter.showRecap(nil)
+        composer.presenter.showRecap(nil)
         refresh()
     }
 
@@ -357,7 +255,7 @@ final class ClaudeCodeController {
     }
 
     /// `Details…`: the recap is done with, its week opens in the window.
-    private func openRecapDetails() {
+    func openRecapDetails() {
         let week = isDemoActive ? demoRecap?.weekStart : pendingRecap?.weekStart
         dismissRecap()
         openStatistics(week: week)
@@ -371,36 +269,37 @@ final class ClaudeCodeController {
         )
     }
 
-    /// The notch state from the demo script, built like the real one (demo mode spec §2.3).
-    private func showDemoFrame() {
+    /// The notch part from the demo script, built like the real one (demo mode spec §2.3).
+    private var demoPart: AgentNotchPart {
         let now = clock()
-        let thresholds = settings.thresholds
-        let frame = ClaudeCodeDemoScript.frame(at: demoElapsed, now: now, thresholds: thresholds)
+        let frame = ClaudeCodeDemoScript.frame(at: demoElapsed, now: now, thresholds: settings.thresholds)
         let withSessions = Set(frame.sessions.map { $0.instance ?? ClaudeInstance.mainName })
-        let blocks = frame.accounts.map { account in
-            AccountLimitsViewState(
-                name: account.name,
-                windows: account.windows,
-                age: account.age,
-                forecasts: demoForecasts(account.windows, now: now),
-                plan: account.plan,
-                isActive: withSessions.contains(account.name)
-            )
-        }
-        let main = blocks[0]
-        let pressing = UsageFormatting.mostPressing(main.windows.filter { $0.resetsAt > now })
-        state = LimitsViewState(
-            display: .notch(LimitsPresentation.displayLevel(pressing: pressing, hasData: true, thresholds: thresholds)),
-            windows: main.windows,
+        return AgentNotchPart(
+            agent: .claudeCode,
+            isEnabled: true,
+            hasSource: true,
+            showsLimits: true,
+            accounts: frame.accounts.map { account in
+                AccountLimitsViewState(
+                    name: account.name,
+                    windows: account.windows,
+                    age: account.age,
+                    forecasts: demoForecasts(account.windows, now: now),
+                    plan: account.plan,
+                    isActive: withSessions.contains(account.name)
+                )
+            },
+            compactIndex: 0,
+            compactLabel: nil,
             now: now,
-            age: main.age,
-            thresholds: thresholds,
-            forecasts: main.forecasts,
-            sessions: SessionsPresentation.viewState(sessions: frame.sessions, now: now, showsAccounts: true),
-            accounts: blocks,
-            collapsesOtherAccounts: settings.collapsesOtherAccounts
+            sessions: frame.sessions,
+            sessionsNow: now,
+            showsAccounts: true,
+            sessionsConnected: true,
+            // "When active" keeps timing real work, so its linger is right after the stop.
+            activeCount: sessions.viewState.activeCount,
+            isDemo: true
         )
-        presenter.show(state)
     }
 
     private func demoForecasts(_ windows: [UsageWindow], now: Date) -> [UsageWindowKind: Date] {
@@ -460,49 +359,6 @@ final class ClaudeCodeController {
         settings.fetchFromAPI && account.poller.status == .waitingForClaudeCode
     }
 
-    /// An alert restarts the "When active" linger, as if work had just ended (flash spec §2.3).
-    private func noteAlerts() {
-        workEndedAt = clock()
-        lingerTask?.cancel()
-        lingerTask = nil
-    }
-
-    private func flash(_ alerts: [LimitsAlert]) {
-        guard !alerts.isEmpty else { return }
-        // Session alerts are logged by their policy; the presenter decides whether anything shows.
-        for alert in alerts where LimitsText.alertProject(alert) == nil {
-            WorkdeckLog.alerts.notice("\(LimitsText.alertTitle(alert, showsAccount: true), privacy: .public), alert")
-        }
-        presenter.flash(alerts)
-    }
-
-    /// "When active" keeps the notch `linger` seconds after the last active session goes idle (spec §3).
-    private func lingers(isActive: Bool) -> Bool {
-        let now = clock()
-        if isActive {
-            wasActive = true
-            lingerTask?.cancel()
-            lingerTask = nil
-            return false
-        }
-        if wasActive {
-            wasActive = false
-            workEndedAt = now
-        }
-        guard let workEndedAt else { return false }
-        let remaining = linger - now.timeIntervalSince(workEndedAt)
-        guard remaining > 0 else { return false }
-        if lingerTask == nil {
-            lingerTask = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(remaining))
-                guard !Task.isCancelled, let self else { return }
-                lingerTask = nil
-                refresh()
-            }
-        }
-        return true
-    }
-
     /// Why the usage API brings no data for an account, e.g. its Keychain item is missing (spec §6).
     private func usageProblem(of account: AccountLimits) -> String? {
         guard settings.fetchFromAPI, account.poller.status.isProblem else { return nil }
@@ -541,11 +397,11 @@ extension ClaudeCodeController: DemoParticipant {
         demoElapsed = 0
         demoDays = ClaudeCodeDemoScript.days(now: clock(), calendar: calendar)
         // Neither side's alerts carry over: real ones leave at the start, demo ones at the stop.
-        presenter.clearAlerts()
+        composer.presenter.clearAlerts()
         // A real recap steps aside and comes back at stop.
-        realRecapWasExpanded = pendingRecap != nil && presenter.isRecapExpanded
+        realRecapWasExpanded = pendingRecap != nil && composer.presenter.isRecapExpanded
         if pendingRecap != nil {
-            presenter.showRecap(nil)
+            composer.presenter.showRecap(nil)
         }
         refresh()
     }
@@ -553,17 +409,17 @@ extension ClaudeCodeController: DemoParticipant {
     func demoTick(elapsed: TimeInterval, previous: TimeInterval?) {
         demoElapsed = elapsed
         // Only the demo moves on a tick; real changes refresh on their own.
-        showDemoFrame()
+        composer.refresh()
         for event in ClaudeCodeDemoScript.events(after: previous, upTo: elapsed, now: clock(), thresholds: settings.thresholds) {
             switch event {
             case let .expand(seconds):
-                presenter.expand(for: .seconds(seconds))
+                composer.presenter.expand(for: .seconds(seconds))
             case let .alert(alert):
-                presenter.flash([alert])
+                composer.presenter.flash([alert])
             case .showRecap:
                 let recap = ClaudeCodeDemoScript.recap(now: clock(), calendar: calendar)
                 demoRecap = recap
-                presenter.showRecap(recap, for: .seconds(ClaudeCodeDemoScript.recapSeconds))
+                composer.presenter.showRecap(recap, for: .seconds(ClaudeCodeDemoScript.recapSeconds))
             }
         }
     }
@@ -571,11 +427,78 @@ extension ClaudeCodeController: DemoParticipant {
     func demoDidStop() {
         isDemoActive = false
         demoDays = []
-        presenter.clearAlerts()
+        composer.presenter.clearAlerts()
         if demoRecap != nil || pendingRecap != nil {
             demoRecap = nil
-            presenter.showRecap(pendingRecap, for: realRecapWasExpanded ? nil : .zero)
+            composer.presenter.showRecap(pendingRecap, for: realRecapWasExpanded ? nil : .zero)
         }
         refresh()
+    }
+}
+
+extension ClaudeCodeController: AgentSource {
+    var notchPart: AgentNotchPart {
+        if isDemoActive {
+            return demoPart
+        }
+        let withData = limits.accounts.filter { $0.hasData || usageProblem(of: $0) != nil || isWaiting($0) }
+        let shown = withData.isEmpty ? [limits.main] : withData
+        let compact = compactAccount(among: shown)
+        let plans = planLabels()
+        let listed = sessions.listedSessions
+        // Accounts with a listed session get full blocks; with no session anywhere, the compact notch's account does.
+        let withSessions = Set(sessions.store.sessions.map { $0.instance ?? ClaudeInstance.mainName })
+        let activeLabels = withSessions.isEmpty ? [compact.label] : withSessions
+        return AgentNotchPart(
+            agent: .claudeCode,
+            isEnabled: settings.isEnabled,
+            hasSource: hasAnySource,
+            showsLimits: limits.hasDataSource,
+            // Blocks keep the accounts' fixed order (main, then instances), so sessions on two accounts do not swap them.
+            accounts: shown.map { account in
+                AccountLimitsViewState(
+                    name: account.label,
+                    windows: account.store.allWindows,
+                    age: account.store.age,
+                    forecasts: limits.forecasts(for: account),
+                    refresh: limits.refreshState(for: account),
+                    problem: usageProblem(of: account),
+                    isWaiting: isWaiting(account),
+                    plan: plans[account.label],
+                    isActive: activeLabels.contains(account.label)
+                )
+            },
+            compactIndex: shown.firstIndex { $0.label == compact.label } ?? 0,
+            // Main needs no letter; another account is always marked, even when it is the only one with data.
+            compactLabel: compact.name.map { String($0.prefix(1)) },
+            now: compact.store.now,
+            sessions: listed,
+            sessionsNow: sessions.store.now,
+            showsAccounts: sessions.showsAccounts,
+            sessionsConnected: sessions.isHooksConnected,
+            activeCount: sessions.viewState.activeCount,
+            keepsVisible: pendingRecap != nil
+        )
+    }
+
+    func activateSession(id: String) {
+        guard !isDemoActive else { return }
+        sessions.activateSession(id: id)
+    }
+
+    func activateProject(named name: String) {
+        guard !isDemoActive else { return }
+        sessions.activateProject(named: name)
+    }
+
+    func refreshNow() {
+        guard !isDemoActive else { return }
+        limits.refreshNow()
+    }
+
+    /// Every source hears a limit alert's click; only a Claude account opens Chats.
+    func openChats(account: String) {
+        guard !isDemoActive, account == ClaudeInstance.mainName || limits.account(named: account) != nil else { return }
+        onOpenChats?(sessions.latestSessionID(ofAccount: account))
     }
 }
