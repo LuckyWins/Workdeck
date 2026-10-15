@@ -102,4 +102,17 @@ nonisolated enum RecapText {
         formatter.dateFormat = pattern
         return formatter.string(from: date)
     }
+
+    /// The recap's split line: each agent with time, in a fixed order (Codex recap spec §3.1).
+    static func agentSplit(_ seconds: [AgentKind: Double]) -> [(agent: AgentKind, text: String)] {
+        AgentKind.allCases.compactMap { agent in
+            guard let value = seconds[agent], value > 0 else { return nil }
+            return (agent, "\(agent.shortName) \(duration(value))")
+        }
+    }
+
+    /// The Statistics header of a week without work, for every agent or the filtered one.
+    static func noWork(_ agent: AgentKind?) -> String {
+        "No \(agent?.name ?? "coding") work this week."
+    }
 }

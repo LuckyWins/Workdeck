@@ -24,6 +24,12 @@ final class NotchComposer {
     @ObservationIgnored private var isPeeking = false
     @ObservationIgnored private var screenObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var isStarted = false
+    /// The recap records on every refresh and handles its card's buttons (Codex recap spec §5).
+    @ObservationIgnored var onRefresh: (() -> Void)?
+    @ObservationIgnored var onRecapDismiss: (() -> Void)?
+    @ObservationIgnored var onRecapDetails: (() -> Void)?
+    /// A recap card waits for Got it: the notch stays up whatever the mode.
+    @ObservationIgnored var recapKeepsVisible = false
 
     init(
         settings: NotchSettings,
@@ -61,6 +67,16 @@ final class NotchComposer {
         if case let .menuBar(_, level) = state.display { level } else { .noData }
     }
 
+    /// What each agent tool reports to the recap.
+    var recapSamples: [AgentRecapSample] {
+        sources.map(\.recapSample)
+    }
+
+    /// An agent tool is switched on in the popover: the recap card may show.
+    var isAnyAgentEnabled: Bool {
+        sources.contains { $0.notchPart.isEnabled }
+    }
+
     /// Wires the presenter's actions to the sources; safe to call from every source's `start()`. The screen observer,
     /// the linger timer, peek and the accounts toggle refresh only the notch: what the sources record or keep awake
     /// changes with their own data, which refreshes them in full.
@@ -91,10 +107,10 @@ final class NotchComposer {
             self?.sources.forEach { $0.openChats(account: account) }
         }
         presenter.setRecapDismissAction { [weak self] in
-            self?.sources.forEach { $0.dismissRecap() }
+            self?.onRecapDismiss?()
         }
         presenter.setRecapDetailsAction { [weak self] in
-            self?.sources.forEach { $0.openRecapDetails() }
+            self?.onRecapDetails?()
         }
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
@@ -124,6 +140,7 @@ final class NotchComposer {
     /// Recomposes the notch from every source; `alerts` happened just now and flash after it shows. Limit alerts come
     /// first: in "When active" an alert counts as activity, so a hidden notch shows (flash spec §2.3).
     func refresh(alerts: [LimitsAlert] = []) {
+        onRefresh?()
         let parts = sources.map(\.notchPart)
         guard !parts.isEmpty else { return }
         // The demo shows only itself: other agents and their real alerts wait (demo mode spec §2.3).
@@ -152,7 +169,7 @@ final class NotchComposer {
         let showsLimits = shown.contains(where: \.showsLimits)
         let hasNotchScreen = hasNotchScreen
         // A disabled agent adds nothing, not even a reason to show or to peek (Codex spec §3.4).
-        let keepsVisible = shown.contains(where: \.keepsVisible)
+        let keepsVisible = recapKeepsVisible
         func decide() -> LimitsDisplay {
             LimitsPresentation.display(
                 isEnabled: isEnabled,

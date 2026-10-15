@@ -43,29 +43,30 @@ nonisolated struct RecapStretch: Codable, Equatable, Sendable {
 nonisolated struct RecapAccountDay: Codable, Equatable, Sendable {
     var hitWindows: Set<Date> = []
     var weeklyPeak: Double = 0
+    /// A 5-hour window was seen; a Codex plan may have only the weekly one (Codex recap spec §3.1).
+    var hasFiveHour = true
 
-    init(hitWindows: Set<Date> = [], weeklyPeak: Double = 0) {
+    init(hitWindows: Set<Date> = [], weeklyPeak: Double = 0, hasFiveHour: Bool = true) {
         self.hitWindows = hitWindows
         self.weeklyPeak = weeklyPeak
+        self.hasFiveHour = hasFiveHour
     }
 
     init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         hitWindows = try values.decodeIfPresent(Set<Date>.self, forKey: .hitWindows) ?? []
         weeklyPeak = try values.decodeIfPresent(Double.self, forKey: .weeklyPeak) ?? 0
+        hasFiveHour = try values.decodeIfPresent(Bool.self, forKey: .hasFiveHour) ?? true
     }
 }
 
-/// A day's totals, as `recap.json` keeps them.
-nonisolated struct RecapDay: Codable, Equatable, Sendable {
-    /// "2026-10-13" in the Mac's time zone.
-    var date: String
+/// One agent's day: its own time per project, its counts, its longest stretch and its accounts (Codex recap spec §4).
+nonisolated struct RecapAgentDay: Codable, Equatable, Sendable {
     var projects: [String: RecapProjectDay] = [:]
     var longest: RecapStretch?
     var accounts: [String: RecapAccountDay] = [:]
 
-    init(date: String, projects: [String: RecapProjectDay] = [:], longest: RecapStretch? = nil, accounts: [String: RecapAccountDay] = [:]) {
-        self.date = date
+    init(projects: [String: RecapProjectDay] = [:], longest: RecapStretch? = nil, accounts: [String: RecapAccountDay] = [:]) {
         self.projects = projects
         self.longest = longest
         self.accounts = accounts
@@ -73,14 +74,132 @@ nonisolated struct RecapDay: Codable, Equatable, Sendable {
 
     init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
-        date = try values.decode(String.self, forKey: .date)
         projects = try values.decodeIfPresent([String: RecapProjectDay].self, forKey: .projects) ?? [:]
         longest = try values.decodeIfPresent(RecapStretch.self, forKey: .longest)
         accounts = try values.decodeIfPresent([String: RecapAccountDay].self, forKey: .accounts) ?? [:]
     }
 
+    /// The agent's own time: an interval is split between its own busy sessions only.
     var seconds: Double {
         projects.values.reduce(0) { $0 + $1.seconds }
+    }
+}
+
+/// A day's totals, as `recap.json` keeps them (Codex recap spec §4).
+nonisolated struct RecapDay: Codable, Equatable, Sendable {
+    /// "2026-10-13" in the Mac's time zone.
+    var date: String
+    /// Each project's real time across agents: an interval is split between every busy session (Codex recap spec §2).
+    var projectSeconds: [String: Double] = [:]
+    /// Each agent's own day, by `AgentKind` raw value.
+    var agents: [String: RecapAgentDay] = [:]
+
+    init(date: String, projectSeconds: [String: Double] = [:], agents: [AgentKind: RecapAgentDay] = [:]) {
+        self.date = date
+        self.projectSeconds = projectSeconds
+        self.agents = Dictionary(uniqueKeysWithValues: agents.map { ($0.key.rawValue, $0.value) })
+    }
+
+    /// A day of Claude Code's work only, as days were kept before Codex.
+    init(date: String, projects: [String: RecapProjectDay], longest: RecapStretch? = nil, accounts: [String: RecapAccountDay] = [:]) {
+        self.init(
+            date: date,
+            projectSeconds: projects.mapValues(\.seconds),
+            agents: [.claudeCode: RecapAgentDay(projects: projects, longest: longest, accounts: accounts)]
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case date
+        case projectSeconds = "seconds"
+        case agents
+        /// Schema 1: Claude Code's day at the top level.
+        case projects, longest, accounts
+    }
+
+    init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        date = try values.decode(String.self, forKey: .date)
+        if values.contains(.agents) {
+            projectSeconds = try values.decodeIfPresent([String: Double].self, forKey: .projectSeconds) ?? [:]
+            agents = try values.decode([String: RecapAgentDay].self, forKey: .agents)
+        } else {
+            let claude = RecapAgentDay(
+                projects: try values.decodeIfPresent([String: RecapProjectDay].self, forKey: .projects) ?? [:],
+                longest: try values.decodeIfPresent(RecapStretch.self, forKey: .longest),
+                accounts: try values.decodeIfPresent([String: RecapAccountDay].self, forKey: .accounts) ?? [:]
+            )
+            projectSeconds = claude.projects.mapValues(\.seconds)
+            agents = [AgentKind.claudeCode.rawValue: claude]
+        }
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(date, forKey: .date)
+        try values.encode(projectSeconds, forKey: .projectSeconds)
+        try values.encode(agents, forKey: .agents)
+    }
+
+    func agentDay(_ agent: AgentKind) -> RecapAgentDay? {
+        agents[agent.rawValue]
+    }
+
+    mutating func updateAgent(_ agent: AgentKind, _ change: (inout RecapAgentDay) -> Void) {
+        var day = agents[agent.rawValue] ?? RecapAgentDay()
+        change(&day)
+        agents[agent.rawValue] = day
+    }
+
+    /// Every agent's projects in one: sessions and files joined, counts summed, times from `projectSeconds`.
+    var projects: [String: RecapProjectDay] {
+        projects(for: nil)
+    }
+
+    /// One agent's projects with its own time, or (`nil`) every agent's together.
+    func projects(for agent: AgentKind?) -> [String: RecapProjectDay] {
+        if let agent {
+            return agentDay(agent)?.projects ?? [:]
+        }
+        var merged: [String: RecapProjectDay] = [:]
+        for day in agents.values {
+            for (name, project) in day.projects {
+                var entry = merged[name, default: RecapProjectDay()]
+                entry.sessionIDs.formUnion(project.sessionIDs)
+                entry.files.formUnion(project.files)
+                entry.added += project.added
+                entry.removed += project.removed
+                entry.commands += project.commands
+                entry.agents += project.agents
+                merged[name] = entry
+            }
+        }
+        for (name, seconds) in projectSeconds {
+            merged[name, default: RecapProjectDay()].seconds = seconds
+        }
+        return merged
+    }
+
+    /// The longest stretch of one agent, or (`nil`) of any agent, with whose it is.
+    func longest(for agent: AgentKind?) -> (stretch: RecapStretch, agent: AgentKind)? {
+        AgentKind.allCases
+            .filter { agent == nil || $0 == agent }
+            .compactMap { kind in agentDay(kind)?.longest.map { (stretch: $0, agent: kind) } }
+            .max { $0.stretch.seconds < $1.stretch.seconds }
+    }
+
+    var longest: RecapStretch? {
+        longest(for: nil)?.stretch
+    }
+
+    /// Real time across agents.
+    var seconds: Double {
+        projectSeconds.values.reduce(0, +)
+    }
+
+    /// One agent's own time, or (`nil`) real time across agents.
+    func seconds(for agent: AgentKind?) -> Double {
+        agent.map { agentDay($0)?.seconds ?? 0 } ?? seconds
     }
 }
 
@@ -119,6 +238,9 @@ nonisolated struct RecapAccountSummary: Equatable, Sendable {
     var name: String
     var hits: Int
     var weeklyPeak: Double
+    var agent: AgentKind = .claudeCode
+    /// `5h hit` shows only for an account that has a 5-hour window.
+    var hasFiveHour = true
 }
 
 /// One project's week: its time and what it changed (statistics spec §3.4).
@@ -171,6 +293,16 @@ nonisolated struct WeeklyRecapSummary: Equatable, Sendable {
     var days: [RecapDaySplit] = []
     var accounts: [RecapAccountSummary] = []
 
+    /// Each agent's own time that week (Codex recap spec §2).
+    var agentSeconds: [AgentKind: Double] = [:]
+    /// Whose the longest stretch is.
+    var longestAgent: AgentKind?
+
+    /// Two agents worked that week: the card shows the split line, marks tell them apart.
+    var showsAgentSplit: Bool {
+        agentSeconds.values.filter { $0 > 0 }.count > 1
+    }
+
     var isWorthShowing: Bool {
         seconds >= Self.minimumSeconds
     }
@@ -183,7 +315,8 @@ nonisolated struct WeeklyRecapSummary: Equatable, Sendable {
 nonisolated enum WeeklyRecap {
     static let topProjectCount = 3
 
-    static func summary(days: [RecapDay], weekStart: Date, calendar: Calendar) -> WeeklyRecapSummary {
+    /// One week across agents (`agent == nil`) or of one agent (Codex recap spec §3).
+    static func summary(days: [RecapDay], weekStart: Date, calendar: Calendar, agent: AgentKind? = nil) -> WeeklyRecapSummary {
         let weekDates = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: weekStart) }
         let weekKeys = weekDates.map { RecapCalendar.dayKey($0, calendar: calendar) }
         let week = days.filter { weekKeys.contains($0.date) }
@@ -192,12 +325,13 @@ nonisolated enum WeeklyRecap {
         var projects: [String: RecapProjectSummary] = [:]
         var projectSessions: [String: Set<String>] = [:]
         var projectFiles: [String: Set<String>] = [:]
-        var hits: [String: Set<Date>] = [:]
-        var peaks: [String: Double] = [:]
+        var hits: [AccountKey: Set<Date>] = [:]
+        var peaks: [AccountKey: Double] = [:]
+        var fiveHour: [AccountKey: Bool] = [:]
         summary.days = weekDates.map { RecapDaySplit(date: $0) }
         for day in week {
             let index = weekKeys.firstIndex(of: day.date)
-            for (name, project) in day.projects {
+            for (name, project) in day.projects(for: agent) {
                 summary.seconds += project.seconds
                 summary.added += project.added
                 summary.removed += project.removed
@@ -215,12 +349,23 @@ nonisolated enum WeeklyRecap {
                     summary.days[index].projects[name, default: 0] += project.seconds
                 }
             }
-            if let longest = day.longest, longest.seconds > (summary.longest?.seconds ?? 0) {
-                summary.longest = longest
+            for kind in AgentKind.allCases where agent == nil || kind == agent {
+                let seconds = day.seconds(for: kind)
+                if seconds > 0 {
+                    summary.agentSeconds[kind, default: 0] += seconds
+                }
             }
-            for (name, account) in day.accounts {
-                hits[name, default: []].formUnion(account.hitWindows)
-                peaks[name] = max(peaks[name] ?? 0, account.weeklyPeak)
+            if let longest = day.longest(for: agent), longest.stretch.seconds > (summary.longest?.seconds ?? 0) {
+                summary.longest = longest.stretch
+                summary.longestAgent = longest.agent
+            }
+            for kind in AgentKind.allCases where agent == nil || kind == agent {
+                for (name, account) in day.agentDay(kind)?.accounts ?? [:] {
+                    let key = AccountKey(agent: kind, name: name)
+                    hits[key, default: []].formUnion(account.hitWindows)
+                    peaks[key] = max(peaks[key] ?? 0, account.weeklyPeak)
+                    fiveHour[key] = (fiveHour[key] ?? false) || account.hasFiveHour
+                }
             }
         }
         summary.sessions = sessions.count
@@ -233,19 +378,22 @@ nonisolated enum WeeklyRecap {
                 return project
             }
             .sorted { $0.seconds != $1.seconds ? $0.seconds > $1.seconds : $0.name < $1.name }
+        // Claude Code's accounts first (main, then by name), then Codex's (Codex recap spec §3.1).
         summary.accounts = peaks.keys
-            .sorted { ($0 == ClaudeInstance.mainName ? 0 : 1, $0) < ($1 == ClaudeInstance.mainName ? 0 : 1, $1) }
-            .map { RecapAccountSummary(name: $0, hits: hits[$0]?.count ?? 0, weeklyPeak: peaks[$0] ?? 0) }
+            .sorted { $0.order < $1.order }
+            .map { key in
+                RecapAccountSummary(name: key.name, hits: hits[key]?.count ?? 0, weeklyPeak: peaks[key] ?? 0, agent: key.agent, hasFiveHour: fiveHour[key] ?? true)
+            }
         return summary
     }
 
-    static func pace(days: [RecapDay], weekStart: Date, now: Date, calendar: Calendar) -> RecapPace {
+    static func pace(days: [RecapDay], weekStart: Date, now: Date, calendar: Calendar, agent: AgentKind? = nil) -> RecapPace {
         // Calendar days, so a 23- or 25-hour day still counts as one.
         let today = calendar.dateComponents([.day], from: weekStart, to: calendar.startOfDay(for: now)).day ?? 6
         let elapsed = min(7, max(1, today + 1))
-        let seconds = seconds(of: days, from: weekStart, count: elapsed, calendar: calendar)
+        let seconds = seconds(of: days, from: weekStart, count: elapsed, agent: agent, calendar: calendar)
         let before = calendar.date(byAdding: .weekOfYear, value: -1, to: weekStart)
-            .map { Self.seconds(of: days, from: $0, count: elapsed, calendar: calendar) } ?? 0
+            .map { Self.seconds(of: days, from: $0, count: elapsed, agent: agent, calendar: calendar) } ?? 0
         return RecapPace(
             elapsedDays: elapsed,
             average: seconds / Double(elapsed),
@@ -253,10 +401,20 @@ nonisolated enum WeeklyRecap {
         )
     }
 
-    private static func seconds(of days: [RecapDay], from start: Date, count: Int, calendar: Calendar) -> Double {
+    private static func seconds(of days: [RecapDay], from start: Date, count: Int, agent: AgentKind?, calendar: Calendar) -> Double {
         let keys = Set((0..<count).compactMap { offset in
             calendar.date(byAdding: .day, value: offset, to: start).map { RecapCalendar.dayKey($0, calendar: calendar) }
         })
-        return days.filter { keys.contains($0.date) }.reduce(0) { $0 + $1.seconds }
+        return days.filter { keys.contains($0.date) }.reduce(0) { $0 + $1.seconds(for: agent) }
+    }
+
+    /// An account is its agent's: a Claude Code instance may be named "codex".
+    private struct AccountKey: Hashable {
+        var agent: AgentKind
+        var name: String
+
+        var order: (Int, Int, String) {
+            (AgentKind.allCases.firstIndex(of: agent) ?? 0, name == ClaudeInstance.mainName ? 0 : 1, name)
+        }
     }
 }

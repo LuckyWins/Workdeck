@@ -21,7 +21,6 @@ nonisolated enum ClaudeCodeDemoEvent: Equatable, Sendable {
     /// Expands the notch for this many seconds.
     case expand(TimeInterval)
     case alert(LimitsAlert)
-    case showRecap
 }
 
 /// The one-minute Claude Code tour (demo mode spec §2.2). Pure: the same moment gives the same frame, so every run
@@ -29,8 +28,6 @@ nonisolated enum ClaudeCodeDemoEvent: Equatable, Sendable {
 nonisolated enum ClaudeCodeDemoScript {
     static let length: TimeInterval = 60
     static let expandedSeconds: TimeInterval = 6
-    /// The recap shows from 50 s to the end.
-    static let recapSeconds: TimeInterval = 10
     static let personal = "personal"
     static let orbitID = "demo-orbit-app"
     static let apiID = "demo-api-server"
@@ -158,35 +155,9 @@ nonisolated enum ClaudeCodeDemoScript {
             (20, .alert(.sessionNeedsYou(project: "api-server"))),
             (30, .alert(.threshold(window, threshold: threshold))),
             (orbitFinishesAt, .alert(.sessionFinished(project: "orbit-app", worked: orbitWorked))),
-            (length - recapSeconds, .showRecap),
         ]
         let from = previous ?? -1
         return timeline.filter { $0.at > from && $0.at <= elapsed }.map(\.event)
-    }
-
-    /// Twelve weeks of made-up days up to today, the same on every call (statistics spec, demo mode spec §2.3).
-    static func days(now: Date, calendar: Calendar) -> [RecapDay] {
-        let today = calendar.startOfDay(for: now)
-        let thisWeek = RecapCalendar.weekStart(of: now, calendar: calendar)
-        var result: [RecapDay] = []
-        for week in 0..<RecapStore.keptWeeks {
-            guard let start = calendar.date(byAdding: .weekOfYear, value: -week, to: thisWeek) else { continue }
-            let factor = weekFactors[week % weekFactors.count]
-            for weekday in 0..<7 {
-                guard let date = calendar.date(byAdding: .day, value: weekday, to: start), date <= today else { continue }
-                let minutes = dayMinutes[weekday] * factor
-                guard minutes > 0 else { continue }
-                result.append(day(date: date, minutes: minutes, weekday: weekday, calendar: calendar))
-            }
-        }
-        return result.sorted { $0.date < $1.date }
-    }
-
-    /// Last week's recap from the demo's days.
-    static func recap(now: Date, calendar: Calendar) -> WeeklyRecapSummary {
-        let thisWeek = RecapCalendar.weekStart(of: now, calendar: calendar)
-        let lastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: thisWeek) ?? thisWeek
-        return WeeklyRecap.summary(days: days(now: now, calendar: calendar), weekStart: lastWeek, calendar: calendar)
     }
 
     // MARK: Sessions
@@ -274,47 +245,4 @@ nonisolated enum ClaudeCodeDemoScript {
         return turn
     }
 
-    // MARK: Days
-
-    private static let projectShares: [(name: String, share: Double)] = [("orbit-app", 0.5), ("api-server", 0.3), ("design-system", 0.15), ("docs", 0.05)]
-    /// Monday to Sunday.
-    private static let dayMinutes: [Double] = [95, 140, 120, 160, 80, 25, 0]
-    private static let weekFactors: [Double] = [1.0, 0.85, 1.15, 0.7]
-    private static let projectFiles = [
-        "orbit-app": ["OrbitView.swift", "PlanetModel.swift", "OrbitViewTests.swift", "Package.swift"],
-        "api-server": ["routes.ts", "auth.ts", "db.ts"],
-        "design-system": ["Button.tsx", "tokens.json"],
-        "docs": ["README.md"],
-    ]
-
-    private static func day(date: Date, minutes: Double, weekday: Int, calendar: Calendar) -> RecapDay {
-        let key = RecapCalendar.dayKey(date, calendar: calendar)
-        var projects: [String: RecapProjectDay] = [:]
-        for (name, share) in projectShares {
-            let seconds = (minutes * share * 60).rounded()
-            guard seconds >= 60 else { continue }
-            let files = projectFiles[name] ?? []
-            projects[name] = RecapProjectDay(
-                seconds: seconds,
-                sessionIDs: Set((0..<max(1, Int(seconds / 2400))).map { "demo-\(key)-\(name)-\($0)" }),
-                files: Set(files.prefix(max(1, Int(seconds / 900)))),
-                added: Int(seconds / 15),
-                removed: Int(seconds / 45),
-                commands: Int(seconds / 180),
-                agents: Int(seconds / 1200)
-            )
-        }
-        let orbit = projects["orbit-app"]?.seconds ?? 0
-        // Thursdays hit the 5-hour limit once.
-        let hits: Set<Date> = weekday == 3 ? Set([calendar.date(byAdding: .hour, value: 15, to: date)].compactMap { $0 }) : []
-        return RecapDay(
-            date: key,
-            projects: projects,
-            longest: RecapStretch(project: "orbit-app", seconds: (orbit * 0.6).rounded()),
-            accounts: [
-                ClaudeInstance.mainName: RecapAccountDay(hitWindows: hits, weeklyPeak: min(100, 18 + 14 * Double(weekday))),
-                personal: RecapAccountDay(weeklyPeak: 8 + 4 * Double(weekday)),
-            ]
-        )
-    }
 }

@@ -65,8 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 makeHooksConnector: { SessionHooksConnector.forInstance($0) },
                 mainSettingsURL: ClaudeSettingsFile.standard().url
             ),
-            composer: notch,
-            recapStore: RecapStore.standard()
+            composer: notch
         )
     }()
 
@@ -86,6 +85,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             root: CodexSessionFiles.root()
         ),
         composer: notch
+    )
+
+    /// The weekly recap and Statistics across agents (Codex recap spec §5).
+    private(set) lazy var recap = RecapController(
+        composer: notch,
+        settings: RecapSettings(),
+        store: RecapStore.standard(),
+        activity: SessionActivityMonitor()
     )
 
     private(set) lazy var instances = ClaudeInstancesController(
@@ -112,19 +119,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { await chats.focus(onChat: sessionID) }
             WindowOpener.shared.open(ChatsWindow.id)
         }
-        claudeCode.onOpenStatistics = { WindowOpener.shared.open(StatisticsWindow.id) }
+        recap.onOpenStatistics = { WindowOpener.shared.open(StatisticsWindow.id) }
         claudeCode.planLabels = { [unowned self] in instances.plans }
         instances.onAccountsRefreshed = { [unowned self] in claudeCode.refresh() }
         Task { await instances.refreshAccounts() }
         claudeCode.setInstances(instances.instances)
         claudeCode.start()
         codex.start()
+        recap.start()
         demo.register(claudeCode)
+        demo.register(recap)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         demo.stop()
-        claudeCode.saveRecap()
+        recap.save()
         lidSleep.prepareForTermination()
     }
 }

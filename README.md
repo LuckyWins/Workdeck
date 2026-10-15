@@ -31,7 +31,7 @@ A Claude Code plan limit runs out in the middle of a task, a session sits waitin
 - 🤖 **Live sessions and agents** — every session working, waiting for you or idle, its agents as a tree, the focused session's last steps as a ticker, and each edit's `+12 −3`. [More](docs/claude-code.md#sessions)
 - 🔔 **Alerts that come to you** — a limit at 80 % and 95 %, a limit that reset, a session that needs you, a long session that finished. The notch opens with the alert, glows in its color, then flashes once.
 - 🎯 **Back to the right window** — click a session to bring forward its VS Code, Cursor or Windsurf window, or its own Terminal or iTerm2 tab.
-- 📅 **Weekly recap and Statistics** — last week's coding time by project, sessions, files, lines, commands, agents and limit hits on the first unlock of a week; any of the last twelve weeks in a window. Counts and names only, stored locally. [More](docs/claude-code.md#weekly-recap-and-statistics)
+- 📅 **Weekly recap and Statistics** — last week's coding time by project, sessions, files, lines, commands, agents and limit hits on the first unlock of a week, for Claude Code and Codex with each agent's own time; any of the last twelve weeks in a window, filtered by agent. Counts and names only, stored locally. [More](docs/claude-code.md#weekly-recap-and-statistics)
 - 👥 **Two accounts side by side** — run a second Claude Code instance with its own login, see both accounts' limits, and continue a chat on the other account when a limit runs out. [More](docs/claude-code.md#instances-and-chats)
 - 🖥️ **Any display** — on an external monitor with the lid closed, a virtual notch at the top of the screen, or plain text in the menu bar.
 - 🧪 **Demo mode** — a one-minute scripted tour in the notch, no Claude Code needed.
@@ -75,7 +75,7 @@ Claude Code reports plan usage only for Pro and Max subscriptions. Details: [doc
 | Click a session in the notch | brings forward its editor window or terminal tab |
 | Click a limit alert | opens Chats on that account, to go on with another one |
 | Turn on **Notify when a session finishes** in Settings → Notch and start a long task | tells you when it is done, with how long it worked |
-| Click **Statistics…** in the Claude Code row | shows this week's coding time by day and project |
+| Click the chart button in the popover's header | shows this week's coding time by day and project |
 | Turn on Closed-Lid Mode and close the lid | keeps the build running |
 | Settings → General → **Try Demo** | plays the one-minute tour |
 

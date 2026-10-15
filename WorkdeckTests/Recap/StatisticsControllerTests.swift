@@ -20,7 +20,7 @@ struct StatisticsControllerTests {
         now.value = date("2026-10-13").addingTimeInterval(15 * 3600)
         let controller = StatisticsController(calendar: calendar) { [now] in now.value }
         controller.isVisible = true
-        controller.update(days: days, isHooksConnected: true, thresholds: [80, 95])
+        controller.update(days: days, connectedAgents: [.claudeCode], thresholds: [80, 95])
         return controller
     }
 
@@ -75,7 +75,7 @@ struct StatisticsControllerTests {
     @Test func theCurrentWeekUpdatesLive() {
         let controller = makeController(days: [work("2026-10-12")])
         #expect(controller.summary.seconds == 3600)
-        controller.update(days: [work("2026-10-12"), work("2026-10-13", 1800)], isHooksConnected: false, thresholds: [70, 90])
+        controller.update(days: [work("2026-10-12"), work("2026-10-13", 1800)], connectedAgents: [], thresholds: [70, 90])
         #expect(controller.summary.seconds == 5400)
         #expect(controller.pace.elapsedDays == 2)
         #expect(!controller.isHooksConnected)
@@ -85,7 +85,7 @@ struct StatisticsControllerTests {
     @Test func thisWeekFollowsTheNewWeek() {
         let controller = makeController()
         now.value = date("2026-10-19").addingTimeInterval(9 * 3600)
-        controller.update(days: [], isHooksConnected: true, thresholds: [80, 95])
+        controller.update(days: [], connectedAgents: [.claudeCode], thresholds: [80, 95])
         #expect(key(controller.weekStart) == "2026-10-19")
         #expect(controller.isCurrentWeek)
     }
@@ -94,7 +94,7 @@ struct StatisticsControllerTests {
         let controller = makeController(days: [work("2026-10-07")])
         controller.show(week: date("2026-10-05"))
         now.value = date("2026-10-19").addingTimeInterval(9 * 3600)
-        controller.update(days: [work("2026-10-07")], isHooksConnected: true, thresholds: [80, 95])
+        controller.update(days: [work("2026-10-07")], connectedAgents: [.claudeCode], thresholds: [80, 95])
         #expect(key(controller.weekStart) == "2026-10-05")
         #expect(controller.canGoForward)
     }
@@ -102,11 +102,11 @@ struct StatisticsControllerTests {
     @Test func anUnchangedUpdateDoesNotRepublish() {
         let controller = makeController(days: [work("2026-10-12")])
         let count = controller.publishCount
-        controller.update(days: [work("2026-10-12")], isHooksConnected: true, thresholds: [80, 95])
+        controller.update(days: [work("2026-10-12")], connectedAgents: [.claudeCode], thresholds: [80, 95])
         #expect(controller.publishCount == count)
         // The clock moves on every hook event; within the same day nothing the window shows changes.
         now.value = now.value.addingTimeInterval(120)
-        controller.update(days: [work("2026-10-12")], isHooksConnected: true, thresholds: [80, 95])
+        controller.update(days: [work("2026-10-12")], connectedAgents: [.claudeCode], thresholds: [80, 95])
         #expect(controller.publishCount == count)
     }
 
@@ -114,7 +114,7 @@ struct StatisticsControllerTests {
         let controller = makeController(days: [work("2026-10-12")])
         controller.isVisible = false
         let count = controller.publishCount
-        controller.update(days: [work("2026-10-12"), work("2026-10-13")], isHooksConnected: true, thresholds: [80, 95])
+        controller.update(days: [work("2026-10-12"), work("2026-10-13")], connectedAgents: [.claudeCode], thresholds: [80, 95])
         #expect(controller.publishCount == count)
         #expect(controller.summary.seconds == 3600)
         controller.isVisible = true
@@ -125,7 +125,74 @@ struct StatisticsControllerTests {
         let controller = makeController()
         #expect(key(controller.today) == "2026-10-13")
         now.value = date("2026-10-14").addingTimeInterval(60)
-        controller.update(days: [], isHooksConnected: true, thresholds: [80, 95])
+        controller.update(days: [], connectedAgents: [.claudeCode], thresholds: [80, 95])
         #expect(key(controller.today) == "2026-10-14")
+    }
+
+    @Test func theAgentFilterShowsOneAgentsOwnTime() {
+        // A day of the current week: Claude Code and Codex worked an hour at once on Workdeck.
+        let shared = RecapDay(
+            date: "2026-10-13",
+            projectSeconds: ["Workdeck": 3600],
+            agents: [
+                .claudeCode: RecapAgentDay(projects: ["Workdeck": RecapProjectDay(seconds: 3600, sessionIDs: ["a"])]),
+                .codex: RecapAgentDay(projects: ["Workdeck": RecapProjectDay(seconds: 3600, sessionIDs: ["c"])]),
+            ]
+        )
+        let controller = makeController()
+        controller.update(days: [shared], connectedAgents: [.claudeCode, .codex], thresholds: [80, 95])
+        #expect(controller.showsAgentFilter)
+        #expect(controller.summary.seconds == 3600)
+        #expect(controller.summary.sessions == 2)
+        controller.setAgent(.codex)
+        #expect(controller.agent == .codex)
+        #expect(controller.summary.sessions == 1)
+        #expect(controller.summary.seconds == 3600)
+        controller.setAgent(nil)
+        #expect(controller.summary.sessions == 2)
+    }
+
+    @Test func theFilterIsOfferedOnlyWithTwoAgents() {
+        let controller = makeController()
+        controller.update(days: [work("2026-10-12")], connectedAgents: [.claudeCode], thresholds: [80, 95])
+        #expect(!controller.showsAgentFilter)
+    }
+
+    @Test func theHooksLineFollowsTheFilter() {
+        let controller = makeController()
+        // Both agents worked, so the filter is offered; only Claude Code's hooks are connected.
+        let both = RecapDay(
+            date: "2026-10-12",
+            projectSeconds: ["Workdeck": 3600],
+            agents: [
+                .claudeCode: RecapAgentDay(projects: ["Workdeck": RecapProjectDay(seconds: 3600, sessionIDs: ["a"])]),
+                .codex: RecapAgentDay(projects: ["Workdeck": RecapProjectDay(seconds: 600, sessionIDs: ["c"])]),
+            ]
+        )
+        controller.update(days: [both], connectedAgents: [.claudeCode], thresholds: [80, 95])
+        #expect(controller.isHooksConnected)
+        controller.setAgent(.codex)
+        #expect(!controller.isHooksConnected)
+        controller.setAgent(nil)
+        #expect(controller.isHooksConnected)
+    }
+
+    @Test func aHiddenFilterFallsBackToAll() {
+        // Filtered to Codex while the demo played; the real days have only Claude Code's work.
+        let both = RecapDay(
+            date: "2026-10-13",
+            projectSeconds: ["Workdeck": 3600],
+            agents: [
+                .claudeCode: RecapAgentDay(projects: ["Workdeck": RecapProjectDay(seconds: 3600, sessionIDs: ["a"])]),
+                .codex: RecapAgentDay(projects: ["docs": RecapProjectDay(seconds: 600, sessionIDs: ["c"])]),
+            ]
+        )
+        let controller = makeController(days: [both])
+        controller.setAgent(.codex)
+        controller.update(days: [work("2026-10-13", 1800)], connectedAgents: [.claudeCode], thresholds: [80, 95])
+        #expect(!controller.showsAgentFilter)
+        #expect(controller.agent == nil)
+        #expect(controller.summary.seconds == 1800)
+        #expect(controller.isHooksConnected)
     }
 }

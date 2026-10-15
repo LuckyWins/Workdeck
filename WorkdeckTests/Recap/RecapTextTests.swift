@@ -58,4 +58,17 @@ struct RecapTextTests {
         #expect(RecapText.dayDetail(projects: 1, seconds: 600, average: 1860) == "1 project · 21m below the daily average")
         #expect(RecapText.dayDetail(projects: 2, seconds: 1890, average: 1860) == "2 projects · about the daily average")
     }
+
+    @Test func theSplitLineListsAgentsWithTime() {
+        let parts = RecapText.agentSplit([.claudeCode: 36_300, .codex: 15_000])
+        #expect(parts.map(\.agent) == [.claudeCode, .codex])
+        #expect(parts.map(\.text) == ["Claude \(RecapText.duration(36_300))", "Codex \(RecapText.duration(15_000))"])
+        #expect(RecapText.agentSplit([.codex: 600, .claudeCode: 0]).map(\.agent) == [.codex])
+    }
+
+    @Test func anEmptyWeekNamesTheFilteredAgent() {
+        #expect(RecapText.noWork(nil) == "No coding work this week.")
+        #expect(RecapText.noWork(.claudeCode) == "No Claude Code work this week.")
+        #expect(RecapText.noWork(.codex) == "No Codex work this week.")
+    }
 }

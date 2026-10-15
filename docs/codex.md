@@ -20,3 +20,7 @@ Connect **Session hooks** in Settings → Codex to list Codex sessions next to C
 - Steps come from Codex's tool calls (`Bash rg -n …`); patches Codex applies show as `Edit index.md +4 −1`, counted from the `patch_apply_end` lines of its session file; edits made through the shell are not counted.
 - The hook keeps only the event, IDs, the project folder, the host app, the `codex` process and the session file's path; never prompts, answers or command output. Events live in `~/Library/Application Support/Workdeck/sessions-codex`.
 - "Notify when a session finishes", "needs you" and "Keep Mac awake" in Settings → Notch apply to Codex sessions too. Clicking a Codex session brings forward its VS Code window or Terminal or iTerm2 tab.
+
+## Recap and Statistics
+
+Codex's work counts in the weekly recap and the Statistics window next to Claude Code's while its session hooks are connected, also with its popover switch off. Its weekly peak shows in the limits as `◎ codex` while Codex is on or its hooks are connected. See [Weekly Recap and Statistics](claude-code.md#weekly-recap-and-statistics).

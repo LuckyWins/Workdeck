@@ -24,9 +24,6 @@ struct ClaudeCodeRow: View {
                         openWindow(id: ChatsWindow.id)
                         NSApp.activate()
                     }
-                    Button("Statistics…") {
-                        controller.openStatistics(week: nil)
-                    }
                 }
                 .buttonStyle(.link)
                 .font(.caption)

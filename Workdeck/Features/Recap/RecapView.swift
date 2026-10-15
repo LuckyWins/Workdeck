@@ -23,6 +23,9 @@ struct RecapView: View {
                 RecapMiniChart(recap: recap, calendar: calendar)
             }
             .padding(.vertical, 4)
+            if recap.showsAgentSplit {
+                agentSplit
+            }
             HStack(spacing: 0) {
                 Text("\(RecapText.number(recap.files)) files  ")
                 Text("+\(RecapText.number(recap.added))").foregroundStyle(.green)
@@ -34,7 +37,7 @@ struct RecapView: View {
             Text("\(RecapText.number(recap.commands)) commands · \(RecapText.number(recap.agents)) agents")
                 .lineLimit(1)
             if let longest = recap.longest {
-                row("longest", "\(longest.project) · \(RecapText.duration(longest.seconds))")
+                row("longest", "\(longestMark)\(longest.project) · \(RecapText.duration(longest.seconds))")
             }
             if !recap.topProjects.isEmpty {
                 header("top projects")
@@ -49,11 +52,13 @@ struct RecapView: View {
             }
             if !recap.accounts.isEmpty {
                 header("limits")
-                ForEach(recap.accounts, id: \.name) { account in
+                ForEach(Array(recap.accounts.enumerated()), id: \.offset) { _, account in
                     HStack {
-                        Text(account.name).foregroundStyle(.purple)
+                        accountName(account)
                         Spacer(minLength: 6)
-                        Text("5h hit \(account.hits)×").foregroundStyle(Terminal.dim)
+                        if account.hasFiveHour {
+                            Text("5h hit \(account.hits)×").foregroundStyle(Terminal.dim)
+                        }
                         Text("7d peak \(Int(account.weeklyPeak.rounded()))%")
                             .foregroundStyle(RecapPalette.peakColor(account.weeklyPeak, thresholds: thresholds))
                     }
@@ -66,6 +71,28 @@ struct RecapView: View {
             }
             .padding(.top, 4)
         }
+    }
+
+    /// "✳ Claude 10h 05m · ◎ Codex 4h 10m", marks in the agents' colors.
+    private var agentSplit: some View {
+        RecapText.agentSplit(recap.agentSeconds).enumerated().reduce(Text("")) { line, item in
+            line + Text(item.offset > 0 ? " · " : "") + item.element.agent.marked(item.element.text)
+        }
+        .foregroundStyle(Terminal.dim)
+        .lineLimit(1)
+    }
+
+    /// The longest stretch's agent, while two agents worked.
+    private var longestMark: String {
+        guard recap.showsAgentSplit, let agent = recap.longestAgent else { return "" }
+        return agent.mark + " "
+    }
+
+    /// An account's name, with its agent's mark when accounts of two agents are listed.
+    private func accountName(_ account: RecapAccountSummary) -> Text {
+        let name = Text(account.name).foregroundStyle(.purple)
+        guard Set(recap.accounts.map(\.agent)).count > 1 else { return name }
+        return Text(account.agent.mark + " ").foregroundStyle(account.agent.color) + name
     }
 
     private func button(_ title: String, action: @escaping () -> Void) -> some View {

@@ -16,42 +16,22 @@ final class ClaudeCodeController {
     @ObservationIgnored var onOpenChats: ((String?) -> Void)?
     /// Plan labels by account label ("main", "personal"), from the instances' `.claude.json`.
     @ObservationIgnored var planLabels: () -> [String: String] = { [:] }
-    @ObservationIgnored private let recapStore: RecapStore?
-    @ObservationIgnored private let calendar: Calendar
-    @ObservationIgnored private var recorder: RecapRecorder?
-    /// Last week's recap, shown until dismissed (recap spec §3.2).
-    @ObservationIgnored private var pendingRecap: WeeklyRecapSummary?
-    @ObservationIgnored private var lastRecapSave: Date?
-    /// The Statistics window's state, fed the recorder's days on every refresh (statistics spec §3.5).
-    let statistics: StatisticsController
-    /// Opens the Statistics window (the app hands it `WindowOpener`).
-    @ObservationIgnored var onOpenStatistics: (() -> Void)?
-    /// Demo mode: the script replaces what the notch and Statistics show (demo mode spec §2.3).
+    /// Demo mode: the script replaces what the notch shows (demo mode spec §2.3).
     @ObservationIgnored private(set) var isDemoActive = false
     @ObservationIgnored private var demoElapsed: TimeInterval = 0
-    @ObservationIgnored private var demoDays: [RecapDay] = []
-    /// The demo's recap while it is up.
-    @ObservationIgnored private var demoRecap: WeeklyRecapSummary?
-    /// A real recap was expanded when the demo started; at stop it expands again, otherwise only its mark returns.
-    @ObservationIgnored private var realRecapWasExpanded = false
 
     init(
         settings: ClaudeCodeSettings,
         limits: ClaudeLimitsController,
         sessions: ClaudeSessionsController,
         composer: NotchComposer,
-        clock: @escaping () -> Date = { Date() },
-        recapStore: RecapStore? = nil,
-        calendar: Calendar = RecapCalendar.calendar()
+        clock: @escaping () -> Date = { Date() }
     ) {
         self.settings = settings
         self.limits = limits
         self.sessions = sessions
         self.composer = composer
         self.clock = clock
-        self.recapStore = recapStore
-        self.calendar = calendar
-        statistics = StatisticsController(calendar: calendar, clock: clock)
         composer.register(self)
     }
 
@@ -63,12 +43,10 @@ final class ClaudeCodeController {
         presenter: any LimitsPresenting,
         cameraHousings: @escaping @MainActor () -> [Bool] = { NSScreen.screens.map { $0.safeAreaInsets.top > 0 } },
         clock: @escaping () -> Date = { Date() },
-        linger: TimeInterval = 60,
-        recapStore: RecapStore? = nil,
-        calendar: Calendar = RecapCalendar.calendar()
+        linger: TimeInterval = 60
     ) {
         let composer = NotchComposer(settings: settings.notch, presenter: presenter, cameraHousings: cameraHousings, clock: clock, linger: linger)
-        self.init(settings: settings, limits: limits, sessions: sessions, composer: composer, clock: clock, recapStore: recapStore, calendar: calendar)
+        self.init(settings: settings, limits: limits, sessions: sessions, composer: composer, clock: clock)
     }
 
     /// The indicator has something to show: limits, sessions, or both.
@@ -111,18 +89,8 @@ final class ClaudeCodeController {
             refresh()
             composer.flash(alerts)
         }
-        if let recapStore {
-            recorder = RecapRecorder(days: recapStore.load(now: clock(), calendar: calendar), calendar: calendar)
-        }
-        updateStatistics()
-        limits.onActivityChange = { [weak self] active in
-            if active {
-                self?.checkRecap()
-            }
-        }
         limits.start()
         sessions.start()
-        checkRecap()
     }
 
     func diagnosticsText(logLines: [String], extraLines: [String] = [], now: Date = Date()) -> String {
@@ -192,10 +160,8 @@ final class ClaudeCodeController {
         refresh()
     }
 
-    /// Keep-awake, the recap and Statistics, then the notch with this tool's limit alerts.
+    /// Keep-awake, then the notch with this tool's limit alerts.
     func refresh() {
-        recordRecap()
-        updateStatistics()
         sessions.updateKeepAwake()
         let limitAlerts = limits.takeAlerts()
         // Real limit alerts during the demo are dropped with it (demo mode spec §2.3).
@@ -207,66 +173,6 @@ final class ClaudeCodeController {
             return
         }
         composer.refresh(alerts: limitAlerts)
-    }
-
-    /// Shows last week's recap if it is due: not dismissed, worth showing, and a notch to show it in (recap spec §3.1).
-    func checkRecap() {
-        guard let recorder, settings.isEnabled, composer.hasNotchScreen,
-              let lastWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: RecapCalendar.weekStart(of: clock(), calendar: calendar))
-        else { return }
-        // A recap left open gives way to the next week's.
-        if let pending = pendingRecap {
-            guard pending.weekStart != lastWeek else { return }
-            pendingRecap = nil
-        }
-        let key = RecapCalendar.dayKey(lastWeek, calendar: calendar)
-        guard settings.dismissedRecapWeek != key else { return }
-        let summary = WeeklyRecap.summary(days: recorder.days, weekStart: lastWeek, calendar: calendar)
-        guard summary.isWorthShowing else {
-            settings.dismissedRecapWeek = key
-            return
-        }
-        pendingRecap = summary
-        if !isDemoActive {
-            composer.presenter.showRecap(summary)
-        }
-        refresh()
-    }
-
-    func dismissRecap() {
-        if isDemoActive {
-            // The demo's recap is made up: closing it keeps nothing (demo mode spec §2.3).
-            guard demoRecap != nil else { return }
-            demoRecap = nil
-            composer.presenter.showRecap(nil)
-            return
-        }
-        guard let recap = pendingRecap else { return }
-        settings.dismissedRecapWeek = RecapCalendar.dayKey(recap.weekStart, calendar: calendar)
-        pendingRecap = nil
-        composer.presenter.showRecap(nil)
-        refresh()
-    }
-
-    /// Shows the week holding `week` (`nil`: the current week) in the Statistics window (statistics spec §2).
-    func openStatistics(week: Date?) {
-        statistics.show(week: week)
-        onOpenStatistics?()
-    }
-
-    /// `Details…`: the recap is done with, its week opens in the window.
-    func openRecapDetails() {
-        let week = isDemoActive ? demoRecap?.weekStart : pendingRecap?.weekStart
-        dismissRecap()
-        openStatistics(week: week)
-    }
-
-    private func updateStatistics() {
-        statistics.update(
-            days: isDemoActive ? demoDays : recorder?.days ?? [],
-            isHooksConnected: isDemoActive || sessions.isHooksConnected,
-            thresholds: settings.thresholds
-        )
     }
 
     /// The notch part from the demo script, built like the real one (demo mode spec §2.3).
@@ -316,49 +222,6 @@ final class ClaudeCodeController {
         return forecasts
     }
 
-    /// Writes the recorded days now (on quit) or at most once a minute (from `refresh()`).
-    /// On quit: keeps the time and stretches up to now, then writes.
-    func saveRecap() {
-        guard let recorder else { return }
-        recordRecap(saving: false)
-        recorder.finish(now: clock())
-        writeRecap()
-    }
-
-    private func writeRecap() {
-        guard let recorder, let recapStore else { return }
-        let now = clock()
-        lastRecapSave = now
-        do {
-            try recapStore.save(recorder.days, now: now, calendar: calendar)
-            recorder.markSaved()
-        } catch {
-            WorkdeckLog.sessions.error("Recap: \(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    private func recordRecap(saving: Bool = true) {
-        guard let recorder else { return }
-        let now = clock()
-        recorder.record(
-            // Without hooks, sessions are stale snapshots: nothing to count.
-            sessions: sessions.isHooksConnected ? sessions.store.sessions : [],
-            accounts: limits.accounts.map { account in
-                let windows = account.store.currentWindows
-                return RecapAccountSample(
-                    name: account.label,
-                    fiveHour: windows.first { $0.kind == .fiveHour },
-                    sevenDay: windows.first { $0.kind == .sevenDay }
-                )
-            },
-            now: now
-        )
-        // At most once a minute, and only when something changed.
-        if saving, recorder.hasChanges, lastRecapSave.map({ now.timeIntervalSince($0) >= 60 }) ?? true {
-            writeRecap()
-        }
-    }
-
     /// The usage API waits for Claude Code to renew this account's login (spec §12); shown, but not as a problem.
     private func isWaiting(_ account: AccountLimits) -> Bool {
         settings.fetchFromAPI && account.poller.status == .waitingForClaudeCode
@@ -400,14 +263,8 @@ extension ClaudeCodeController: DemoParticipant {
     func demoDidStart() {
         isDemoActive = true
         demoElapsed = 0
-        demoDays = ClaudeCodeDemoScript.days(now: clock(), calendar: calendar)
         // Neither side's alerts carry over: real ones leave at the start, demo ones at the stop.
         composer.presenter.clearAlerts()
-        // A real recap steps aside and comes back at stop.
-        realRecapWasExpanded = pendingRecap != nil && composer.presenter.isRecapExpanded
-        if pendingRecap != nil {
-            composer.presenter.showRecap(nil)
-        }
         refresh()
     }
 
@@ -421,22 +278,13 @@ extension ClaudeCodeController: DemoParticipant {
                 composer.presenter.expand(for: .seconds(seconds))
             case let .alert(alert):
                 composer.presenter.flash([alert])
-            case .showRecap:
-                let recap = ClaudeCodeDemoScript.recap(now: clock(), calendar: calendar)
-                demoRecap = recap
-                composer.presenter.showRecap(recap, for: .seconds(ClaudeCodeDemoScript.recapSeconds))
             }
         }
     }
 
     func demoDidStop() {
         isDemoActive = false
-        demoDays = []
         composer.presenter.clearAlerts()
-        if demoRecap != nil || pendingRecap != nil {
-            demoRecap = nil
-            composer.presenter.showRecap(pendingRecap, for: realRecapWasExpanded ? nil : .zero)
-        }
         refresh()
     }
 }
@@ -444,6 +292,23 @@ extension ClaudeCodeController: DemoParticipant {
 extension ClaudeCodeController: AgentSource {
     var agent: AgentKind {
         .claudeCode
+    }
+
+    var recapSample: AgentRecapSample {
+        AgentRecapSample(
+            agent: .claudeCode,
+            // Without hooks, sessions are stale snapshots: nothing to count.
+            sessions: sessions.isHooksConnected ? sessions.store.sessions : [],
+            accounts: limits.accounts.map { account in
+                let windows = account.store.currentWindows
+                return RecapAccountSample(
+                    name: account.label,
+                    fiveHour: windows.first { $0.kind == .fiveHour },
+                    sevenDay: windows.first { $0.kind == .sevenDay }
+                )
+            },
+            isConnected: sessions.isHooksConnected
+        )
     }
 
     var notchPart: AgentNotchPart {
@@ -486,7 +351,6 @@ extension ClaudeCodeController: AgentSource {
             showsAccounts: sessions.showsAccounts,
             sessionsConnected: sessions.isHooksConnected,
             activeCount: sessions.viewState.activeCount,
-            keepsVisible: pendingRecap != nil,
             limitsChangedAt: compact.store.age.map { compact.store.now.addingTimeInterval(-$0) }
         )
     }

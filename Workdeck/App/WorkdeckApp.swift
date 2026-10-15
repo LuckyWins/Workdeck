@@ -6,7 +6,7 @@ struct WorkdeckApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            PopoverView(controller: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode, codex: appDelegate.codex, demo: appDelegate.demo)
+            PopoverView(controller: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode, codex: appDelegate.codex, recap: appDelegate.recap, demo: appDelegate.demo)
         } label: {
             MenuBarLabel(lidSleep: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode)
         }
@@ -23,8 +23,8 @@ struct WorkdeckApp: App {
         .defaultLaunchBehavior(.suppressed)
         .restorationBehavior(.disabled)
 
-        Window("Claude Code Statistics", id: StatisticsWindow.id) {
-            StatisticsWindow(controller: appDelegate.claudeCode.statistics)
+        Window("Statistics", id: StatisticsWindow.id) {
+            StatisticsWindow(controller: appDelegate.recap.statistics)
         }
         .defaultSize(width: 460, height: 680)
         .defaultLaunchBehavior(.suppressed)

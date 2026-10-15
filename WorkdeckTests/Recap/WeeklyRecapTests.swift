@@ -76,7 +76,7 @@ struct WeeklyRecapTests {
         let json = #"{"date":"2026-10-05","projects":{"Workdeck":{"seconds":60}}}"#
         let day = try JSONDecoder().decode(RecapDay.self, from: Data(json.utf8))
         #expect(day.projects["Workdeck"] == RecapProjectDay(seconds: 60))
-        #expect(day.accounts.isEmpty)
+        #expect(day.agentDay(.claudeCode)?.accounts.isEmpty == true)
         #expect(day.longest == nil)
     }
 

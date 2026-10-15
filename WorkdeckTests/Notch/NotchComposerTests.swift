@@ -9,8 +9,11 @@ final class FakeAgentSource: AgentSource {
     private(set) var projects: [String] = []
     private(set) var refreshes = 0
 
+    var recapSample: AgentRecapSample
+
     init(_ part: AgentNotchPart) {
         notchPart = part
+        recapSample = AgentRecapSample(agent: part.agent)
     }
 
     var agent: AgentKind {
@@ -113,8 +116,7 @@ struct NotchComposerTests {
     @Test func aDisabledSourceNeitherHoldsNorPeeks() {
         settings.mode = .whenActive
         let composer = makeComposer()
-        var off = part(.claudeCode, enabled: false)
-        off.keepsVisible = true
+        let off = part(.claudeCode, enabled: false)
         var on = part(.codex, account: "codex")
         on.hasSource = false
         add(off, to: composer)
@@ -178,14 +180,14 @@ struct NotchComposerTests {
         #expect(second.refreshes == 1)
     }
 
-    @Test func aPartThatKeepsVisibleHoldsAWhenActiveNotch() {
+    @Test func aPendingRecapHoldsAWhenActiveNotch() {
         settings.mode = .whenActive
         let composer = makeComposer()
         let source = FakeAgentSource(part(.claudeCode))
         composer.register(source)
         composer.refresh()
         #expect(composer.state.display == .hidden)
-        source.notchPart.keepsVisible = true
+        composer.recapKeepsVisible = true
         composer.refresh()
         #expect(composer.state.display == .notch(.normal))
     }

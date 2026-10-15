@@ -76,6 +76,26 @@ final class CodexController: AgentSource {
         .codex
     }
 
+    /// Codex's sessions count while its hooks are connected, whatever its popover switch; its limits, read passively,
+    /// only while the tool is on or its hooks are connected (Codex recap spec §3.3). Listed sessions carry the lines of
+    /// their applied patches.
+    var recapSample: AgentRecapSample {
+        let now = clock()
+        let windows = (limits.limits?.windows ?? []).filter { $0.resetsAt > now }
+        return AgentRecapSample(
+            agent: .codex,
+            sessions: sessions.listedSessions,
+            accounts: limits.limits == nil || !(settings.isEnabled || sessions.isHooksConnected) ? [] : [
+                RecapAccountSample(
+                    name: CodexLimitsSource.accountLabel,
+                    fiveHour: windows.first { $0.kind == .fiveHour },
+                    sevenDay: windows.first { $0.kind == .sevenDay }
+                ),
+            ],
+            isConnected: sessions.isHooksConnected
+        )
+    }
+
     var notchPart: AgentNotchPart {
         let now = clock()
         let current = limits.limits

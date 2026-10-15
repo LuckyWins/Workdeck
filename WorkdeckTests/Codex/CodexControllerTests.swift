@@ -136,4 +136,40 @@ struct CodexControllerTests {
         controller.sessions.start()
         #expect(controller.rowSubtitle == "1 session")
     }
+
+    @Test func codexCountsWhileItsSwitchIsOff() async {
+        let controller = await makeController(weekly)
+        sessionsHooks.status = .connected
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "c1") { $0.cwd = "/p/docs" }, to: sessionsDirectory)
+        controller.sessions.start()
+        controller.setEnabled(false)
+        let sample = controller.recapSample
+        #expect(sample.agent == .codex)
+        #expect(sample.isConnected)
+        #expect(sample.sessions.map(\.id) == ["c1"])
+        #expect(sample.accounts == [RecapAccountSample(name: "codex", fiveHour: nil, sevenDay: window(.sevenDay, 3, resetsIn: 86_400))])
+    }
+
+    @Test func withoutHooksCodexReportsNoSessions() async {
+        let controller = await makeController(weekly)
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "c1") { $0.cwd = "/p/docs" }, to: sessionsDirectory)
+        controller.sessions.start()
+        #expect(controller.recapSample.sessions.isEmpty)
+        #expect(!controller.recapSample.isConnected)
+    }
+
+    @Test func aCodexToolThatIsOffRecordsNoLimits() async {
+        // Codex's files are read passively even while its tool is off; a disabled agent adds nothing.
+        let controller = await makeController(weekly)
+        controller.setEnabled(false)
+        #expect(controller.recapSample.accounts.isEmpty)
+    }
+
+    @Test func expiredCodexWindowsAreNotRecorded() async {
+        let answer = CodexAppServerAnswer.limits(CodexLimits(windows: [window(.fiveHour, 50, resetsIn: -60), window(.sevenDay, 3, resetsIn: 86_400)], plan: "pro", resetCredits: 0, capturedAt: fixedNow.addingTimeInterval(-120)), version: "0.162.1")
+        let controller = await makeController(answer)
+        let account = controller.recapSample.accounts.first
+        #expect(account?.fiveHour == nil)
+        #expect(account?.sevenDay?.usedPercent == 3)
+    }
 }

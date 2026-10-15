@@ -5,6 +5,7 @@ struct PopoverView: View {
     let controller: LidSleepController
     let claudeCode: ClaudeCodeController
     let codex: CodexController
+    let recap: RecapController
     let demo: DemoMode
 
     var body: some View {
@@ -27,6 +28,13 @@ struct PopoverView: View {
                     .background(.tint.opacity(0.15), in: Capsule())
                 }
                 Spacer()
+                Button {
+                    recap.openStatistics(week: nil)
+                } label: {
+                    Image(systemName: "chart.bar")
+                }
+                .buttonStyle(.borderless)
+                .help("Statistics")
                 SettingsLink {
                     Image(systemName: "gearshape")
                 }

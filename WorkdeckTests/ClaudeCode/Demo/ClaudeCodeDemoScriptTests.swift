@@ -94,7 +94,6 @@ struct ClaudeCodeDemoScriptTests {
         #expect(events(19, 20) == [.alert(.sessionNeedsYou(project: "api-server"))])
         #expect(events(20, 21).isEmpty)
         #expect(events(41.5, 42.5) == [.alert(.sessionFinished(project: "orbit-app", worked: 14 * 60))])
-        #expect(events(49, 50) == [.showRecap])
         #expect(events(33, 33).isEmpty)
     }
 
@@ -106,23 +105,12 @@ struct ClaudeCodeDemoScriptTests {
             previous = elapsed
         }
         #expect(all.filter { if case .alert = $0 { true } else { false } }.count == 3)
-        #expect(all.filter { $0 == .showRecap }.count == 1)
         #expect(all.filter { $0 == .expand(6) }.count == 1)
     }
 
     @Test func framesAreDeterministic() {
         #expect(frame(33) == frame(33))
-        #expect(ClaudeCodeDemoScript.days(now: fixedNow, calendar: calendar) == ClaudeCodeDemoScript.days(now: fixedNow, calendar: calendar))
-    }
-
-    @Test func daysCoverTheKeptWeeksAndLastWeekIsWorthARecap() {
-        let days = ClaudeCodeDemoScript.days(now: fixedNow, calendar: calendar)
-        let weeks = Set(days.compactMap { RecapCalendar.date(ofKey: $0.date, calendar: calendar) }.map { RecapCalendar.weekStart(of: $0, calendar: calendar) })
-        #expect(weeks.count == RecapStore.keptWeeks)
-        #expect(days.allSatisfy { $0.date <= RecapCalendar.dayKey(fixedNow, calendar: calendar) })
-        let recap = ClaudeCodeDemoScript.recap(now: fixedNow, calendar: calendar)
-        #expect(recap.isWorthShowing)
-        #expect(RecapCalendar.dayKey(recap.weekStart, calendar: calendar) == "2026-09-28")
+        #expect(RecapDemoScript.days(now: fixedNow, calendar: calendar) == RecapDemoScript.days(now: fixedNow, calendar: calendar))
     }
 
     @Test func aCodexSessionWorksFromTwelveToFortyEight() {

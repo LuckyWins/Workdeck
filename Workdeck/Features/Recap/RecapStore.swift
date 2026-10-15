@@ -11,7 +11,7 @@ nonisolated struct RecapStore: Sendable {
     }
 
     private struct File: Codable {
-        var schemaVersion = 1
+        var schemaVersion = 2
         var days: [RecapDay]
     }
 

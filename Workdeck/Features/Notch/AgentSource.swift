@@ -20,6 +20,14 @@ nonisolated enum AgentKind: String, CaseIterable, Sendable {
         case .codex: "Codex"
         }
     }
+
+    /// The name in the recap's split line.
+    var shortName: String {
+        switch self {
+        case .claudeCode: "Claude"
+        case .codex: "Codex"
+        }
+    }
 }
 
 extension AgentKind {
@@ -64,8 +72,6 @@ nonisolated struct AgentNotchPart: Equatable, Sendable {
     var sessionsConnected: Bool
     /// Real sessions at work, for "When active" (the demo shows its own but keeps timing real work).
     var activeCount: Int
-    /// Something of this agent keeps the notch up, e.g. a pending recap.
-    var keepsVisible = false
     /// The demo plays: the notch shows whatever the mode.
     var isDemo = false
     /// When the agent's limits last changed; without sessions anywhere, the latest takes the compact notch.
@@ -85,6 +91,8 @@ nonisolated struct AgentNotchPart: Equatable, Sendable {
 protocol AgentSource: AnyObject {
     var agent: AgentKind { get }
     var notchPart: AgentNotchPart { get }
+    /// What the recap records for this agent on each refresh (Codex recap spec §3.3).
+    var recapSample: AgentRecapSample { get }
     /// A session row was clicked; a source that does not know the ID ignores it.
     func activateSession(id: String)
     /// A session alert was clicked; it knows only the project's name.
@@ -93,12 +101,12 @@ protocol AgentSource: AnyObject {
     func refreshNow()
     /// A limit alert was clicked, by account label.
     func openChats(account: String)
-    func dismissRecap()
-    func openRecapDetails()
 }
 
 extension AgentSource {
+    var recapSample: AgentRecapSample {
+        AgentRecapSample(agent: agent)
+    }
+
     func openChats(account: String) {}
-    func dismissRecap() {}
-    func openRecapDetails() {}
 }

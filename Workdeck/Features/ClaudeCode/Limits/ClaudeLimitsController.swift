@@ -16,7 +16,6 @@ final class ClaudeLimitsController {
     /// Limits data or their settings changed; the composer redraws.
     @ObservationIgnored var onChange: (() -> Void)?
     /// The screen became active (unlocked, displays awake) or not.
-    @ObservationIgnored var onActivityChange: ((Bool) -> Void)?
 
     @ObservationIgnored private let activity: any SessionActivityMonitoring
     @ObservationIgnored private let makeAccount: ((ClaudeInstance) -> AccountLimits)?
@@ -349,6 +348,5 @@ final class ClaudeLimitsController {
                 account.poller.pollIfStale()
             }
         }
-        onActivityChange?(active)
     }
 }

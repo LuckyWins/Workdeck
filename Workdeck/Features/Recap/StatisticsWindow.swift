@@ -1,7 +1,7 @@
 import Charts
 import SwiftUI
 
-/// One week of Claude Code work, Screen Time style (statistics spec §3).
+/// One week of every agent's work, Screen Time style (statistics spec §3, Codex recap spec §3.2).
 struct StatisticsWindow: View {
     static let id = "claude-statistics"
 
@@ -66,6 +66,17 @@ struct StatisticsContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if controller.showsAgentFilter {
+                Picker("Agent", selection: Binding(get: { controller.agent }, set: { controller.setAgent($0) })) {
+                    Text("All").tag(AgentKind?.none)
+                    ForEach(AgentKind.allCases, id: \.self) { agent in
+                        Text(agent.name).tag(AgentKind?.some(agent))
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .padding(.bottom, 12)
+            }
             header
             chart
                 .padding(.top, 14)
@@ -81,6 +92,9 @@ struct StatisticsContent: View {
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .onChange(of: controller.weekStart) {
+            selectedProject = nil
+        }
+        .onChange(of: controller.agent) {
             selectedProject = nil
         }
     }
@@ -124,7 +138,7 @@ struct StatisticsContent: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
-                Text("No Claude Code work this week.")
+                Text(RecapText.noWork(controller.agent))
                     .font(.title3)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 6)
@@ -319,20 +333,22 @@ struct StatisticsContent: View {
             // The longest stretch is kept one per day, not per project.
             if filter == nil, let longest = summary.longest {
                 Divider()
-                row("Longest") { Text("\(longest.project) · \(RecapText.duration(longest.seconds))") }
+                row("Longest") { Text("\(summary.showsAgentSplit ? (summary.longestAgent?.mark ?? "") + " " : "")\(longest.project) · \(RecapText.duration(longest.seconds))") }
             }
         }
     }
 
     private var limits: some View {
         section("Limits") {
-            ForEach(Array(summary.accounts.enumerated()), id: \.element.name) { index, account in
+            ForEach(Array(summary.accounts.enumerated()), id: \.offset) { index, account in
                 if index > 0 {
                     Divider()
                 }
-                row(account.name, color: .purple) {
+                row((Set(summary.accounts.map(\.agent)).count > 1 ? account.agent.mark + " " : "") + account.name, color: .purple) {
                     HStack(spacing: 6) {
-                        Text("5h hit \(account.hits)×").foregroundStyle(.secondary)
+                        if account.hasFiveHour {
+                            Text("5h hit \(account.hits)×").foregroundStyle(.secondary)
+                        }
                         Text("7d peak \(Int(account.weeklyPeak.rounded()))%")
                             .foregroundStyle(RecapPalette.peakColor(account.weeklyPeak, thresholds: controller.thresholds))
                     }

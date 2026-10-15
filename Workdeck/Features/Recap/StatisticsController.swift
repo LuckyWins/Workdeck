@@ -29,6 +29,11 @@ final class StatisticsController {
     private(set) var canGoBack = false
     private(set) var isHooksConnected = true
     private(set) var thresholds: [Int] = []
+    /// `nil` shows every agent (Codex recap spec §3.2).
+    private(set) var agent: AgentKind?
+    /// Two agents have time in the kept days: the window offers the filter.
+    private(set) var showsAgentFilter = false
+    @ObservationIgnored private var connectedAgents: Set<AgentKind> = []
 
     init(calendar: Calendar, clock: @escaping () -> Date) {
         self.calendar = calendar
@@ -45,17 +50,26 @@ final class StatisticsController {
         !isCurrentWeek
     }
 
-    func update(days: [RecapDay], isHooksConnected: Bool, thresholds: [Int]) {
+    func update(days: [RecapDay], connectedAgents: Set<AgentKind>, thresholds: [Int]) {
         self.days = days
-        if self.isHooksConnected != isHooksConnected {
-            self.isHooksConnected = isHooksConnected
-        }
-        if self.thresholds != thresholds {
-            self.thresholds = thresholds
-        }
+        self.connectedAgents = connectedAgents
+        set(\.isHooksConnected, hooksConnected)
+        set(\.thresholds, thresholds)
         // `refresh()` runs on every hook event; a closed window catches up when it opens.
         guard isVisible else { return }
         rebuild()
+    }
+
+    /// Shows one agent's own work, or (`nil`) every agent's.
+    func setAgent(_ agent: AgentKind?) {
+        set(\.agent, agent)
+        set(\.isHooksConnected, hooksConnected)
+        rebuild()
+    }
+
+    /// The hooks line shows when no agent counts, or when the filtered agent does not.
+    private var hooksConnected: Bool {
+        agent.map { connectedAgents.contains($0) } ?? !connectedAgents.isEmpty
     }
 
     /// Shows the week holding `week`; `nil` shows the current week and follows it.
@@ -90,8 +104,14 @@ final class StatisticsController {
         set(\.today, calendar.startOfDay(for: now))
         set(\.isCurrentWeek, weekStart == current)
         set(\.canGoBack, weekStart > oldestWeek(current: current))
-        set(\.summary, WeeklyRecap.summary(days: days, weekStart: weekStart, calendar: calendar))
-        set(\.pace, WeeklyRecap.pace(days: days, weekStart: weekStart, now: now, calendar: calendar))
+        set(\.showsAgentFilter, AgentKind.allCases.filter { kind in days.contains { $0.seconds(for: kind) > 0 } }.count > 1)
+        // Without the control there is no way back from a filter: show every agent.
+        if !showsAgentFilter, agent != nil {
+            set(\.agent, nil)
+            set(\.isHooksConnected, hooksConnected)
+        }
+        set(\.summary, WeeklyRecap.summary(days: days, weekStart: weekStart, calendar: calendar, agent: agent))
+        set(\.pace, WeeklyRecap.pace(days: days, weekStart: weekStart, now: now, calendar: calendar, agent: agent))
     }
 
     /// The oldest week with a day, but never more than the store keeps (spec §3.1).

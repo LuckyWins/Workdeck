@@ -110,7 +110,7 @@ struct RecapRecorderTests {
         recorder.record(sessions: [], accounts: [full], now: noon.addingTimeInterval(60))
         let below = RecapAccountSample(name: "main", fiveHour: UsageWindow(kind: .fiveHour, usedPercent: 99.9, resetsAt: reset.addingTimeInterval(18000)), sevenDay: UsageWindow(kind: .sevenDay, usedPercent: 41, resetsAt: noon.addingTimeInterval(86_400)))
         recorder.record(sessions: [], accounts: [below], now: noon.addingTimeInterval(120))
-        #expect(today(recorder)?.accounts["main"] == RecapAccountDay(hitWindows: [reset], weeklyPeak: 63))
+        #expect(today(recorder)?.agentDay(.claudeCode)?.accounts["main"] == RecapAccountDay(hitWindows: [reset], weeklyPeak: 63))
     }
 
     @Test func aStretchEndsAtAnUnobservedGap() {
@@ -127,7 +127,7 @@ struct RecapRecorderTests {
     @Test func anAccountWithoutDataIsNotRecorded() {
         let recorder = RecapRecorder(days: [], calendar: calendar)
         recorder.record(sessions: [session("a", "Workdeck", busy: true)], accounts: [RecapAccountSample(name: "main", fiveHour: nil, sevenDay: nil)], now: noon)
-        #expect(today(recorder)?.accounts["main"] == nil)
+        #expect(today(recorder)?.agentDay(.claudeCode)?.accounts["main"] == nil)
     }
 
     @Test func aSessionSilentForAnHourStopsCounting() {
@@ -168,4 +168,70 @@ struct RecapRecorderTests {
         #expect(!recorder.days.contains { $0.date == "2026-01-05" })
     }
 
+    private func codex(_ id: String, _ project: String, busy: Bool) -> ClaudeSession {
+        var session = session(id, project, busy: busy)
+        session.agent = .codex
+        return session
+    }
+
+    @Test func twoAgentsInOneProjectShareTheTotal() {
+        let recorder = RecapRecorder(days: [], calendar: calendar)
+        let samples = [
+            AgentRecapSample(agent: .claudeCode, sessions: [session("a", "Workdeck", busy: true)]),
+            AgentRecapSample(agent: .codex, sessions: [codex("c", "Workdeck", busy: true)]),
+        ]
+        recorder.record(samples: samples, now: noon)
+        recorder.record(samples: samples, now: noon.addingTimeInterval(60))
+        let day = today(recorder)
+        #expect(day?.projectSeconds == ["Workdeck": 60])
+        #expect(day?.agentDay(.claudeCode)?.projects["Workdeck"]?.seconds == 60)
+        #expect(day?.agentDay(.codex)?.projects["Workdeck"]?.seconds == 60)
+        #expect(day?.agentDay(.codex)?.projects["Workdeck"]?.sessionIDs == ["c"])
+    }
+
+    @Test func twoAgentsInTwoProjectsSplitTheTotalOnly() {
+        let recorder = RecapRecorder(days: [], calendar: calendar)
+        let samples = [
+            AgentRecapSample(agent: .claudeCode, sessions: [session("a", "Workdeck", busy: true)]),
+            AgentRecapSample(agent: .codex, sessions: [codex("c", "docs", busy: true)]),
+        ]
+        recorder.record(samples: samples, now: noon)
+        recorder.record(samples: samples, now: noon.addingTimeInterval(60))
+        let day = today(recorder)
+        #expect(day?.projectSeconds == ["Workdeck": 30, "docs": 30])
+        #expect(day?.agentDay(.claudeCode)?.seconds == 60)
+        #expect(day?.agentDay(.codex)?.seconds == 60)
+    }
+
+    @Test func countsAndStretchesStayWithTheirAgent() {
+        let recorder = RecapRecorder(days: [], calendar: calendar)
+        var work = codex("c", "docs", busy: true)
+        recorder.record(samples: [AgentRecapSample(agent: .codex, sessions: [work])], now: noon)
+        work.turn = TurnEdits(startedAt: noon, edits: 1, added: 4, removed: 1, files: ["index.md"])
+        work.commands = 2
+        recorder.record(samples: [AgentRecapSample(agent: .codex, sessions: [work])], now: noon.addingTimeInterval(50))
+        work.status = .idle
+        recorder.record(samples: [AgentRecapSample(agent: .codex, sessions: [work])], now: noon.addingTimeInterval(80))
+        let day = today(recorder)
+        #expect(day?.agentDay(.codex)?.projects["docs"]?.added == 4)
+        #expect(day?.agentDay(.codex)?.projects["docs"]?.commands == 2)
+        #expect(day?.agentDay(.codex)?.longest == RecapStretch(project: "docs", seconds: 80))
+        #expect(day?.agentDay(.claudeCode) == nil)
+    }
+
+    @Test func aWeeklyOnlyAccountHasNoFiveHourWindow() {
+        let recorder = RecapRecorder(days: [], calendar: calendar)
+        let weekly = RecapAccountSample(name: "codex", fiveHour: nil, sevenDay: UsageWindow(kind: .sevenDay, usedPercent: 41, resetsAt: noon.addingTimeInterval(86_400)))
+        recorder.record(samples: [AgentRecapSample(agent: .codex, accounts: [weekly])], now: noon)
+        #expect(today(recorder)?.agentDay(.codex)?.accounts["codex"] == RecapAccountDay(weeklyPeak: 41, hasFiveHour: false))
+    }
+
+
+    @Test func claudeAccountsAlwaysHaveAFiveHourWindow() {
+        // Sampled first while its 5-hour window had expired: Claude Code plans always have one.
+        let recorder = RecapRecorder(days: [], calendar: calendar)
+        let weeklyOnly = RecapAccountSample(name: "main", fiveHour: nil, sevenDay: UsageWindow(kind: .sevenDay, usedPercent: 40, resetsAt: noon.addingTimeInterval(86_400)))
+        recorder.record(sessions: [], accounts: [weeklyOnly], now: noon)
+        #expect(today(recorder)?.agentDay(.claudeCode)?.accounts["main"]?.hasFiveHour == true)
+    }
 }

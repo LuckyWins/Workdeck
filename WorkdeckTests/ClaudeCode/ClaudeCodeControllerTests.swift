@@ -1137,4 +1137,18 @@ struct ClaudeCodeControllerTests {
         #expect(controller.sessions.hooksReview != nil)
         #expect(controller.sessions.hooksError == nil)
     }
+
+    @Test func claudeReportsSessionsOnlyWithHooks() {
+        addLiveSession()
+        let (controller, _) = makeController()
+        controller.start()
+        #expect(controller.recapSample.agent == .claudeCode)
+        #expect(controller.recapSample.sessions.isEmpty)
+        #expect(!controller.recapSample.isConnected)
+        hooksConnector.status = .connected
+        let (connected, _) = makeController()
+        connected.start()
+        #expect(connected.recapSample.sessions.map(\.id) == ["s1"])
+        #expect(connected.recapSample.isConnected)
+    }
 }

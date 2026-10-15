@@ -1,7 +1,7 @@
 # Workdeck — Codex in the Recap and Statistics Design
 
 **Date:** 2026-10-15
-**Status:** Draft
+**Status:** Approved; implemented
 
 ## 1. Overview
 
@@ -74,7 +74,7 @@ personal      5h hit 0×  7d peak 22%
 ### 3.3 Recording
 
 - An agent's sessions count while its session hooks are connected, as Claude Code's do today; Codex's popover switch does not stop the counting (keep-awake does not follow it either).
-- Limits are sampled from each agent's figures on each update: Claude Code per account, Codex from `CodexLimitsSource`.
+- Limits are sampled from each agent's figures on each update: Claude Code per account, Codex from `CodexLimitsSource` only while the Codex tool is on or its session hooks are connected (its session files are read even while it is off; a disabled agent adds nothing).
 
 ### 3.4 Demo
 

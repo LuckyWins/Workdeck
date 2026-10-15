@@ -24,7 +24,6 @@ final class ClaudeCodeSettings {
         static let firedAlertKeys = "claudeLimits.firedAlertKeys"
         static let fetchFromAPI = "claudeLimits.fetchFromAPI"
         static let hookEventsVersion = "claudeSessions.hookEventsVersion"
-        static let dismissedRecapWeek = "claudeRecap.dismissedWeek"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -91,11 +90,6 @@ final class ClaudeCodeSettings {
         notch.thresholds
     }
 
-    /// The Monday ("2026-10-05") of the last week whose recap was dismissed or skipped (recap spec §3.2).
-    var dismissedRecapWeek: String? {
-        didSet { defaults.set(dismissedRecapWeek, forKey: Keys.dismissedRecapWeek) }
-    }
-
     /// Whether the notch or menu bar indicator is shown.
     var isEnabled: Bool {
         didSet { defaults.set(isEnabled, forKey: Keys.isEnabled) }
@@ -148,6 +142,5 @@ final class ClaudeCodeSettings {
         firedAlertKeys = Set(defaults.stringArray(forKey: Keys.firedAlertKeys) ?? [])
         fetchFromAPI = defaults.bool(forKey: Keys.fetchFromAPI)
         hookEventsVersion = defaults.integer(forKey: Keys.hookEventsVersion)
-        dismissedRecapWeek = defaults.string(forKey: Keys.dismissedRecapWeek)
     }
 }
