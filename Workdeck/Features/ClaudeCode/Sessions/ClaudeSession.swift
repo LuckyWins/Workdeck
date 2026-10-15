@@ -103,6 +103,8 @@ nonisolated struct ClaudeSession: Equatable, Sendable, Identifiable {
     var commands = 0
     /// Counts whose step was not seen yet: each hook stamps its own time, so a fast edit's PostToolUse can come first.
     var earlyLines: [EarlyLines] = []
+    /// The agent the session belongs to (Codex spec §3.3).
+    var agent: AgentKind = .claudeCode
 
     static let maxSteps = 3
 

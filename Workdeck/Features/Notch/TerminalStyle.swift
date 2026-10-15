@@ -48,10 +48,12 @@ enum Terminal {
 struct TerminalHeader: View {
     let title: String
     var trailing: String?
+    /// The agent's mark before the title, while more than one agent is on.
+    var mark: AgentKind?
 
     var body: some View {
         HStack(spacing: 4) {
-            Text("─ \(title)")
+            (Text("─ ") + (mark.map { $0.marked(title) } ?? Text(title)))
                 .lineLimit(1)
                 .fixedSize()
             Rectangle()

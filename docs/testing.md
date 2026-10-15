@@ -153,6 +153,16 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 |---|------|-------|----------|
 | N1 | Settings moved | Open Settings; check the Notch section; change Show, the alert thresholds, the forecast and Keep Mac awake; relaunch Workdeck. | The Notch section sits after Closed-Lid Mode with Show, Without a notch (lid closed only), both alert thresholds, reset alert, forecast, finished and needs-you alerts and keep-awake; the Claude Code sections no longer have them. Every change shows at once in the notch (and `pmset -g assertions` for keep-awake) and survives the relaunch, as do the values chosen before this version. |
 
+## Codex Checklist
+
+| # | Case | Steps | Expected |
+|---|------|-------|----------|
+| X1 | Limits without a session | Turn on Codex in the popover with no Codex session running. | A `◎ codex` block (plan Pro Lite or yours, weekly bar, `N free resets`); Settings → Codex shows Installed and the version. |
+| X2 | Limits after a turn | Run one Codex turn (CLI or VS Code). | The block's age resets to `updated just now` within a second or two of the turn ending. |
+| X3 | Both agents | Work in Claude Code with Codex on. | Blocks read `✳ main`, `◎ codex`; session dots become `✳`; the compact notch shows `✳ 41%`; a Codex alert starts with `◎` and opens nothing on click. |
+| X4 | Codex off | Turn Codex off. | The notch looks exactly as before Codex: no marks, no Codex block. |
+| X5 | Not installed | On a Mac without Codex (or rename `~/.codex` while Workdeck is quit), turn Codex on. | Row says `Codex not found`, no block, no crash. |
+
 ## Virtual Notch Checklist
 
 | # | Case | Steps | Expected |

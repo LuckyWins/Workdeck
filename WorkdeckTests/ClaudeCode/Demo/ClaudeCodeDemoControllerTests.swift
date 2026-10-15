@@ -107,12 +107,12 @@ struct ClaudeCodeDemoControllerTests {
         controller.sessions.onAlerts?([.sessionNeedsYou(project: "real")])
         controller.demoDidStop()
         usage.reload()
-        #expect(!presenter.alerts.contains { if case .threshold(_, 80, _) = $0 { true } else { false } })
+        #expect(!presenter.alerts.contains { if case .threshold(_, 80, _, _) = $0 { true } else { false } })
         #expect(!presenter.alerts.contains(.sessionNeedsYou(project: "real")))
         // The pipeline itself works: the next threshold after the demo shows.
         try writeUsage(fiveHour: 97)
         usage.reload()
-        #expect(presenter.alerts.contains { if case .threshold(_, 95, _) = $0 { true } else { false } })
+        #expect(presenter.alerts.contains { if case .threshold(_, 95, _, _) = $0 { true } else { false } })
     }
 
     @Test func clicksDoNothingDuringTheDemo() {

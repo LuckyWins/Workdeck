@@ -123,15 +123,21 @@ final class NotchComposer {
     /// Recomposes the notch from every source; `alerts` happened just now and flash after it shows. Limit alerts come
     /// first: in "When active" an alert counts as activity, so a hidden notch shows (flash spec §2.3).
     func refresh(alerts: [LimitsAlert] = []) {
+        let parts = sources.map(\.notchPart)
+        guard !parts.isEmpty else { return }
+        // The demo shows only itself: other agents and their real alerts wait (demo mode spec §2.3).
+        let demoParts = parts.filter(\.isDemo)
+        let alerts = demoParts.isEmpty ? alerts : []
         if !alerts.isEmpty {
             noteAlerts()
         }
-        let parts = sources.map(\.notchPart)
-        guard !parts.isEmpty else { return }
-        let enabled = parts.filter { $0.isEnabled || $0.isDemo }
+        let enabled = demoParts.isEmpty ? parts.filter(\.isEnabled) : demoParts
         // With every agent off the notch hides; the state still describes the agents for the popover and tests.
         let shown = enabled.isEmpty ? parts : enabled
         let compact = Self.compactPart(among: shown)
+        // Marks tell agents apart only when more than one is on (Codex spec §3.1).
+        let showsMarks = Set(shown.filter { ($0.isEnabled || $0.isDemo) && $0.hasSource }.map(\.agent)).count > 1
+        let label: String? = showsMarks ? compact.agent.mark + (compact.compactLabel ?? "") : compact.compactLabel
         let block = compact.compactBlock
         let pressing = UsageFormatting.mostPressing((block?.windows ?? []).filter { $0.resetsAt > compact.now })
         let hasData = block?.age != nil
@@ -155,7 +161,7 @@ final class NotchComposer {
                 thresholds: thresholds,
                 hasSessions: isActive || (settings.mode == .whenActive && isLingering) || keepsVisible,
                 isPeeking: isPeeking,
-                label: compact.compactLabel
+                label: label
             )
         }
         var display: LimitsDisplay
@@ -176,13 +182,25 @@ final class NotchComposer {
             isPeekable = canPeek && display == .hidden
         }
         let sessionParts = shown.filter(\.sessionsConnected)
-        let sessions = sessionParts.isEmpty
+        var sessions = sessionParts.isEmpty
             ? SessionsViewState.none
             : SessionsPresentation.viewState(
                 sessions: Self.merged(sessionParts.map(\.sessions)),
                 now: sessionParts.map(\.sessionsNow).max() ?? clock(),
                 showsAccounts: sessionParts.contains(where: \.showsAccounts)
             )
+        // With no session anywhere, only the compact notch's block is full (accounts spec §4.2, across agents).
+        let anySession = shown.contains { !$0.sessions.isEmpty }
+        let accounts = shown.flatMap { part in
+            part.accounts.enumerated().map { index, block in
+                var block = block
+                if !anySession {
+                    block.isActive = part.agent == compact.agent && index == compact.compactIndex
+                }
+                return block
+            }
+        }
+        sessions.showsAgentMarks = showsMarks
         state = LimitsViewState(
             display: display,
             windows: block?.windows ?? [],
@@ -195,21 +213,26 @@ final class NotchComposer {
             isPeekable: isPeekable,
             isPeeking: isDemo ? false : isPeeking,
             sessions: sessions,
-            accounts: shown.flatMap(\.accounts),
-            compactLabel: compact.compactLabel,
-            collapsesOtherAccounts: settings.collapsesOtherAccounts
+            accounts: accounts,
+            compactLabel: label,
+            collapsesOtherAccounts: settings.collapsesOtherAccounts,
+            showsAgentMarks: showsMarks
         )
         presenter.show(state)
         flash(alerts)
     }
 
-    /// The agent whose session had the latest event; without sessions, the first agent (Codex spec §3.1). An agent
-    /// with no limit blocks shows no percent, so it takes the compact notch only when no agent has blocks.
+    /// The agent whose session had the latest event; without sessions, the agent whose limits changed last
+    /// (Codex spec §3.1). An agent with no limit blocks shows no percent, so it takes the compact notch only when no
+    /// agent has blocks.
     static func compactPart(among parts: [AgentNotchPart]) -> AgentNotchPart {
         let withBlocks = parts.filter { !$0.accounts.isEmpty }
         let candidates = withBlocks.isEmpty ? parts : withBlocks
-        let withSessions = candidates.filter { $0.lastSessionEvent != nil }
-        return withSessions.max { ($0.lastSessionEvent ?? .distantPast) < ($1.lastSessionEvent ?? .distantPast) } ?? candidates[0]
+        if let latest = candidates.filter({ $0.lastSessionEvent != nil }).max(by: { ($0.lastSessionEvent ?? .distantPast) < ($1.lastSessionEvent ?? .distantPast) }) {
+            return latest
+        }
+        // Ties (no dates at all) keep the first agent.
+        return candidates.reduce(candidates[0]) { ($1.limitsChangedAt ?? .distantPast) > ($0.limitsChangedAt ?? .distantPast) ? $1 : $0 }
     }
 
     /// One agent's list keeps its order; several are merged in the order one store keeps (waiting, working, idle;

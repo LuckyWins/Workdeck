@@ -125,7 +125,7 @@ struct SessionsList: View {
         let isHovered = hoveredID == row.id
         return VStack(alignment: .leading, spacing: 1) {
             HStack(spacing: 6) {
-                Text(row.status == .idle ? "○" : "●")
+                Text(state.showsAgentMarks ? row.agent.mark : (row.status == .idle ? "○" : "●"))
                     .foregroundStyle(row.status.notchColor)
                     .opacity(dotOpacity(row.status, at: date))
                     .flashGlow(

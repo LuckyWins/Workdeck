@@ -229,4 +229,76 @@ struct NotchComposerTests {
         #expect(controller.notchPart.accounts.map(\.name) == ["main"])
         #expect(controller.composer === composer)
     }
+
+    @Test func twoEnabledAgentsShowMarks() throws {
+        let composer = makeComposer()
+        add(part(.claudeCode, sessions: [session("a", at: 0)]), to: composer)
+        add(part(.codex, percent: 10, account: "codex", sessions: [session("b", at: 5)]), to: composer)
+        composer.refresh()
+        let shown = try #require(presenter.shown.last)
+        #expect(shown.showsAgentMarks)
+        #expect(shown.sessions.showsAgentMarks)
+        #expect(shown.compactLabel == "◎")
+    }
+
+    @Test func oneEnabledAgentShowsNoMarks() throws {
+        let composer = makeComposer()
+        add(part(.claudeCode), to: composer)
+        add(part(.codex, enabled: false, account: "codex"), to: composer)
+        composer.refresh()
+        let shown = try #require(presenter.shown.last)
+        #expect(!shown.showsAgentMarks)
+        #expect(shown.compactLabel == nil)
+    }
+
+    @Test func withoutSessionsTheLatestLimitsTakeTheCompactNotch() throws {
+        let composer = makeComposer()
+        var claude = part(.claudeCode, percent: 40)
+        claude.limitsChangedAt = fixedNow.addingTimeInterval(-600)
+        var codex = part(.codex, percent: 10, account: "codex")
+        codex.limitsChangedAt = fixedNow.addingTimeInterval(-60)
+        codex.accounts[0].isActive = false
+        add(claude, to: composer)
+        add(codex, to: composer)
+        composer.refresh()
+        let shown = try #require(presenter.shown.last)
+        #expect(shown.windows.first?.usedPercent == 10)
+        // Without sessions only the compact block is full; the other is a dim line.
+        #expect(shown.fullBlocks.map(\.name) == ["codex"])
+        #expect(shown.quietBlocks.map(\.name) == ["main"])
+    }
+
+    @Test func aMarkPrecedesAnAccountLetter() throws {
+        let composer = makeComposer()
+        var claude = part(.claudeCode, account: "personal", sessions: [session("a", at: 5)])
+        claude.compactLabel = "p"
+        add(claude, to: composer)
+        add(part(.codex, account: "codex"), to: composer)
+        composer.refresh()
+        #expect(try #require(presenter.shown.last).compactLabel == "✳p")
+    }
+
+    @Test func theDemoShowsOnlyItself() throws {
+        let composer = makeComposer()
+        var demo = part(.claudeCode)
+        demo.isDemo = true
+        add(demo, to: composer)
+        add(part(.codex, percent: 10, account: "codex", sessions: [session("b", at: 5)]), to: composer)
+        composer.refresh(alerts: [LimitsAlert.threshold(window(.sevenDay, 85), threshold: 80).forAgent(.codex)])
+        let shown = try #require(presenter.shown.last)
+        #expect(shown.accounts.map(\.name) == ["main"])
+        #expect(!shown.showsAgentMarks)
+        #expect(presenter.flashes.isEmpty)
+    }
+
+    @Test func anAgentWithNothingToShowAddsNoMarks() throws {
+        let composer = makeComposer()
+        add(part(.claudeCode), to: composer)
+        var empty = part(.codex, account: "codex")
+        empty.accounts = []
+        empty.hasSource = false
+        add(empty, to: composer)
+        composer.refresh()
+        #expect(!(try #require(presenter.shown.last).showsAgentMarks))
+    }
 }

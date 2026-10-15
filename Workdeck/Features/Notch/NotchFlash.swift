@@ -35,7 +35,7 @@ nonisolated enum NotchFlash {
         switch alert {
         case .sessionFinished, .reset: .green
         case .sessionNeedsYou: .orange
-        case let .threshold(_, threshold, _):
+        case let .threshold(_, threshold, _, _):
             thresholds.count > 1 && threshold >= (thresholds.max() ?? .max) ? .red : .orange
         }
     }

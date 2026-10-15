@@ -79,6 +79,7 @@ nonisolated struct SessionRow: Equatable, Sendable, Identifiable {
     var steps: [StepRow] = []
     /// `nil` when the turn has no edits.
     var turn: TurnRow?
+    var agent: AgentKind = .claudeCode
 }
 
 /// Everything the notch needs to draw the sessions part.
@@ -93,6 +94,8 @@ nonisolated struct SessionsViewState: Equatable, Sendable {
     var agentCount = 0
     var level = SessionsLevel.none
     var now = Date.distantPast
+    /// More than one agent is on: each row's dot becomes its agent's mark (Codex spec §3.1).
+    var showsAgentMarks = false
 
     static let none = SessionsViewState()
 }
@@ -133,7 +136,8 @@ nonisolated enum SessionsPresentation {
                 actionLines: session.action == nil ? nil : session.steps.last?.lines,
                 isFocused: session.id == focusedID,
                 steps: session.id == focusedID ? stepRows(session.steps) : [],
-                turn: turnRow(session)
+                turn: turnRow(session),
+                agent: session.agent
             )
         }
         return SessionsViewState(

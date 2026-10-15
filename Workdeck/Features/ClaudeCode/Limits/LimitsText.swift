@@ -79,11 +79,11 @@ nonisolated enum LimitsText {
     }
 
     static func alertTitle(_ alert: LimitsAlert, showsAccount: Bool = false) -> String {
-        let suffix = showsAccount ? alertAccount(alert).map { " · \($0)" } ?? "" : ""
+        let suffix = showsAccount && alert.agent == .claudeCode ? alertAccount(alert).map { " · \($0)" } ?? "" : ""
         switch alert {
-        case let .threshold(window, threshold, _):
+        case let .threshold(window, threshold, _, _):
             return "\(window.kind.title) limit at \(threshold)%" + suffix
-        case let .reset(kinds, _):
+        case let .reset(kinds, _, _):
             // "5-hour limit reset", "5-hour and weekly limits reset".
             let names = kinds.enumerated().map { $0.offset == 0 ? $0.element.title : $0.element.title.lowercased() }
             return names.joined(separator: " and ") + (kinds.count > 1 ? " limits reset" : " limit reset") + suffix
@@ -96,7 +96,7 @@ nonisolated enum LimitsText {
 
     static func alertSubtitle(_ alert: LimitsAlert, now: Date, calendar: Calendar = .current) -> String? {
         switch alert {
-        case let .threshold(window, _, _):
+        case let .threshold(window, _, _, _):
             let today = calendar.isDate(window.resetsAt, inSameDayAs: now)
             return "Resets \(today ? "at " : "")\(clockText(window.resetsAt, now: now, calendar: calendar))"
         case .reset:
@@ -132,10 +132,20 @@ nonisolated enum LimitsText {
         }
     }
 
+    /// The alert's title, after its agent's mark while more than one agent shows (Codex spec §3.1).
+    static func alertHeadline(_ alert: LimitsAlert, showsAccount: Bool = false, showsMark: Bool) -> String {
+        (showsMark ? "\(alert.agent.mark) " : "") + alertTitle(alert, showsAccount: showsAccount)
+    }
+
+    /// Only a Claude limit alert opens the Chats window; a Codex one opens nothing (Codex spec §3.2).
+    static func opensChats(_ alert: LimitsAlert) -> Bool {
+        alertProject(alert) == nil && alert.agent == .claudeCode
+    }
+
     /// The account a limit alert is about; clicking it opens the Chats window (spec §4.4).
     static func alertAccount(_ alert: LimitsAlert) -> String? {
         switch alert {
-        case let .threshold(_, _, account), let .reset(_, account): account ?? ClaudeInstance.mainName
+        case let .threshold(_, _, account, _), let .reset(_, account, _): account ?? ClaudeInstance.mainName
         case .sessionFinished, .sessionNeedsYou: nil
         }
     }

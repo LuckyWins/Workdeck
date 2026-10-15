@@ -1,22 +1,38 @@
 import Foundation
 
 nonisolated enum LimitsAlert: Equatable, Sendable {
-    /// `account` is the instance label ("main", "personal"); set by `ClaudeLimitsController`, `nil` means main.
-    case threshold(UsageWindow, threshold: Int, account: String? = nil)
+    /// `account` is the block's label ("main", "personal", "codex"); `nil` means Claude's main account.
+    case threshold(UsageWindow, threshold: Int, account: String? = nil, agent: AgentKind = .claudeCode)
     /// Every window of one account that reset at the same check, in `UsageWindowKind.allCases` order.
-    case reset([UsageWindowKind], account: String? = nil)
+    case reset([UsageWindowKind], account: String? = nil, agent: AgentKind = .claudeCode)
     case sessionFinished(project: String, worked: TimeInterval)
     case sessionNeedsYou(project: String)
 }
 
-/// Decides which alerts to show when new usage data arrives. Pure; the caller persists `firedKeys`.
-extension LimitsAlert {
+nonisolated extension LimitsAlert {
     /// The same alert, labeled with the account it is about; session alerts are unchanged.
     func forAccount(_ label: String) -> LimitsAlert {
         switch self {
-        case let .threshold(window, threshold, _): .threshold(window, threshold: threshold, account: label)
-        case let .reset(kinds, _): .reset(kinds, account: label)
+        case let .threshold(window, threshold, _, agent): .threshold(window, threshold: threshold, account: label, agent: agent)
+        case let .reset(kinds, _, agent): .reset(kinds, account: label, agent: agent)
         case .sessionFinished, .sessionNeedsYou: self
+        }
+    }
+
+    /// The same limit alert, about another agent's limits.
+    func forAgent(_ agent: AgentKind) -> LimitsAlert {
+        switch self {
+        case let .threshold(window, threshold, account, _): .threshold(window, threshold: threshold, account: account, agent: agent)
+        case let .reset(kinds, account, _): .reset(kinds, account: account, agent: agent)
+        case .sessionFinished, .sessionNeedsYou: self
+        }
+    }
+
+    /// The agent an alert is about. Session alerts are Claude Code's until Codex sessions arrive (plan 3).
+    var agent: AgentKind {
+        switch self {
+        case let .threshold(_, _, _, agent), let .reset(_, _, agent): agent
+        case .sessionFinished, .sessionNeedsYou: .claudeCode
         }
     }
 }

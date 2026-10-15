@@ -70,6 +70,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }()
 
+    private(set) lazy var codex = CodexController(
+        settings: CodexSettings(),
+        limits: CodexLimitsSource(
+            root: CodexSessionFiles.root(),
+            watcher: FSEventsSessionsWatcher(),
+            fetcher: CodexAppServerClient(locator: .standard(), runner: SystemCodexProcessRunner())
+        ),
+        composer: notch
+    )
+
     private(set) lazy var instances = ClaudeInstancesController(
         store: ClaudeInstanceStore(),
         aliasFile: .standard(),
@@ -100,6 +110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { await instances.refreshAccounts() }
         claudeCode.setInstances(instances.instances)
         claudeCode.start()
+        codex.start()
         demo.register(claudeCode)
     }
 

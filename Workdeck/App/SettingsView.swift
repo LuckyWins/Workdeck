@@ -6,6 +6,7 @@ struct SettingsView: View {
     let controller: LidSleepController
     let claudeCode: ClaudeCodeController
     let instances: ClaudeInstancesController
+    let codex: CodexController
     let demo: DemoMode
 
     @State private var diagnosticsState = DiagnosticsCopyState.idle
@@ -58,13 +59,17 @@ struct SettingsView: View {
 
             NotchSettingsSection(
                 settings: claudeCode.settings.notch,
-                isNotchEnabled: claudeCode.settings.isEnabled,
-                onChange: claudeCode.notchSettingsChanged
+                isNotchEnabled: claudeCode.settings.isEnabled || codex.settings.isEnabled,
+                onChange: {
+                    claudeCode.notchSettingsChanged()
+                    codex.refresh()
+                }
             )
 
             ClaudeLimitsSettingsSection(controller: claudeCode.limits)
             ClaudeSessionsSettingsSection(controller: claudeCode.sessions)
             InstancesSettingsSection(controller: instances, claudeCode: claudeCode)
+            CodexSettingsSection(controller: codex)
 
             Section {
                 LabeledContent("Version", value: HelperConstants.version(of: .main))
@@ -145,7 +150,7 @@ struct SettingsView: View {
         Task {
             let since = Date().addingTimeInterval(-3600)
             let lines = await Task.detached { DiagnosticsReport.recentLogLines(since: since) }.value
-            let text = claudeCode.diagnosticsText(logLines: lines)
+            let text = claudeCode.diagnosticsText(logLines: lines, extraLines: codex.diagnosticsLines)
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
             diagnosticsState = .copied

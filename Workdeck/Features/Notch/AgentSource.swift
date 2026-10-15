@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 /// The agent tools that show in the notch (Codex spec §3.1).
 nonisolated enum AgentKind: String, CaseIterable, Sendable {
@@ -18,6 +19,21 @@ nonisolated enum AgentKind: String, CaseIterable, Sendable {
         case .claudeCode: "Claude Code"
         case .codex: "Codex"
         }
+    }
+}
+
+extension AgentKind {
+    /// The mark's color in block headers and short lines.
+    var color: Color {
+        switch self {
+        case .claudeCode: .orange
+        case .codex: .mint
+        }
+    }
+
+    /// "✳ main": the mark in its color, then the name.
+    func marked(_ name: String) -> Text {
+        Text(mark).foregroundStyle(color) + Text(" \(name)")
     }
 }
 
@@ -52,6 +68,8 @@ nonisolated struct AgentNotchPart: Equatable, Sendable {
     var keepsVisible = false
     /// The demo plays: the notch shows whatever the mode.
     var isDemo = false
+    /// When the agent's limits last changed; without sessions anywhere, the latest takes the compact notch.
+    var limitsChangedAt: Date?
 
     var compactBlock: AccountLimitsViewState? {
         accounts.isEmpty ? nil : accounts[min(max(compactIndex, 0), accounts.count - 1)]

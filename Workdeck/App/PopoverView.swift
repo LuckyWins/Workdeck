@@ -4,6 +4,7 @@ import SwiftUI
 struct PopoverView: View {
     let controller: LidSleepController
     let claudeCode: ClaudeCodeController
+    let codex: CodexController
     let demo: DemoMode
 
     var body: some View {
@@ -53,6 +54,12 @@ struct PopoverView: View {
 
             Divider()
 
+            CodexRow(controller: codex)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+
+            Divider()
+
             Button {
                 NSApp.terminate(nil)
             } label: {
@@ -72,6 +79,7 @@ struct PopoverView: View {
         .frame(width: 300)
         .task {
             claudeCode.popoverOpened()
+            codex.popoverOpened()
             await controller.refresh()
         }
     }

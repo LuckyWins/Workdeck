@@ -27,6 +27,7 @@ A Claude Code plan limit runs out in the middle of a task, a session sits waitin
 
 - 💻 **Closed-Lid Mode** — keeps the Mac awake with the lid closed, for long builds, SSH sessions or a working Mac in a bag. Turns itself off on low battery or when the Mac gets too hot, and sleep always comes back on quit, crash or restart. [More](docs/closed-lid-mode.md)
 - 📊 **Claude Code limits in the notch** — a ring and the percent of the window closest to its limit; hover for both windows with reset times and a forecast (`runs out ~16:40 · resets 18:00`). [More](docs/claude-code.md#limits)
+- 🧩 **Codex too** — Codex's plan limits in the same notch, marked `◎` next to Claude Code's `✳`, read from Codex's own files and CLI. [More](docs/codex.md)
 - 🤖 **Live sessions and agents** — every session working, waiting for you or idle, its agents as a tree, the focused session's last steps as a ticker, and each edit's `+12 −3`. [More](docs/claude-code.md#sessions)
 - 🔔 **Alerts that come to you** — a limit at 80 % and 95 %, a limit that reset, a session that needs you, a long session that finished. The notch opens with the alert, glows in its color, then flashes once.
 - 🎯 **Back to the right window** — click a session to bring forward its VS Code, Cursor or Windsurf window, or its own Terminal or iTerm2 tab.
@@ -62,6 +63,7 @@ The first time you turn on Closed-Lid Mode, macOS asks you to approve Workdeck's
 2. **Connect the session hooks** in Settings → Claude Code · Sessions to see sessions and agents. Again a diff first, then a backup; **Disconnect…** removes only Workdeck's entries.
 3. **Optional:** only working in the Claude Code VS Code extension, whose panel does not run the status line? Turn on **Fetch usage from Anthropic (unofficial)**: it calls an undocumented endpoint with Claude Code's login token. Read the [risks](docs/claude-code.md#limits) first.
 4. **Optional:** add a second account in Settings → Claude Code · Instances.
+5. **Optional:** turn on **Codex** in the popover to see its limits; it needs Codex signed in with ChatGPT.
 
 Claude Code reports plan usage only for Pro and Max subscriptions. Details: [docs/claude-code.md](docs/claude-code.md).
 
@@ -89,6 +91,7 @@ Claude Code reports plan usage only for Pro and Max subscriptions. Details: [doc
 - No account, no analytics, no telemetry. The only network call is the opt-in usage endpoint, to Anthropic.
 - Prompts, answers, file contents and chat titles are never stored or logged; tool calls keep only the tool name, a short target with secret-looking values masked, and line counts.
 - The login token is read from your Keychain only for the opt-in usage call; it is never refreshed, stored or logged.
+- Codex limits come from Codex's own session files and `codex app-server`; Workdeck never reads Codex's login.
 - Every `settings.json` change is shown as a diff before it is written; `settings.json` and `~/.zshrc` are backed up before Workdeck changes them.
 
 <details>

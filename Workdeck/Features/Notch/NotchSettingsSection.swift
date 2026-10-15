@@ -50,14 +50,14 @@ struct NotchSettingsSection: View {
             .disabled(!isNotchEnabled)
             Toggle("Keep Mac awake while an agent works", isOn: $settings.keepAwakeWhileWorking)
             if !isNotchEnabled {
-                Text("Turn on Claude Code in the menu bar popover to see the notch and its alerts.")
+                Text("Turn on Claude Code or Codex in the menu bar popover to see the notch and its alerts.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         } header: {
             SettingsHeader("Notch", symbol: "menubar.rectangle", color: .teal)
         } footer: {
-            Text("Applies to every tool that shows in the notch. Keeping the Mac awake uses a standard power assertion; the display still sleeps, and a closed lid still sleeps unless Closed-Lid Mode is on.")
+            Text("Applies to Claude Code and Codex. Keeping the Mac awake uses a standard power assertion; the display still sleeps, and a closed lid still sleeps unless Closed-Lid Mode is on.")
                 .foregroundStyle(.secondary)
         }
         .onChange(of: settings.mode) { onChange() }

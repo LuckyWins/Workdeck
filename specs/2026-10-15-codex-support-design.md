@@ -1,7 +1,7 @@
 # Workdeck — Codex Support Design
 
 **Date:** 2026-10-15
-**Status:** Approved
+**Status:** Approved; stage 1 (limits) implemented
 
 ## 1. Overview
 

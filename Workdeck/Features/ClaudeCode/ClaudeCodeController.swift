@@ -125,7 +125,7 @@ final class ClaudeCodeController {
         checkRecap()
     }
 
-    func diagnosticsText(logLines: [String], now: Date = Date()) -> String {
+    func diagnosticsText(logLines: [String], extraLines: [String] = [], now: Date = Date()) -> String {
         DiagnosticsReport.text(
             appVersion: HelperConstants.version(of: .main),
             now: now,
@@ -137,7 +137,7 @@ final class ClaudeCodeController {
                 let age = account.store.age.map { "\(Int($0 / 60))m old" } ?? "none"
                 let hooks = sessions.instanceHooks[account.label]?.status == .connected ? "connected" : "not connected"
                 return "Account \(account.label): status line \(account.isConnected ? "connected" : "not connected"); data \(age); usage API \(String(describing: account.poller.status)); hooks \(hooks)"
-            },
+            } + extraLines,
             logLines: logLines
         )
     }
@@ -477,7 +477,8 @@ extension ClaudeCodeController: AgentSource {
             showsAccounts: sessions.showsAccounts,
             sessionsConnected: sessions.isHooksConnected,
             activeCount: sessions.viewState.activeCount,
-            keepsVisible: pendingRecap != nil
+            keepsVisible: pendingRecap != nil,
+            limitsChangedAt: compact.store.age.map { compact.store.now.addingTimeInterval(-$0) }
         )
     }
 

@@ -69,7 +69,7 @@ struct ClaudeCodeDemoScriptTests {
         #expect(ClaudeCodeDemoScript.fiveHourPercent(at: 60, thresholds: thresholds) == percent + 4)
         let events = ClaudeCodeDemoScript.events(after: 29.5, upTo: 30.5, now: fixedNow, thresholds: thresholds)
         let first = try #require(events.first)
-        guard case let .alert(.threshold(window, threshold, account)) = first else {
+        guard case let .alert(.threshold(window, threshold, account, _)) = first else {
             Issue.record("Expected a threshold alert, got \(events)")
             return
         }

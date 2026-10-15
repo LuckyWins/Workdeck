@@ -178,7 +178,7 @@ struct LimitsExpandedView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     AlertBadge(symbol: LimitsText.alertSymbol(alert), color: flashColor(alert))
-                    Text(LimitsText.alertTitle(alert, showsAccount: model.state.limitBlocks.count > 1))
+                    Text(LimitsText.alertHeadline(alert, showsAccount: model.state.showsClaudeAccounts, showsMark: model.state.showsAgentMarks))
                         .fontWeight(.semibold)
                     Spacer(minLength: 6)
                     if hoveredAlert == "single", let hint = clickTarget(alert)?.hint {
@@ -229,7 +229,7 @@ struct LimitsExpandedView: View {
         if let project = LimitsText.alertProject(alert) {
             return ({ model.onActivateProject?(project) }, "Open \(project)", "↗ open")
         }
-        if let account = LimitsText.alertAccount(alert), let open = model.onOpenChats {
+        if LimitsText.opensChats(alert), let account = LimitsText.alertAccount(alert), let open = model.onOpenChats {
             return ({ open(account) }, "Open Chats", "↗ chats")
         }
         return nil
@@ -249,7 +249,7 @@ struct LimitsExpandedView: View {
                     HStack(spacing: 6) {
                         Text(LimitsText.alertSymbol(alert))
                             .foregroundStyle(flashColor(alert).color)
-                        Text(LimitsText.batchLine(alert, now: model.state.now, showsAccount: model.state.limitBlocks.count > 1))
+                        Text((model.state.showsAgentMarks ? "\(alert.agent.mark) " : "") + LimitsText.batchLine(alert, now: model.state.now, showsAccount: model.state.showsClaudeAccounts))
                             .lineLimit(1)
                             .truncationMode(.tail)
                         Spacer(minLength: 6)
@@ -282,8 +282,8 @@ struct LimitsExpandedView: View {
                 let blocks = model.state.limitBlocks
                 if model.state.collapsesOtherAccounts, blocks.count > 1 {
                     // The short view: one line per account, in the accounts' fixed order.
-                    accountsHeader(title: "limits", plan: nil, collapsed: true)
-                    let width = blocks.map(\.name.count).max() ?? 0
+                    accountsHeader(title: "limits", mark: nil, plan: nil, collapsed: true)
+                    let width = blocks.map { LimitsPresentation.displayName($0, showsMark: model.state.showsAgentMarks).count }.max() ?? 0
                     ForEach(blocks) { account in
                         summaryRow(account, nameWidth: width)
                             .flashGlow(model.flash, color: ringFlash(for: account))
@@ -293,14 +293,14 @@ struct LimitsExpandedView: View {
                     ForEach(full) { account in
                         let isFirst = account.id == full.first?.id
                         if blocks.count > 1, isFirst {
-                            accountsHeader(title: LimitsPresentation.blockTitle(account, isOnlyBlock: false), plan: account.plan, collapsed: false)
+                            accountsHeader(title: LimitsPresentation.blockTitle(account, isOnlyBlock: false), mark: model.state.showsAgentMarks ? account.agent : nil, plan: account.plan, collapsed: false)
                                 .flashGlow(model.flash, color: ringFlash(for: account))
                         } else {
-                            TerminalHeader(title: LimitsPresentation.blockTitle(account, isOnlyBlock: blocks.count == 1), trailing: account.plan)
+                            TerminalHeader(title: LimitsPresentation.blockTitle(account, isOnlyBlock: blocks.count == 1), trailing: account.plan, mark: model.state.showsAgentMarks && blocks.count > 1 ? account.agent : nil)
                                 .flashGlow(model.flash, color: ringFlash(for: account))
                                 .padding(.top, isFirst ? 0 : 4)
                         }
-                        ForEach(UsageWindowKind.allCases, id: \.self) { kind in
+                        ForEach(LimitsPresentation.shownKinds(account), id: \.self) { kind in
                             windowRow(kind, in: account)
                         }
                         if let problem = account.problem {
@@ -311,11 +311,16 @@ struct LimitsExpandedView: View {
                         if account.age != nil || account.refresh != .hidden || account.isWaiting {
                             ageRow(account)
                         }
+                        if let detail = account.detail {
+                            Text(detail)
+                                .foregroundStyle(Terminal.dim)
+                                .lineLimit(1)
+                        }
                     }
                     // Accounts without sessions: one dim line each, with how old their figures are.
                     let quiet = model.state.quietBlocks
                     if !quiet.isEmpty {
-                        let width = quiet.map(\.name.count).max() ?? 0
+                        let width = quiet.map { LimitsPresentation.displayName($0, showsMark: model.state.showsAgentMarks).count }.max() ?? 0
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(quiet) { account in
                                 summaryRow(account, nameWidth: width, showsAge: true)
@@ -338,9 +343,9 @@ struct LimitsExpandedView: View {
     }
 
     /// The limits header with the control that switches between the short view and the full one.
-    private func accountsHeader(title: String, plan: String?, collapsed: Bool) -> some View {
+    private func accountsHeader(title: String, mark: AgentKind?, plan: String?, collapsed: Bool) -> some View {
         HStack(spacing: 4) {
-            Text("─ \(title)")
+            (Text("─ ") + (mark.map { $0.marked(title) } ?? Text(title)))
                 .lineLimit(1)
                 .fixedSize()
             Rectangle()
@@ -379,7 +384,9 @@ struct LimitsExpandedView: View {
     private func summaryRow(_ account: AccountLimitsViewState, nameWidth: Int, showsAge: Bool = false) -> some View {
         let windows = LimitsPresentation.summaryWindows(account, now: model.state.now)
         return HStack(spacing: 6) {
-            Text(account.name.padding(toLength: nameWidth, withPad: " ", startingAt: 0))
+            // The mark in its color; the name padded so the figures line up.
+            let name = LimitsPresentation.displayName(account, showsMark: model.state.showsAgentMarks).padding(toLength: nameWidth, withPad: " ", startingAt: 0)
+            model.state.showsAgentMarks ? Text(account.agent.mark).foregroundStyle(account.agent.color) + Text(name.dropFirst(account.agent.mark.count)) : Text(name)
             if windows.isEmpty {
                 Text(account.hasData ? "5h 0%" : "—")
                     .foregroundStyle(Terminal.dim)

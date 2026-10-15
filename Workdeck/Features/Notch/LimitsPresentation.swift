@@ -70,8 +70,13 @@ nonisolated struct AccountLimitsViewState: Equatable, Sendable, Identifiable {
     /// The account has a listed session, or it is the compact notch's account while no account has one; the others
     /// are shown as one dim line.
     var isActive = true
+    /// Whose limits these are; the mark shows while more than one agent is on.
+    var agent: AgentKind = .claudeCode
+    /// A dim line under the bars, e.g. "3 free resets" for Codex.
+    var detail: String?
 
-    var id: String { name }
+    /// The agent is part of it: a Claude instance may be called "codex".
+    var id: String { "\(agent.rawValue)/\(name)" }
 
     var hasData: Bool {
         age != nil
@@ -102,6 +107,13 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
     var compactLabel: String?
     /// The short view: one line per account instead of full blocks.
     var collapsesOtherAccounts = false
+    /// More than one agent is on: blocks, sessions and alerts carry their agent's mark (Codex spec §3.1).
+    var showsAgentMarks = false
+
+    /// Claude alerts name their account only when Claude has more than one; Codex's block does not count.
+    var showsClaudeAccounts: Bool {
+        limitBlocks.filter { $0.agent == .claudeCode }.count > 1
+    }
 
     /// The blocks to draw; states built without accounts (tests, the hidden state) draw their own windows as main.
     var limitBlocks: [AccountLimitsViewState] {
@@ -140,8 +152,20 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
 
 nonisolated enum LimitsPresentation {
     /// "personal" when several accounts have blocks; a lone block is just "limits". The plan goes at the right.
-    static func blockTitle(_ account: AccountLimitsViewState, isOnlyBlock: Bool) -> String {
-        isOnlyBlock ? "limits" : account.name
+    static func blockTitle(_ account: AccountLimitsViewState, isOnlyBlock: Bool, showsMark: Bool = false) -> String {
+        isOnlyBlock ? "limits" : displayName(account, showsMark: showsMark)
+    }
+
+    /// The window rows of a block: Claude's missing 5-hour window has not started and keeps its row; a window Codex
+    /// does not report does not exist on its plan (Codex spec §3.2).
+    static func shownKinds(_ account: AccountLimitsViewState) -> [UsageWindowKind] {
+        guard account.agent == .codex else { return UsageWindowKind.allCases }
+        return UsageWindowKind.allCases.filter { kind in account.windows.contains { $0.kind == kind } }
+    }
+
+    /// "main", or "✳ main" while more than one agent is on.
+    static func displayName(_ account: AccountLimitsViewState, showsMark: Bool) -> String {
+        showsMark ? "\(account.agent.mark) \(account.name)" : account.name
     }
 
     /// A collapsed account's line: its running windows, the most used first.
