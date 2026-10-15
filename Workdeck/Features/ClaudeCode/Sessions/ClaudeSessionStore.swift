@@ -15,6 +15,8 @@ final class ClaudeSessionStore {
     /// over, and a chat silent this long is gone (Codex spec §3.3).
     static let silentWorkLimit: TimeInterval = 30 * 60
     static let silentIdleLimit: TimeInterval = 3 * 60 * 60
+    /// A busy session silent this long has its transcript checked for an interrupt; while hooks speak, it is working.
+    static let interruptCheckDelay: TimeInterval = 3
 
     /// Live sessions: waiting first, then working, then idle; the newest state change first within a group.
     private(set) var sessions: [ClaudeSession] = []
@@ -48,6 +50,9 @@ final class ClaudeSessionStore {
     @ObservationIgnored private let agent: AgentKind
     @ObservationIgnored private let oneSessionPerProcess: Bool
     @ObservationIgnored private let keptFileSize: Int
+    @ObservationIgnored private let interrupts: (any SessionInterruptSource)?
+    /// The interrupt last added to each session, so one interrupt is added once.
+    @ObservationIgnored private var addedInterrupts: [String: Date] = [:]
 
     init(
         directory: URL,
@@ -56,9 +61,11 @@ final class ClaudeSessionStore {
         keptFileSize: Int = SessionFileTrimmer.keptFileSize,
         agent: AgentKind = .claudeCode,
         oneSessionPerProcess: Bool = true,
+        interrupts: (any SessionInterruptSource)? = nil,
         clock: @escaping () -> Date = { Date() }
     ) {
         self.agent = agent
+        self.interrupts = interrupts
         self.oneSessionPerProcess = oneSessionPerProcess
         self.directory = directory
         self.liveness = liveness
@@ -119,6 +126,12 @@ final class ClaudeSessionStore {
         var live: [ClaudeSession] = []
         for id in Array(events.keys) {
             guard var session = currentSession(id)?.withoutStoppedAgents(now: now) else { continue }
+            if let time = interruptTime(of: session) {
+                // Claude Code sends no hook when the user interrupts a turn; it ends here as Codex's `Interrupt` does.
+                addedInterrupts[id] = time
+                events[id, default: []].append(HookEvent(time: time, name: .interrupt, sessionID: id))
+                session = currentSession(id)?.withoutStoppedAgents(now: now) ?? session
+            }
             session.agent = agent
             resolveModels(of: &session)
             if !oneSessionPerProcess {
@@ -169,6 +182,17 @@ final class ClaudeSessionStore {
         }
         lastNotifiedMinute = minute
         onChange?()
+    }
+
+    /// When the user interrupted the current turn of a busy session that went quiet, if they did.
+    private func interruptTime(of session: ClaudeSession) -> Date? {
+        guard let interrupts, session.status == .working || session.status == .waiting,
+              now.timeIntervalSince(session.lastEventAt) >= Self.interruptCheckDelay,
+              let time = interrupts.lastInterrupt(of: session),
+              time >= session.turn.startedAt, time <= now,
+              time > addedInterrupts[session.id] ?? .distantPast
+        else { return nil }
+        return time
     }
 
     /// Folds events older than the reorder window into the settled state and keeps the rest.
@@ -257,6 +281,8 @@ final class ClaudeSessionStore {
         settled[id] = nil
         offsets[id] = nil
         fileNumbers[id] = nil
+        addedInterrupts[id] = nil
+        interrupts?.forget(id)
         fileSources.removeValue(forKey: id)?.cancel()
     }
 

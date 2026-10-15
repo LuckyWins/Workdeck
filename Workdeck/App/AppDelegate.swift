@@ -58,7 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ),
             sessions: ClaudeSessionsController(
                 settings: settings,
-                store: ClaudeSessionStore(directory: SessionsDirectory.standard(), liveness: SystemProcessLiveness()),
+                store: ClaudeSessionStore(directory: SessionsDirectory.standard(), liveness: SystemProcessLiveness(), interrupts: TranscriptInterruptReader.standard()),
                 hooksConnector: SessionHooksConnector.standard(),
                 activator: WindowActivator(workspace: SystemWorkspace()),
                 sleepPreventer: PowerAssertionSleepPreventer(),
