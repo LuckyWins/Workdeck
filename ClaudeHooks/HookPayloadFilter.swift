@@ -1,6 +1,7 @@
 import Foundation
 
-/// What `workdeck-hook` keeps from a payload. `transcriptPath` only locates the agent's description and is never stored.
+/// What `workdeck-hook` keeps from a payload. For Claude Code, `transcriptPath` only locates the agent's description and is
+/// never stored; for Codex, the session file's path is kept so the app can count its patches.
 nonisolated struct HookPayload: Equatable, Sendable {
     var event: HookEvent
     var transcriptPath: String?
@@ -15,6 +16,13 @@ nonisolated enum HookPayloadFilter {
 
     /// The tool and a short target (spec §10.1); the rest of the tool input is never read.
     static func action(toolName: String, input: [String: Any]?) -> String {
+        // Codex's agent tools: a launch reads like Claude's ("Agent …"), so the ticker hides it behind the agent card.
+        if toolName == "collaborationspawn_agent" {
+            return truncated(firstLine(input?["task_name"]).map { "Agent " + $0 } ?? "Agent")
+        }
+        if toolName == "collaborationwait_agent" {
+            return "Waiting for agent"
+        }
         if toolName.hasPrefix("mcp__") {
             let server = toolName.components(separatedBy: "__").dropFirst().first ?? ""
             return truncated(server.isEmpty ? "mcp" : "mcp:\(server)")

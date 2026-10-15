@@ -14,6 +14,9 @@ nonisolated enum HookEventName: String, Codable, Sendable, CaseIterable {
     case preCompact = "PreCompact"
     /// A turn cut short by an API error, e.g. a plan limit: Claude Code sends this instead of `Stop`.
     case stopFailure = "StopFailure"
+    /// Codex only: a permission request, until the user answers; and a turn the user interrupted.
+    case permissionRequest = "PermissionRequest"
+    case interrupt = "Interrupt"
 }
 
 /// One line of a session's event file. Holds only what Workdeck needs, never prompt, answer, or tool content.
@@ -56,6 +59,8 @@ nonisolated struct HookEvent: Codable, Equatable, Sendable {
     var editedFile: String?
     /// The extra instance whose hook wrote this event (`--instance <name>`); `nil` for the main one.
     var instance: String?
+    /// Codex only: its session file, where the app counts the lines of applied patches (Codex spec §3.3).
+    var transcriptPath: String?
 
     /// The counts of an applied edit; `nil` for every other event.
     var lineCounts: LineCounts? {

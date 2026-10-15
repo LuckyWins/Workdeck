@@ -13,6 +13,10 @@ final class FakeAgentSource: AgentSource {
         notchPart = part
     }
 
+    var agent: AgentKind {
+        notchPart.agent
+    }
+
     func activateSession(id: String) { activated.append(id) }
     func activateProject(named name: String) { projects.append(name) }
     func refreshNow() { refreshes += 1 }
@@ -300,5 +304,27 @@ struct NotchComposerTests {
         add(empty, to: composer)
         composer.refresh()
         #expect(!(try #require(presenter.shown.last).showsAgentMarks))
+    }
+
+    @Test func aProjectClickReachesOnlyItsAgent() {
+        let composer = makeComposer()
+        let claude = add(part(.claudeCode), to: composer)
+        let codex = add(part(.codex, account: "codex"), to: composer)
+        composer.start()
+        presenter.projectAction?("Workdeck", .codex)
+        #expect(claude.projects.isEmpty)
+        #expect(codex.projects == ["Workdeck"])
+    }
+
+    @Test func theDemoMarksAgentsByWhatItShows() throws {
+        let composer = makeComposer()
+        var demo = part(.claudeCode, sessions: [session("a", at: 0)])
+        demo.isDemo = true
+        var codexSession = session("b", at: 5)
+        codexSession.agent = .codex
+        demo.sessions.append(codexSession)
+        add(demo, to: composer)
+        composer.refresh()
+        #expect(try #require(presenter.shown.last).showsAgentMarks)
     }
 }

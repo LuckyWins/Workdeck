@@ -273,7 +273,7 @@ final class ClaudeCodeController {
     private var demoPart: AgentNotchPart {
         let now = clock()
         let frame = ClaudeCodeDemoScript.frame(at: demoElapsed, now: now, thresholds: settings.thresholds)
-        let withSessions = Set(frame.sessions.map { $0.instance ?? ClaudeInstance.mainName })
+        let withSessions = Set(frame.sessions.filter { $0.agent == .claudeCode }.map { $0.instance ?? ClaudeInstance.mainName })
         return AgentNotchPart(
             agent: .claudeCode,
             isEnabled: true,
@@ -286,7 +286,12 @@ final class ClaudeCodeController {
                     age: account.age,
                     forecasts: demoForecasts(account.windows, now: now),
                     plan: account.plan,
-                    isActive: withSessions.contains(account.name)
+                    // Codex's block is full while its session works; Claude's by their accounts' sessions.
+                    isActive: account.agent == .codex
+                        ? frame.sessions.contains { $0.agent == .codex }
+                        : withSessions.contains(account.name),
+                    agent: account.agent,
+                    detail: account.detail
                 )
             },
             compactIndex: 0,
@@ -437,6 +442,10 @@ extension ClaudeCodeController: DemoParticipant {
 }
 
 extension ClaudeCodeController: AgentSource {
+    var agent: AgentKind {
+        .claudeCode
+    }
+
     var notchPart: AgentNotchPart {
         if isDemoActive {
             return demoPart

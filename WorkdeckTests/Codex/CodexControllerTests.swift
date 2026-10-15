@@ -7,6 +7,16 @@ struct CodexControllerTests {
     let defaults = UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!
     let presenter = FakePresenter()
     let watcher = FakeSessionsWatcher()
+    let sessionsDirectory = makeTemporaryDirectory()
+    let sessionsHooks = FakeHooksConnector()
+
+    private func makeSessions(_ notch: NotchSettings) -> CodexSessionsController {
+        CodexSessionsController(
+            store: ClaudeSessionStore(directory: sessionsDirectory, liveness: FakeLiveness(), agent: .codex, oneSessionPerProcess: false) { fixedNow.addingTimeInterval(2) },
+            hooksConnector: sessionsHooks, activator: FakeActivator(), sleepPreventer: FakeSleepPreventer(),
+            notch: notch, root: makeTemporaryDirectory(), frontmostBundleID: { nil }
+        )
+    }
 
     private func makeController(_ answer: CodexAppServerAnswer) async -> CodexController {
         let notch = NotchSettings(defaults: defaults)
@@ -14,7 +24,7 @@ struct CodexControllerTests {
         let limits = CodexLimitsSource(root: makeTemporaryDirectory().appending(path: "sessions"), watcher: watcher, fetcher: FakeFetcher(answer), clock: { fixedNow })
         let settings = CodexSettings(defaults: defaults)
         settings.isEnabled = true
-        let controller = CodexController(settings: settings, limits: limits, composer: composer, clock: { fixedNow })
+        let controller = CodexController(settings: settings, limits: limits, sessions: makeSessions(notch), composer: composer, clock: { fixedNow })
         controller.start()
         while limits.isFetching {
             try? await Task.sleep(for: .milliseconds(5))
@@ -78,7 +88,7 @@ struct CodexControllerTests {
         let composer = NotchComposer(settings: notch, presenter: presenter, cameraHousings: { [true] }, clock: { fixedNow })
         let fetcher = FakeFetcher(weekly)
         let limits = CodexLimitsSource(root: makeTemporaryDirectory().appending(path: "sessions"), watcher: watcher, fetcher: fetcher, clock: { fixedNow })
-        let controller = CodexController(settings: CodexSettings(defaults: defaults), limits: limits, composer: composer, clock: { fixedNow })
+        let controller = CodexController(settings: CodexSettings(defaults: defaults), limits: limits, sessions: makeSessions(notch), composer: composer, clock: { fixedNow })
         controller.start()
         controller.popoverOpened()
         controller.refreshNow()
@@ -94,5 +104,36 @@ struct CodexControllerTests {
     @Test func subtitleSaysWhenCodexDidNotAnswer() async {
         let controller = await makeController(.failed)
         #expect(controller.rowSubtitle == "Codex did not answer")
+    }
+
+    @Test func codexSessionsJoinItsPart() async {
+        let controller = await makeController(weekly)
+        controller.sessions.isEnabled = { true }
+        sessionsHooks.status = .connected
+        writeSessionEvent(hookEvent(.sessionStart, at: 0, session: "c1") { $0.cwd = "/p/docs" }, to: sessionsDirectory)
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "c1"), to: sessionsDirectory)
+        controller.sessions.start()
+        let part = controller.notchPart
+        #expect(part.sessionsConnected)
+        #expect(part.sessions.map(\.projectName) == ["docs"])
+        #expect(part.activeCount == 1)
+        #expect(part.accounts.first?.isActive == true)
+        #expect(controller.rowSubtitle == "7d 3% · 1 session")
+    }
+
+    @Test func subtitleLeadsWithWhyLimitsAreMissing() async {
+        let controller = await makeController(.noLimits(version: "0.162.1"))
+        sessionsHooks.status = .connected
+        controller.sessions.start()
+        #expect(controller.rowSubtitle == "Plan limits need Sign in with ChatGPT · no sessions")
+    }
+
+    @Test func expiredLimitsLeaveTheSessionCount() async {
+        let expired = CodexAppServerAnswer.limits(CodexLimits(windows: [window(.sevenDay, 3, resetsIn: -60)], plan: "prolite", resetCredits: 0, capturedAt: fixedNow.addingTimeInterval(-120)), version: "0.162.1")
+        let controller = await makeController(expired)
+        sessionsHooks.status = .connected
+        writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "c1") { $0.cwd = "/p/docs" }, to: sessionsDirectory)
+        controller.sessions.start()
+        #expect(controller.rowSubtitle == "1 session")
     }
 }

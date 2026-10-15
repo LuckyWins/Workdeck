@@ -77,6 +77,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             watcher: FSEventsSessionsWatcher(),
             fetcher: CodexAppServerClient(locator: .standard(), runner: SystemCodexProcessRunner())
         ),
+        sessions: CodexSessionsController(
+            store: ClaudeSessionStore(directory: SessionsDirectory.codex(), liveness: SystemProcessLiveness(), agent: .codex, oneSessionPerProcess: false),
+            hooksConnector: CodexHooksConnector.standard(),
+            activator: WindowActivator(workspace: SystemWorkspace()),
+            sleepPreventer: PowerAssertionSleepPreventer(),
+            notch: notch.settings,
+            root: CodexSessionFiles.root()
+        ),
         composer: notch
     )
 

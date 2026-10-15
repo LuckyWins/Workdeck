@@ -67,4 +67,15 @@ struct AgentIdentityTests {
         let codex = AccountLimitsViewState(name: "codex", windows: [], age: 60, agent: .codex)
         #expect(claude.id != codex.id)
     }
+
+    @Test func sessionAlertsCarryTheSessionsAgent() {
+        var old = ClaudeSession(id: "s", cwd: "/p/docs", status: .working, since: fixedNow, lastEventAt: fixedNow)
+        old.agent = .codex
+        var now = old
+        now.status = .waiting
+        now.since = fixedNow.addingTimeInterval(5)
+        let alerts = SessionAlertPolicy.alerts(previous: [old], current: [now], notifyFinished: true, finishedAfter: 0, notifyNeedsYou: true, frontmostBundleID: nil)
+        #expect(alerts == [.sessionNeedsYou(project: "docs", agent: .codex)])
+        #expect(alerts.first?.agent == .codex)
+    }
 }

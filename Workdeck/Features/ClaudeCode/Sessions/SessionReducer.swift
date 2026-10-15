@@ -50,6 +50,7 @@ nonisolated enum SessionReducer {
                 isBlank: ["startup", "clear", "resume"].contains(event.source),
                 turn: TurnEdits(startedAt: event.time)
             )
+            session.transcriptPath = current?.transcriptPath
         } else if event.name != .sessionStart {
             session.isBlank = false
         }
@@ -67,6 +68,7 @@ nonisolated enum SessionReducer {
         session.hostBundleID = event.hostBundleID ?? session.hostBundleID
         session.termProgram = event.termProgram ?? session.termProgram
         session.instance = event.instance ?? session.instance
+        session.transcriptPath = event.transcriptPath ?? session.transcriptPath
         session.lastEventAt = max(session.lastEventAt, event.time)
 
         switch event.name {
@@ -91,7 +93,8 @@ nonisolated enum SessionReducer {
             if event.agentID == nil, event.action == "TaskStop" {
                 session.lastTaskStopAt = event.time
             }
-            if session.status != .waiting {
+            // Claude's agents call tools in parallel while one waits; Codex's asking agent moves on only once answered.
+            if session.status != .waiting || (session.waitEndsOnNextCall && event.agentID == session.waitingAgentID) {
                 setStatus(.working, at: event.time, on: &session)
             }
         case .postToolUse:
@@ -114,6 +117,7 @@ nonisolated enum SessionReducer {
             case "permission_prompt":
                 setStatus(.waiting, at: event.time, on: &session)
                 session.waitingAgentID = event.agentID
+                session.waitEndsOnNextCall = false
             case "idle_prompt":
                 // An interrupt (Esc) or a denied permission sends no Stop; this arrives about a minute later.
                 setStatus(.idle, at: event.time, on: &session)
@@ -128,6 +132,16 @@ nonisolated enum SessionReducer {
             if let alive = event.backgroundAgentIDs {
                 session.agents.removeAll { !alive.contains($0.id) }
             }
+            setStatus(.idle, at: event.time, on: &session)
+        case .permissionRequest:
+            // Codex asks for permission; the next event of the session ends the wait (Codex spec §3.3).
+            setStatus(.waiting, at: event.time, on: &session)
+            session.waitingAgentID = event.agentID
+            session.waitEndsOnNextCall = true
+        case .interrupt:
+            // Foreground agents end with the interrupted turn; background ones go on.
+            session.action = nil
+            session.agents.removeAll { !$0.isBackground }
             setStatus(.idle, at: event.time, on: &session)
         case .stopFailure:
             // The turn was cut short (a plan limit, an API error): no Stop follows, and it did not finish, so

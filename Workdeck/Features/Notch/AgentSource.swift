@@ -83,6 +83,7 @@ nonisolated struct AgentNotchPart: Equatable, Sendable {
 
 /// An agent tool that feeds the notch (Codex spec §4).
 protocol AgentSource: AnyObject {
+    var agent: AgentKind { get }
     var notchPart: AgentNotchPart { get }
     /// A session row was clicked; a source that does not know the ID ignores it.
     func activateSession(id: String)

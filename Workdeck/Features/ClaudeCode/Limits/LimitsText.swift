@@ -87,9 +87,9 @@ nonisolated enum LimitsText {
             // "5-hour limit reset", "5-hour and weekly limits reset".
             let names = kinds.enumerated().map { $0.offset == 0 ? $0.element.title : $0.element.title.lowercased() }
             return names.joined(separator: " and ") + (kinds.count > 1 ? " limits reset" : " limit reset") + suffix
-        case let .sessionFinished(project, _):
+        case let .sessionFinished(project, _, _):
             return "\(project) finished"
-        case let .sessionNeedsYou(project):
+        case let .sessionNeedsYou(project, _):
             return "\(project) needs you"
         }
     }
@@ -101,7 +101,7 @@ nonisolated enum LimitsText {
             return "Resets \(today ? "at " : "")\(clockText(window.resetsAt, now: now, calendar: calendar))"
         case .reset:
             return "back to 0%"
-        case let .sessionFinished(_, worked):
+        case let .sessionFinished(_, worked, _):
             return "worked \(SessionsText.duration(from: now.addingTimeInterval(-worked), to: now))"
         case .sessionNeedsYou:
             return "permission prompt"
@@ -123,9 +123,9 @@ nonisolated enum LimitsText {
     /// One alert as a line under a batch header.
     static func batchLine(_ alert: LimitsAlert, now: Date, showsAccount: Bool = false) -> String {
         switch alert {
-        case let .sessionFinished(project, worked):
+        case let .sessionFinished(project, worked, _):
             "\(project)  worked \(SessionsText.duration(from: now.addingTimeInterval(-worked), to: now))"
-        case let .sessionNeedsYou(project):
+        case let .sessionNeedsYou(project, _):
             "\(project)  needs you"
         case .threshold, .reset:
             alertTitle(alert, showsAccount: showsAccount)
@@ -153,7 +153,7 @@ nonisolated enum LimitsText {
     /// The project a session alert is about; clicking the alert opens it.
     static func alertProject(_ alert: LimitsAlert) -> String? {
         switch alert {
-        case let .sessionFinished(project, _), let .sessionNeedsYou(project): project
+        case let .sessionFinished(project, _, _), let .sessionNeedsYou(project, _): project
         case .threshold, .reset: nil
         }
     }

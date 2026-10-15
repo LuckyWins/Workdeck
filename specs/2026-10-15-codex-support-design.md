@@ -1,7 +1,7 @@
 # Workdeck — Codex Support Design
 
 **Date:** 2026-10-15
-**Status:** Approved; stage 1 (limits) implemented
+**Status:** Approved; stages 1 and 2 implemented
 
 ## 1. Overview
 
@@ -66,7 +66,7 @@ The data sources come from two probes on 2026-10-14 and 2026-10-15 on Codex CLI 
 - **Payload filter (allowlist).** Kept: event name, session, turn, agent and tool call IDs, `agent_type`, the project folder (`cwd`), `transcript_path`, `source`, `reason`, `stop_hook_active`, the host app (§3.3 last item) and the PID. Actions: `Bash` → `Bash <first 30 characters of the command>` with secret-looking values masked as for Claude; `collaborationspawn_agent` → an agent launch with the first 30 characters of `task_name`; `collaborationwait_agent` → `Waiting for agent`; any other tool → its name only. Never kept: `prompt`, `last_assistant_message`, `tool_response`, `message`, `description`.
 - **Status.** `UserPromptSubmit` and tool events → working; `PermissionRequest` → waiting for you until the session's next event; `Stop` → the turn is finished (idle); `Interrupt` → idle; `SessionEnd` → the session goes; `SubagentStart` / `SubagentStop` → agents of the session's tree; tool events with an `agent_id` → that agent's current step. The existing reducer takes these as Claude's events, with `PermissionRequest` playing the part of Claude's permission-prompt notification.
 - **Line counts.** While a Codex session works, Workdeck reads the tail of its session file (`transcript_path`) as it grows and decodes only `patch_apply_end` lines; for each change it counts the `+` and `−` lines of `unified_diff` and keeps the file's base name and the two counts, never the diff. Each becomes a step `Edit <file> +N −M` in the ticker and adds to the turn total. The path must lie under `~/.codex/sessions`; anything else is ignored.
-- **Liveness and host.** The hook records the PID of its nearest ancestor process whose executable is named `codex` (`proc_pidpath`), so liveness works as for Claude; without one the session ends by its events or goes stale after the usual silence. The host app comes from the environment as for Claude (`__CFBundleIdentifier`, `TERM_PROGRAM`, the TTY), so clicking a session brings forward its VS Code window or its Terminal or iTerm2 tab.
+- **Liveness and host.** The hook records the PID of its nearest ancestor process whose executable is named `codex` (`proc_pidpath`), so liveness works as for Claude. One `codex app-server` runs every chat of a VS Code window and outlives a closed chat, so a Codex session also ends by silence: 30 minutes without events make a working or waiting session idle (no "finished" alert), 3 hours remove it. The host app comes from the environment as for Claude (`__CFBundleIdentifier`, `TERM_PROGRAM`, the TTY), so clicking a session brings forward its VS Code window or its Terminal or iTerm2 tab.
 
 ### 3.4 Popover and Settings
 

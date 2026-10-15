@@ -6,12 +6,14 @@ import Observation
 final class CodexController: AgentSource {
     let settings: CodexSettings
     let limits: CodexLimitsSource
+    let sessions: CodexSessionsController
     @ObservationIgnored let composer: NotchComposer
     @ObservationIgnored private let clock: () -> Date
 
-    init(settings: CodexSettings, limits: CodexLimitsSource, composer: NotchComposer, clock: @escaping () -> Date = { Date() }) {
+    init(settings: CodexSettings, limits: CodexLimitsSource, sessions: CodexSessionsController, composer: NotchComposer, clock: @escaping () -> Date = { Date() }) {
         self.settings = settings
         self.limits = limits
+        self.sessions = sessions
         self.composer = composer
         self.clock = clock
         composer.register(self)
@@ -22,12 +24,17 @@ final class CodexController: AgentSource {
         limits.onChange = { [weak self] in self?.refresh() }
         // Codex's CLI runs only while the tool is on; reading its files is passive (Codex spec §3.2).
         limits.start(asks: settings.isEnabled)
+        sessions.isEnabled = { [weak self] in self?.settings.isEnabled ?? false }
+        sessions.onChange = { [weak self] in self?.refresh() }
+        sessions.onAlerts = { [weak self] alerts in self?.refresh(sessionAlerts: alerts) }
+        sessions.start()
     }
 
-    /// Its alerts, then the notch.
-    func refresh() {
+    /// Keep-awake, its alerts (limits, then sessions), then the notch.
+    func refresh(sessionAlerts: [LimitsAlert] = []) {
+        sessions.updateKeepAwake()
         let alerts = limits.takeAlerts(isEnabled: settings.isEnabled, notch: composer.settings, settings: settings)
-        composer.refresh(alerts: alerts)
+        composer.refresh(alerts: alerts + sessionAlerts)
     }
 
     func setEnabled(_ enabled: Bool) {
@@ -44,23 +51,35 @@ final class CodexController: AgentSource {
     }
 
     var rowSubtitle: String {
+        let summary = sessions.isHooksConnected
+            ? SessionsText.summary(SessionsPresentation.viewState(sessions: sessions.listedSessions, now: sessions.store.now))
+            : nil
         if let limits = limits.limits {
             let now = clock()
             let current = limits.windows.filter { $0.resetsAt > now }
-            return UsageFormatting.mostPressing(current).map(UsageFormatting.compactText) ?? "Waiting for a Codex session"
+            let figures = UsageFormatting.mostPressing(current).map(UsageFormatting.compactText)
+            return [figures ?? (summary == nil ? "Waiting for a Codex session" : nil), summary].compactMap { $0 }.joined(separator: " · ")
         }
-        if limits.status == .noLimits {
-            return "Plan limits need Sign in with ChatGPT"
+        // Why there are no limits comes first, the sessions after it.
+        let problem: String? = switch limits.status {
+        case .noLimits: "Plan limits need Sign in with ChatGPT"
+        case .failed: "Codex did not answer"
+        default: nil
         }
-        if limits.status == .failed {
-            return "Codex did not answer"
+        if problem != nil || summary != nil {
+            return [problem, summary].compactMap { $0 }.joined(separator: " · ")
         }
         return limits.isInstalled ? "Waiting for a Codex session" : "Codex not found"
+    }
+
+    var agent: AgentKind {
+        .codex
     }
 
     var notchPart: AgentNotchPart {
         let now = clock()
         let current = limits.limits
+        let listed = sessions.listedSessions
         let block = current.map { current in
             AccountLimitsViewState(
                 name: CodexLimitsSource.accountLabel,
@@ -69,8 +88,8 @@ final class CodexController: AgentSource {
                 forecasts: forecasts(current.windows, now: now),
                 refresh: limits.isFetching ? .fetching : .ready,
                 plan: CodexRateLimits.planLabel(current.plan),
-                // Without Codex sessions (plan 3) its block is a dim line next to an agent at work.
-                isActive: false,
+                // Without a Codex session its block is a dim line next to an agent at work.
+                isActive: !listed.isEmpty,
                 agent: .codex,
                 detail: current.resetCredits.flatMap { $0 > 0 ? "\($0) free reset\($0 == 1 ? "" : "s")" : nil }
             )
@@ -78,17 +97,17 @@ final class CodexController: AgentSource {
         return AgentNotchPart(
             agent: .codex,
             isEnabled: settings.isEnabled,
-            hasSource: current != nil,
+            hasSource: current != nil || sessions.isHooksConnected,
             showsLimits: current != nil,
             accounts: block.map { [$0] } ?? [],
             compactIndex: 0,
             compactLabel: nil,
             now: now,
-            sessions: [],
-            sessionsNow: now,
+            sessions: listed,
+            sessionsNow: sessions.store.now,
             showsAccounts: false,
-            sessionsConnected: false,
-            activeCount: 0,
+            sessionsConnected: sessions.isHooksConnected,
+            activeCount: SessionsPresentation.viewState(sessions: listed, now: sessions.store.now).activeCount,
             limitsChangedAt: limits.limitsChangedAt
         )
     }
@@ -96,12 +115,17 @@ final class CodexController: AgentSource {
     var diagnosticsLines: [String] {
         let age = limits.limits.map { "\(Int(max(0, clock().timeIntervalSince($0.capturedAt)) / 60))m old" } ?? "none"
         return [
-            "Codex: \(settings.isEnabled ? "on" : "off"); installed \(limits.isInstalled ? "yes" : "no"); version \(limits.version ?? "unknown"); limits \(age); app-server \(String(describing: limits.status))",
+            "Codex: \(settings.isEnabled ? "on" : "off"); installed \(limits.isInstalled ? "yes" : "no"); version \(limits.version ?? "unknown"); limits \(age); app-server \(String(describing: limits.status)); hooks \(sessions.isHooksConnected ? "connected" : "not connected")",
         ]
     }
 
-    func activateSession(id: String) {}
-    func activateProject(named name: String) {}
+    func activateSession(id: String) {
+        sessions.activateSession(id: id)
+    }
+
+    func activateProject(named name: String) {
+        sessions.activateProject(named: name)
+    }
 
     func refreshNow() {
         guard settings.isEnabled else { return }

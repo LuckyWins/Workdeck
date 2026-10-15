@@ -15,7 +15,7 @@ enum ClaudeConnectorError: LocalizedError, Equatable {
         switch self {
         case .invalidSettings: "Fix ~/.claude/settings.json first: it is not valid JSON."
         case .binaryMissing: "The status line command is missing from the app bundle."
-        case .changedSinceReview: SettingsReviewText.changedSinceShown
+        case .changedSinceReview: SettingsReviewText.fileChangedSinceShown
         }
     }
 

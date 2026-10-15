@@ -26,6 +26,14 @@ struct SettingsReviewTextTests {
         #expect(SettingsReviewText.confirmTitle(.connect) == "Connect")
         #expect(SettingsReviewText.confirmTitle(.disconnect) == "Disconnect")
     }
+
+    @Test func theTitleNamesTheFile() {
+        let hooks = SettingsChange(account: "codex", url: URL(filePath: "/tmp/hooks.json"), original: nil, before: "", after: "{\n}", isReformatted: false, hasOwnStatusLine: false)
+        let codex = SettingsReview(kind: .hooks, action: .connect, changes: [hooks])
+        #expect(SettingsReviewText.title(for: codex) == "Changes to hooks.json")
+        #expect(SettingsReviewText.changedSinceShown(for: codex) == "hooks.json changed since this preview. Review the new changes.")
+        #expect(SettingsReviewText.title(for: review(.hooks, .connect)) == "Changes to settings.json")
+    }
 }
 
 @MainActor

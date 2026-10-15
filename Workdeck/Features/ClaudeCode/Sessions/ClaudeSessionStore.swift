@@ -11,6 +11,10 @@ final class ClaudeSessionStore {
     static let startTimeTolerance: TimeInterval = 1
     /// Async hooks finish out of order by seconds; events older than this are folded and dropped from memory.
     static let reorderWindow: TimeInterval = 60
+    /// Codex: a chat closed in a window whose app-server keeps running sends nothing more. Work silent this long is
+    /// over, and a chat silent this long is gone (Codex spec §3.3).
+    static let silentWorkLimit: TimeInterval = 30 * 60
+    static let silentIdleLimit: TimeInterval = 3 * 60 * 60
 
     /// Live sessions: waiting first, then working, then idle; the newest state change first within a group.
     private(set) var sessions: [ClaudeSession] = []
@@ -40,6 +44,9 @@ final class ClaudeSessionStore {
     @ObservationIgnored private var fileSources: [String: any DispatchSourceFileSystemObject] = [:]
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private let maxFileSize: Int
+    /// Stamped on every session; Codex's store holds Codex's.
+    @ObservationIgnored private let agent: AgentKind
+    @ObservationIgnored private let oneSessionPerProcess: Bool
     @ObservationIgnored private let keptFileSize: Int
 
     init(
@@ -47,8 +54,12 @@ final class ClaudeSessionStore {
         liveness: any ProcessLiveness,
         maxFileSize: Int = SessionFileTrimmer.maxFileSize,
         keptFileSize: Int = SessionFileTrimmer.keptFileSize,
+        agent: AgentKind = .claudeCode,
+        oneSessionPerProcess: Bool = true,
         clock: @escaping () -> Date = { Date() }
     ) {
+        self.agent = agent
+        self.oneSessionPerProcess = oneSessionPerProcess
         self.directory = directory
         self.liveness = liveness
         self.maxFileSize = maxFileSize
@@ -108,20 +119,39 @@ final class ClaudeSessionStore {
         var live: [ClaudeSession] = []
         for id in Array(events.keys) {
             guard var session = currentSession(id)?.withoutStoppedAgents(now: now) else { continue }
+            session.agent = agent
             resolveModels(of: &session)
+            if !oneSessionPerProcess {
+                let silence = now.timeIntervalSince(session.lastEventAt)
+                // The state is rebuilt from events on every read, so silence alone decides, whatever the status.
+                if silence >= Self.silentIdleLimit {
+                    remove(id)
+                    continue
+                }
+                if session.status != .idle, silence >= Self.silentWorkLimit {
+                    // No Stop came; it did not finish, so no "finished" alert either.
+                    session.status = .idle
+                    session.since = session.lastEventAt.addingTimeInterval(Self.silentWorkLimit)
+                    session.action = nil
+                    session.agents = []
+                }
+            }
             if isAlive(session) {
                 live.append(session)
             } else {
                 remove(id)
             }
         }
-        // One process runs one session; an in-process /resume may not end the previous one.
-        let byPID = Dictionary(grouping: live.filter { $0.pid != nil }, by: \.pid)
-        for group in byPID.values where group.count > 1 {
-            let newest = group.max { $0.lastEventAt < $1.lastEventAt }
-            for session in group where session.id != newest?.id {
-                remove(session.id)
-                live.removeAll { $0.id == session.id }
+        // One Claude Code process runs one session; an in-process /resume may not end the previous one. Codex's
+        // app-server runs every chat of a window, so its sessions share a process.
+        if oneSessionPerProcess {
+            let byPID = Dictionary(grouping: live.filter { $0.pid != nil }, by: \.pid)
+            for group in byPID.values where group.count > 1 {
+                let newest = group.max { $0.lastEventAt < $1.lastEventAt }
+                for session in group where session.id != newest?.id {
+                    remove(session.id)
+                    live.removeAll { $0.id == session.id }
+                }
             }
         }
 

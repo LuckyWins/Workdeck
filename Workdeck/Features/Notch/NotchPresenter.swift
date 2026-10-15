@@ -16,7 +16,7 @@ protocol LimitsPresenting: AnyObject {
     /// What clicking a session in the expanded notch does.
     func setSessionAction(_ action: @escaping (String) -> Void)
     /// What clicking a session alert does, by project name.
-    func setProjectAction(_ action: @escaping (String) -> Void)
+    func setProjectAction(_ action: @escaping (String, AgentKind) -> Void)
     /// What clicking a limit alert does, by account label: open the Chats window (spec §4.4).
     func setChatsAction(_ action: @escaping (String) -> Void)
     /// What the control that hides or shows the other accounts' limits does.
@@ -415,7 +415,7 @@ final class NotchPresenter: LimitsPresenting {
         model.onActivateSession = action
     }
 
-    func setProjectAction(_ action: @escaping (String) -> Void) {
+    func setProjectAction(_ action: @escaping (String, AgentKind) -> Void) {
         model.onActivateProject = action
     }
 

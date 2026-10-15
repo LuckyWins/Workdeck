@@ -19,7 +19,7 @@ final class LimitsNotchModel {
     var isHovering = false
     @ObservationIgnored var onRefresh: (() -> Void)?
     @ObservationIgnored var onActivateSession: ((String) -> Void)?
-    @ObservationIgnored var onActivateProject: ((String) -> Void)?
+    @ObservationIgnored var onActivateProject: ((String, AgentKind) -> Void)?
     @ObservationIgnored var onOpenChats: ((String) -> Void)?
     @ObservationIgnored var onToggleAccounts: (() -> Void)?
     @ObservationIgnored var onDismissRecap: (() -> Void)?
@@ -227,7 +227,7 @@ struct LimitsExpandedView: View {
 
     private func clickTarget(_ alert: LimitsAlert) -> (action: () -> Void, help: String, hint: String)? {
         if let project = LimitsText.alertProject(alert) {
-            return ({ model.onActivateProject?(project) }, "Open \(project)", "↗ open")
+            return ({ model.onActivateProject?(project, alert.agent) }, "Open \(project)", "↗ open")
         }
         if LimitsText.opensChats(alert), let account = LimitsText.alertAccount(alert), let open = model.onOpenChats {
             return ({ open(account) }, "Open Chats", "↗ chats")

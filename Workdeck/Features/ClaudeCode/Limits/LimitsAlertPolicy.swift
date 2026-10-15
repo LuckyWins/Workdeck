@@ -5,8 +5,8 @@ nonisolated enum LimitsAlert: Equatable, Sendable {
     case threshold(UsageWindow, threshold: Int, account: String? = nil, agent: AgentKind = .claudeCode)
     /// Every window of one account that reset at the same check, in `UsageWindowKind.allCases` order.
     case reset([UsageWindowKind], account: String? = nil, agent: AgentKind = .claudeCode)
-    case sessionFinished(project: String, worked: TimeInterval)
-    case sessionNeedsYou(project: String)
+    case sessionFinished(project: String, worked: TimeInterval, agent: AgentKind = .claudeCode)
+    case sessionNeedsYou(project: String, agent: AgentKind = .claudeCode)
 }
 
 nonisolated extension LimitsAlert {
@@ -28,11 +28,10 @@ nonisolated extension LimitsAlert {
         }
     }
 
-    /// The agent an alert is about. Session alerts are Claude Code's until Codex sessions arrive (plan 3).
+    /// The agent an alert is about.
     var agent: AgentKind {
         switch self {
-        case let .threshold(_, _, _, agent), let .reset(_, _, agent): agent
-        case .sessionFinished, .sessionNeedsYou: .claudeCode
+        case let .threshold(_, _, _, agent), let .reset(_, _, agent), let .sessionFinished(_, _, agent), let .sessionNeedsYou(_, agent): agent
         }
     }
 }

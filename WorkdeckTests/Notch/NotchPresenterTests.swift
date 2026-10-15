@@ -671,8 +671,8 @@ struct NotchPresenterTests {
     @Test func projectActionReachesTheNotchViews() {
         let (presenter, _) = makePresenter()
         var opened: [String] = []
-        presenter.setProjectAction { opened.append($0) }
-        presenter.model.onActivateProject?("vitastir")
+        presenter.setProjectAction { name, _ in opened.append(name) }
+        presenter.model.onActivateProject?("vitastir", .claudeCode)
         #expect(opened == ["vitastir"])
     }
 

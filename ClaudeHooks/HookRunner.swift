@@ -8,6 +8,14 @@ nonisolated struct HookRunner: Sendable {
     var readMeta: @Sendable (URL) -> AgentMeta? = { AgentDescriptionReader.meta(at: $0) }
     /// The extra instance this hook belongs to; `nil` for the main one.
     var instance: String?
+    /// `--agent codex`: Codex's hook. Its events go to `sessions-codex`, carry the session file and the `codex` PID.
+    var isCodex = false
+    var codexPID: @Sendable () -> Int32? = { CodexProcess.ancestorPID() }
+
+    static func isCodex(_ arguments: [String]) -> Bool {
+        guard let index = arguments.firstIndex(of: "--agent"), arguments.indices.contains(index + 1) else { return false }
+        return arguments[index + 1] == "codex"
+    }
 
     /// The value of `--instance` when it is a valid instance name; the same rule as `StatusLineRunner.instance(from:)`.
     static func instance(from arguments: [String]) -> String? {
@@ -23,7 +31,7 @@ nonisolated struct HookRunner: Sendable {
         guard stdin.count <= Self.maxInputSize,
               var payload = HookPayloadFilter.parse(stdin, environment: environment, now: now)
         else { return }
-        if payload.event.name == .subagentStart, let transcriptPath = payload.transcriptPath, let agentID = payload.event.agentID {
+        if !isCodex, payload.event.name == .subagentStart, let transcriptPath = payload.transcriptPath, let agentID = payload.event.agentID {
             let url = AgentDescriptionReader.metaURL(transcriptPath: transcriptPath, sessionID: payload.event.sessionID, agentID: agentID)
             let meta = readMeta(url)
             payload.event.agentDescription = meta?.description
@@ -31,7 +39,15 @@ nonisolated struct HookRunner: Sendable {
             payload.event.agentBackground = meta?.isBackground
             payload.event.agentTranscriptPath = AgentDescriptionReader.transcriptURL(forMeta: url).path
         }
-        payload.event.instance = instance
+        if isCodex {
+            // Only a session file's path is kept, never its content; the app checks where it points.
+            if let path = payload.transcriptPath, path.hasSuffix(".jsonl"), path.count <= 512 {
+                payload.event.transcriptPath = path
+            }
+            payload.event.pid = codexPID()
+        } else {
+            payload.event.instance = instance
+        }
         try? HookEventFile.append(payload.event, to: directory)
     }
 }

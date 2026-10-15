@@ -6,6 +6,9 @@ nonisolated struct ClaudeCodeDemoAccount: Equatable, Sendable {
     var plan: String
     var windows: [UsageWindow]
     var age: TimeInterval
+    var agent: AgentKind = .claudeCode
+    /// A dim line under the bars, e.g. Codex's free resets.
+    var detail: String?
 }
 
 /// What the notch shows at one moment of the demo.
@@ -61,6 +64,36 @@ nonisolated enum ClaudeCodeDemoScript {
         Step(action: "Bash npm run lint"),
     ]
 
+    static let docsID = "demo-docs-site"
+
+    private static let docsSteps = [
+        Step(action: "Bash rg -n \"orbit\" docs"),
+        Step(action: "Edit index.md", lines: LineCounts(added: 4, removed: 1)),
+        Step(action: "Bash npm run build"),
+        Step(action: "Edit guide.md", lines: LineCounts(added: 9, removed: 2)),
+    ]
+
+    private static func docsSession(at elapsed: TimeInterval, demoStart: Date, now: Date) -> ClaudeSession {
+        let isWorking = elapsed < 48
+        let last = Int((min(elapsed, 47) - 12) / 2.5)
+        var session = ClaudeSession(
+            id: docsID,
+            cwd: "/Users/demo/Projects/docs-site",
+            status: isWorking ? .working : .idle,
+            since: demoStart.addingTimeInterval(isWorking ? 12 : 48),
+            lastEventAt: now
+        )
+        session.hostBundleID = "com.apple.Terminal"
+        session.termProgram = "Apple_Terminal"
+        session.agent = .codex
+        session.workStartedAt = isWorking ? demoStart.addingTimeInterval(12) : nil
+        session.lastStopAt = isWorking ? nil : demoStart.addingTimeInterval(48)
+        session.steps = steps(docsSteps, upTo: last, every: 2.5, from: 12, demoStart: demoStart, idPrefix: "docs")
+        session.action = isWorking ? docsSteps[last % docsSteps.count].action : nil
+        session.turn = turn(docsSteps, upTo: last, startedAt: demoStart.addingTimeInterval(12))
+        return session
+    }
+
     private static let agentActions = ["Grep \"drawOrbit\"", "Read OrbitLayer.swift", "Glob **/*Orbit*.swift", "Read OrbitRenderer.swift"]
 
     /// Main's 5-hour window: climbs to the first threshold at 30 s, then 4 points more by the end.
@@ -100,7 +133,19 @@ nonisolated enum ClaudeCodeDemoScript {
         if elapsed >= 10 {
             sessions.append(apiSession(at: elapsed, demoStart: demoStart, now: now))
         }
-        return ClaudeCodeDemoFrame(accounts: [main, other], sessions: sessions)
+        let codex = ClaudeCodeDemoAccount(
+            name: "codex",
+            plan: "Pro Lite",
+            windows: [UsageWindow(kind: .sevenDay, usedPercent: 3 + elapsed / 30, resetsAt: demoStart.addingTimeInterval(5 * 86_400))],
+            age: 5,
+            agent: .codex,
+            detail: "3 free resets"
+        )
+        // Codex works in parallel on another project (Codex spec §3.5).
+        if elapsed >= 12 {
+            sessions.append(docsSession(at: elapsed, demoStart: demoStart, now: now))
+        }
+        return ClaudeCodeDemoFrame(accounts: [main, other, codex], sessions: sessions)
     }
 
     /// The events after `previous` (`nil` on the first tick) up to and including `elapsed`.

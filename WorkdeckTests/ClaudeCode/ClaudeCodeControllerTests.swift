@@ -71,8 +71,8 @@ final class FakePresenter: LimitsPresenting {
         sessionAction = action
     }
 
-    private(set) var projectAction: ((String) -> Void)?
-    func setProjectAction(_ action: @escaping (String) -> Void) {
+    private(set) var projectAction: ((String, AgentKind) -> Void)?
+    func setProjectAction(_ action: @escaping (String, AgentKind) -> Void) {
         projectAction = action
     }
 
@@ -275,7 +275,7 @@ struct ClaudeCodeControllerTests {
         let (controller, _) = makeController()
         controller.start()
         presenter.sessionAction?("someone-else")
-        presenter.projectAction?("someone-else")
+        presenter.projectAction?("someone-else", .claudeCode)
         #expect(activator.activated.isEmpty)
     }
 
@@ -983,7 +983,7 @@ struct ClaudeCodeControllerTests {
         }
         let (controller, _) = makeController()
         controller.start()
-        presenter.projectAction?("Workdeck")
+        presenter.projectAction?("Workdeck", .claudeCode)
         #expect(activator.activated == ["newer"])
     }
 
@@ -992,8 +992,8 @@ struct ClaudeCodeControllerTests {
         addLiveSession()
         let (controller, _) = makeController()
         controller.start()
-        presenter.projectAction?("Workdeck")
-        presenter.projectAction?("unknown")
+        presenter.projectAction?("Workdeck", .claudeCode)
+        presenter.projectAction?("unknown", .claudeCode)
         #expect(activator.activated == ["s1"])
     }
 

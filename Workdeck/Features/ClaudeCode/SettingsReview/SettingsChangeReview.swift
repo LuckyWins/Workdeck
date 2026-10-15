@@ -12,10 +12,10 @@ struct SettingsChangeReview: View {
     var body: some View {
         let change = review.changes[min(selection, review.changes.count - 1)]
         VStack(alignment: .leading, spacing: 8) {
-            Text(SettingsReviewText.title)
+            Text(SettingsReviewText.title(for: review))
                 .font(.headline)
             if review.changedSinceShown {
-                Text(SettingsReviewText.changedSinceShown)
+                Text(SettingsReviewText.changedSinceShown(for: review))
                     .font(.caption)
                     .foregroundStyle(.orange)
             }

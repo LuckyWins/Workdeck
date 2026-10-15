@@ -77,6 +77,8 @@ nonisolated struct ClaudeSession: Equatable, Sendable, Identifiable {
     var isBlank = false
     /// The agent whose permission prompt made the session wait (`nil` for the main agent).
     var waitingAgentID: String?
+    /// The wait came from Codex's `PermissionRequest`: the asking agent calls its next tool only once it is answered.
+    var waitEndsOnNextCall = false
     /// What the main agent is doing now.
     var action: String?
     /// When the session last went from quiet to busy: the start of work that background agents may extend.
@@ -103,6 +105,8 @@ nonisolated struct ClaudeSession: Equatable, Sendable, Identifiable {
     var commands = 0
     /// Counts whose step was not seen yet: each hook stamps its own time, so a fast edit's PostToolUse can come first.
     var earlyLines: [EarlyLines] = []
+    /// Codex only: the session file the app counts patch lines in (Codex spec §3.3).
+    var transcriptPath: String?
     /// The agent the session belongs to (Codex spec §3.3).
     var agent: AgentKind = .claudeCode
 

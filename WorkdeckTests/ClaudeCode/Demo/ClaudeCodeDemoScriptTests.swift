@@ -16,8 +16,8 @@ struct ClaudeCodeDemoScriptTests {
 
     @Test func theCycleStartsWithMainWorkingAndPersonalQuiet() throws {
         let start = frame(0)
-        #expect(start.accounts.map(\.name) == ["main", "personal"])
-        #expect(start.accounts.map(\.plan) == ["Max 5x", "Pro"])
+        #expect(start.accounts.map(\.name) == ["main", "personal", "codex"])
+        #expect(start.accounts.map(\.plan) == ["Max 5x", "Pro", "Pro Lite"])
         #expect(start.accounts[0].windows.first { $0.kind == .fiveHour }?.usedPercent == 38)
         #expect(start.accounts[1].age == 13 * 3600)
         #expect(start.sessions.map(\.id) == [ClaudeCodeDemoScript.orbitID])
@@ -123,5 +123,15 @@ struct ClaudeCodeDemoScriptTests {
         let recap = ClaudeCodeDemoScript.recap(now: fixedNow, calendar: calendar)
         #expect(recap.isWorthShowing)
         #expect(RecapCalendar.dayKey(recap.weekStart, calendar: calendar) == "2026-09-28")
+    }
+
+    @Test func aCodexSessionWorksFromTwelveToFortyEight() {
+        #expect(session("demo-docs-site", at: 11.9) == nil)
+        let docs = session("demo-docs-site", at: 12)
+        #expect(docs?.agent == .codex)
+        #expect(docs?.status == .working)
+        #expect(session("demo-docs-site", at: 48)?.status == .idle)
+        #expect(frame(0).accounts.last?.agent == .codex)
+        #expect(frame(0).accounts.last?.detail == "3 free resets")
     }
 }

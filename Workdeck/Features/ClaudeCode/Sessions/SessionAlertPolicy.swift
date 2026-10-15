@@ -53,7 +53,7 @@ nonisolated enum SessionAlertPolicy {
                     let worked = stoppedAt.timeIntervalSince(session.workStartedAt ?? old.since)
                     let duration = SessionsText.duration(from: stoppedAt.addingTimeInterval(-worked), to: stoppedAt)
                     if worked >= finishedAfter {
-                        outcome.alerts.append(.sessionFinished(project: name, worked: worked))
+                        outcome.alerts.append(.sessionFinished(project: name, worked: worked, agent: session.agent))
                         outcome.notes.append("\(name): finished after \(duration), shown")
                     } else {
                         let threshold = SessionsText.duration(from: stoppedAt.addingTimeInterval(-finishedAfter), to: stoppedAt)
@@ -62,7 +62,7 @@ nonisolated enum SessionAlertPolicy {
                 }
             }
             if startedWaiting, notifyNeedsYou {
-                outcome.alerts.append(.sessionNeedsYou(project: name))
+                outcome.alerts.append(.sessionNeedsYou(project: name, agent: session.agent))
                 outcome.notes.append("\(name): needs you, shown")
             }
         }

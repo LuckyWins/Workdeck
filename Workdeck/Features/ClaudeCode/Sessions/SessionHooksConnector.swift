@@ -25,7 +25,7 @@ extension SessionHooksConnecting {
 /// Adds Workdeck's hook entries to Claude Code's user settings, and removes them again (spec §5.3).
 struct SessionHooksConnector: SessionHooksConnecting {
     static let binarySuffix = "/Contents/Helpers/workdeck-hook"
-    static let events = HookEventName.allCases.map(\.rawValue)
+    static let events = ["SessionStart", "SessionEnd", "UserPromptSubmit", "PostToolUse", "Notification", "Stop", "SubagentStart", "SubagentStop", "PreToolUse", "PreCompact", "StopFailure"]
     /// Events added after the first version: without them sessions still work (no actions, no compacting),
     /// so a user may remove them and stay connected.
     static let optionalEvents: Set<String> = [HookEventName.preToolUse.rawValue, HookEventName.preCompact.rawValue, HookEventName.stopFailure.rawValue]

@@ -70,8 +70,9 @@ final class NotchComposer {
         presenter.setSessionAction { [weak self] id in
             self?.sources.forEach { $0.activateSession(id: id) }
         }
-        presenter.setProjectAction { [weak self] name in
-            self?.sources.forEach { $0.activateProject(named: name) }
+        presenter.setProjectAction { [weak self] name, agent in
+            // A session alert opens a window of its own agent only (Codex spec §3.1).
+            self?.sources.filter { $0.agent == agent }.forEach { $0.activateProject(named: name) }
         }
         presenter.setRefreshAction { [weak self] in
             self?.sources.forEach { $0.refreshNow() }
@@ -136,7 +137,9 @@ final class NotchComposer {
         let shown = enabled.isEmpty ? parts : enabled
         let compact = Self.compactPart(among: shown)
         // Marks tell agents apart only when more than one is on (Codex spec §3.1).
-        let showsMarks = Set(shown.filter { ($0.isEnabled || $0.isDemo) && $0.hasSource }.map(\.agent)).count > 1
+        let showsMarks = Set(shown.filter { ($0.isEnabled || $0.isDemo) && $0.hasSource }.flatMap { part in
+            [part.agent] + part.accounts.map(\.agent) + part.sessions.map(\.agent)
+        }).count > 1
         let label: String? = showsMarks ? compact.agent.mark + (compact.compactLabel ?? "") : compact.compactLabel
         let block = compact.compactBlock
         let pressing = UsageFormatting.mostPressing((block?.windows ?? []).filter { $0.resetsAt > compact.now })

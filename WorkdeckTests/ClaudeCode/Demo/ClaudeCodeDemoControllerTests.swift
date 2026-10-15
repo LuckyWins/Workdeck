@@ -54,9 +54,10 @@ struct ClaudeCodeDemoControllerTests {
             Issue.record("Expected the notch, got \(shown.display)")
             return
         }
-        #expect(shown.accounts.map(\.name) == ["main", "personal"])
-        #expect(shown.accounts.map(\.plan) == ["Max 5x", "Pro"])
-        #expect(shown.sessions.rows.map(\.projectName) == ["orbit-app", "api-server"])
+        #expect(shown.accounts.map(\.name) == ["main", "personal", "codex"])
+        #expect(shown.accounts.map(\.plan) == ["Max 5x", "Pro", "Pro Lite"])
+        #expect(Set(shown.sessions.rows.map(\.projectName)) == ["orbit-app", "api-server", "docs-site"])
+        #expect(shown.showsAgentMarks)
         #expect(shown.sessions.rows.first?.agents.map(\.type) == ["Explore"])
     }
 

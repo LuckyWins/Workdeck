@@ -92,16 +92,25 @@ struct SettingsView: View {
         .onChange(of: claudeCode.limits.review != nil) { _, isOpen in
             if isOpen {
                 claudeCode.sessions.cancelHooksReview()
+                codex.sessions.cancelHooksReview()
             }
         }
         .onChange(of: claudeCode.sessions.hooksReview != nil) { _, isOpen in
             if isOpen {
                 claudeCode.limits.cancelReview()
+                codex.sessions.cancelHooksReview()
+            }
+        }
+        .onChange(of: codex.sessions.hooksReview != nil) { _, isOpen in
+            if isOpen {
+                claudeCode.limits.cancelReview()
+                claudeCode.sessions.cancelHooksReview()
             }
         }
         .onDisappear {
             claudeCode.limits.cancelReview()
             claudeCode.sessions.cancelHooksReview()
+            codex.sessions.cancelHooksReview()
         }
         .onChange(of: settings.batteryThreshold) {
             controller.scheduleSafeguardCheck()
