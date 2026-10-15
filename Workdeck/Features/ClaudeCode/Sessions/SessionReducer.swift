@@ -129,6 +129,12 @@ nonisolated enum SessionReducer {
                 session.agents.removeAll { !alive.contains($0.id) }
             }
             setStatus(.idle, at: event.time, on: &session)
+        case .stopFailure:
+            // The turn was cut short (a plan limit, an API error): no Stop follows, and it did not finish, so
+            // `lastStopAt` stays and no "finished" alert shows. Foreground agents ended with it.
+            session.action = nil
+            session.agents.removeAll { !$0.isBackground }
+            setStatus(.idle, at: event.time, on: &session)
         case .subagentStart:
             if let agentID = event.agentID, !session.agents.contains(where: { $0.id == agentID }) {
                 var agent = RunningAgent(

@@ -496,4 +496,24 @@ struct SessionReducerTests {
         ]))
         #expect(session.commands == 3)
     }
+
+    @Test func aTurnCutShortByAnErrorGoesIdle() throws {
+        let session = try #require(SessionReducer.reduce([
+            start,
+            hookEvent(.userPromptSubmit, at: 1),
+            hookEvent(.preToolUse, at: 2) { $0.action = "Skill" },
+            hookEvent(.subagentStart, at: 3) { $0.agentID = "a1"; $0.agentType = "Explore" },
+            hookEvent(.stopFailure, at: 10),
+        ]))
+        #expect(session.status == .idle)
+        #expect(session.action == nil)
+        #expect(session.agents.isEmpty)
+        #expect(session.lastStopAt == nil)
+    }
+
+    @Test func aTurnCutShortIsNotAnnouncedAsFinished() throws {
+        let working = try #require(SessionReducer.reduce([start, hookEvent(.userPromptSubmit, at: 1), hookEvent(.preToolUse, at: 2) { $0.action = "Bash ls" }]))
+        let failed = SessionReducer.apply(hookEvent(.stopFailure, at: 900), to: working)
+        #expect(SessionAlertPolicy.alerts(previous: [working], current: [failed], notifyFinished: true, finishedAfter: 0, notifyNeedsYou: true, frontmostBundleID: nil).isEmpty)
+    }
 }

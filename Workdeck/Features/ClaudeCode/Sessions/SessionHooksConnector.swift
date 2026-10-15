@@ -28,7 +28,7 @@ struct SessionHooksConnector: SessionHooksConnecting {
     static let events = HookEventName.allCases.map(\.rawValue)
     /// Events added after the first version: without them sessions still work (no actions, no compacting),
     /// so a user may remove them and stay connected.
-    static let optionalEvents: Set<String> = [HookEventName.preToolUse.rawValue, HookEventName.preCompact.rawValue]
+    static let optionalEvents: Set<String> = [HookEventName.preToolUse.rawValue, HookEventName.preCompact.rawValue, HookEventName.stopFailure.rawValue]
     static let requiredEvents = events.filter { !optionalEvents.contains($0) }
 
     let file: ClaudeSettingsFile

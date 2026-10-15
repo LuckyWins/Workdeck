@@ -49,7 +49,10 @@ struct SessionHooksConnectorTests {
             #expect(hooks[0]["async"] as? Bool == true)
             #expect(hooks[0]["timeout"] as? Int == 5)
         }
-        #expect(SessionHooksConnector.events.count == 10)
+        #expect(SessionHooksConnector.events.count == 11)
+        // A turn cut short by an API error (a plan limit) ends with StopFailure instead of Stop.
+        #expect(SessionHooksConnector.events.contains("StopFailure"))
+        #expect(!SessionHooksConnector.requiredEvents.contains("StopFailure"))
         #expect(connector(binary).status == .connected)
     }
 

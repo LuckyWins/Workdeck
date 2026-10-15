@@ -12,6 +12,8 @@ nonisolated enum HookEventName: String, Codable, Sendable, CaseIterable {
     case subagentStop = "SubagentStop"
     case preToolUse = "PreToolUse"
     case preCompact = "PreCompact"
+    /// A turn cut short by an API error, e.g. a plan limit: Claude Code sends this instead of `Stop`.
+    case stopFailure = "StopFailure"
 }
 
 /// One line of a session's event file. Holds only what Workdeck needs, never prompt, answer, or tool content.
