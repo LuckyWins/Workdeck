@@ -85,6 +85,8 @@ final class NotchPresenter: LimitsPresenting {
     private let pointer: any PointerMonitoring
     private let hoverEnterDelay: Duration
     private let hoverExitDelay: Duration
+    private let haptics: any HapticPerforming
+    private let isHapticsEnabled: @MainActor () -> Bool
     private var hoverTask: Task<Void, Never>?
     private var peekTask: Task<Void, Never>?
     private var isPointerRunning = false
@@ -118,6 +120,10 @@ final class NotchPresenter: LimitsPresenting {
     /// A flash waiting for the notch to settle; a new one merges into it.
     private var pendingFlash: NotchFlashEvent?
     private var isShowingAlert = false
+    /// The alerts on screen hold one that taps, not yet felt: it taps once the notch is expanded (haptics spec §2.2).
+    private var isAlertTapPending = false
+    /// The alerts on screen already tapped; alerts joining them tap nothing.
+    private var didTapAlerts = false
     private var pendingAlerts: [LimitsAlert] = []
     /// When the shown alerts close; an alert that joins them moves it to a full `alertDuration` from then.
     private var alertDeadline: ContinuousClock.Instant?
@@ -144,6 +150,8 @@ final class NotchPresenter: LimitsPresenting {
         workspaceSettleDelay: Duration = .seconds(1),
         hoverEnterDelay: Duration = .milliseconds(250),
         hoverExitDelay: Duration = .milliseconds(500),
+        haptics: any HapticPerforming = SystemHaptics(),
+        isHapticsEnabled: @escaping @MainActor () -> Bool = { true },
         observeScreenChanges: Bool = true
     ) {
         self.model = model
@@ -153,6 +161,8 @@ final class NotchPresenter: LimitsPresenting {
         self.pointer = pointer
         self.hoverEnterDelay = hoverEnterDelay
         self.hoverExitDelay = hoverExitDelay
+        self.haptics = haptics
+        self.isHapticsEnabled = isHapticsEnabled
         self.flashDuration = flashDuration
         self.alertDuration = alertDuration
         self.recapDuration = recapDuration
@@ -282,6 +292,11 @@ final class NotchPresenter: LimitsPresenting {
         if isShowingAlert {
             model.alerts.append(contentsOf: alerts)
             restartAlertTime()
+            // A reset on screen tapped nothing: an alert that taps, joining it, still does.
+            if !didTapAlerts, alerts.contains(where: \.tapsHaptic) {
+                isAlertTapPending = true
+                requestReconcile()
+            }
             return
         }
         pendingAlerts.append(contentsOf: alerts)
@@ -294,6 +309,9 @@ final class NotchPresenter: LimitsPresenting {
             // Alerts that arrive together are shown together.
             while !pendingAlerts.isEmpty, screen() != nil {
                 model.alerts = pendingAlerts
+                // One tap per batch, felt once it is expanded; alerts joining it later tap nothing (haptics spec §2.2).
+                isAlertTapPending = pendingAlerts.contains(where: \.tapsHaptic)
+                didTapAlerts = false
                 pendingAlerts.removeAll()
                 isShowingAlert = true
                 restartAlertTime()
@@ -310,6 +328,8 @@ final class NotchPresenter: LimitsPresenting {
             model.countdown = nil
             model.alerts = []
             isShowingAlert = false
+            isAlertTapPending = false
+            didTapAlerts = false
             alertTask = nil
             requestReconcile()
         }
@@ -335,6 +355,8 @@ final class NotchPresenter: LimitsPresenting {
         alertDeadline = nil
         model.alerts = []
         isShowingAlert = false
+        isAlertTapPending = false
+        didTapAlerts = false
         flashTask?.cancel()
         flashTask = nil
         pendingFlash = nil
@@ -491,6 +513,22 @@ final class NotchPresenter: LimitsPresenting {
         }
     }
 
+    /// Taps for the alerts on screen once the notch shows them expanded: an expansion still running (a collapse, a
+    /// rebuild) would leave the tap ahead of what it announces.
+    private func tapPendingAlert() {
+        guard isAlertTapPending, isShowingAlert, appliedTarget == .expanded else { return }
+        isAlertTapPending = false
+        didTapAlerts = true
+        tap(.alert)
+    }
+
+    /// The setting is read at tap time, so turning it off stops a tap already on its way.
+    private func tap(_ haptic: NotchHaptic) {
+        if isHapticsEnabled() {
+            haptics.perform(haptic)
+        }
+    }
+
     private func endPeek() {
         peekTask?.cancel()
         peekTask = nil
@@ -567,7 +605,14 @@ final class NotchPresenter: LimitsPresenting {
         )
         let rebuild = needsRebuild
         needsRebuild = false
-        guard target != appliedTarget || rebuild else { return }
+        guard target != appliedTarget || rebuild else {
+            tapPendingAlert()
+            return
+        }
+        // Hover alone opened it: an alert, the recap or the demo's hold keeping it open taps nothing (haptics spec §2.1).
+        if target == .expanded, appliedTarget != .expanded, isHovering, !isShowingAlert, !showsRecap, !holds {
+            tap(.hover)
+        }
 
         switch target {
         case .hidden:
@@ -594,6 +639,7 @@ final class NotchPresenter: LimitsPresenting {
             }
         }
         appliedTarget = target
+        tapPendingAlert()
     }
 
     private func activeSurface() -> any NotchSurface {

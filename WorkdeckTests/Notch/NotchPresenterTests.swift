@@ -66,6 +66,16 @@ final class FakePointer: PointerMonitoring {
 }
 
 @MainActor
+final class FakeHaptics: HapticPerforming {
+    private(set) var performed: [NotchHaptic] = []
+    var onPerform: (() -> Void)?
+    func perform(_ haptic: NotchHaptic) {
+        performed.append(haptic)
+        onPerform?()
+    }
+}
+
+@MainActor
 final class ScreenReads {
     var count = 0
 }
@@ -76,8 +86,9 @@ struct NotchPresenterTests {
     let fullScreen = FakeFullScreen()
     let pointer = FakePointer()
     let screenReads = ScreenReads()
+    let haptics = FakeHaptics()
 
-    private func makePresenter(screen: NSScreen? = NSScreen.screens.first, virtual: Bool = false, flashDuration: Duration = .milliseconds(60), alertDuration: Duration = .milliseconds(100), hoverEnterDelay: Duration = .milliseconds(40), hoverExitDelay: Duration = .milliseconds(80), recapDuration: Duration = .seconds(60)) -> (NotchPresenter, () -> Int) {
+    private func makePresenter(screen: NSScreen? = NSScreen.screens.first, virtual: Bool = false, flashDuration: Duration = .milliseconds(60), alertDuration: Duration = .milliseconds(100), hoverEnterDelay: Duration = .milliseconds(40), hoverExitDelay: Duration = .milliseconds(80), recapDuration: Duration = .seconds(60), hapticsEnabled: @escaping @MainActor () -> Bool = { true }) -> (NotchPresenter, () -> Int) {
         var created = 0
         let presenter = NotchPresenter(
             makeSurface: { model in
@@ -98,6 +109,8 @@ struct NotchPresenterTests {
             workspaceSettleDelay: .milliseconds(50),
             hoverEnterDelay: hoverEnterDelay,
             hoverExitDelay: hoverExitDelay,
+            haptics: haptics,
+            isHapticsEnabled: hapticsEnabled,
             observeScreenChanges: false
         )
         return (presenter, { created })
@@ -327,6 +340,129 @@ struct NotchPresenterTests {
         var state = state(.hidden)
         state.isPeekable = true
         return state
+    }
+
+    @Test func hoverOpeningTheNotchTaps() async {
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        surface.onHoverChange?(true)
+        await settle(presenter)
+        #expect(presenter.appliedTarget == .expanded)
+        surface.onHoverChange?(false)
+        await settle(presenter)
+        #expect(haptics.performed == [.hover])
+    }
+
+    @Test func hoveringAHiddenNotchDoesNotTap() async {
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.hidden))
+        await settle(presenter)
+        surface.onHoverChange?(true)
+        await settle(presenter)
+        #expect(haptics.performed.isEmpty)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func alertsThatAskForAttentionTapOncePerBatch() async {
+        let (presenter, _) = makePresenter(alertDuration: .milliseconds(300))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.flash([.sessionNeedsYou(project: "vitastir")])
+        try? await Task.sleep(for: .milliseconds(100))
+        // Joins the alert on screen: no second tap; hovering the open alert, and staying when it ends, add none.
+        presenter.flash([.sessionFinished(project: "a", worked: 60)])
+        surface.onHoverChange?(true)
+        await settle(presenter)
+        #expect(haptics.performed == [.alert])
+        surface.onHoverChange?(false)
+        await settle(presenter)
+        presenter.flash([.threshold(window(.fiveHour, 96), threshold: 95)])
+        await settle(presenter)
+        presenter.flash([.sessionFinished(project: "a", worked: 60)])
+        await settle(presenter)
+        #expect(haptics.performed == [.alert, .alert, .alert])
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aResetDoesNotTap() async {
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.flash([.reset([.fiveHour])])
+        await settle(presenter)
+        #expect(!surface.alertsAtExpand.isEmpty)
+        #expect(haptics.performed.isEmpty)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func alertsBehindTheRecapTapWhenTheyComeUp() async {
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.showRecap(WeeklyRecapSummary(weekStart: fixedNow), for: .milliseconds(300))
+        await waitFor { presenter.appliedTarget == .expanded }
+        presenter.flash([.sessionFinished(project: "a", worked: 60)])
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(haptics.performed.isEmpty)
+        // The recap's expansion carries the alert on: it may come up without a new expand.
+        await waitFor { presenter.model.alerts == [.sessionFinished(project: "a", worked: 60)] }
+        await settle(presenter)
+        #expect(haptics.performed == [.alert])
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aNeedsYouJoiningAResetTaps() async {
+        let (presenter, _) = makePresenter(alertDuration: .milliseconds(300))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.flash([.reset([.fiveHour])])
+        try? await Task.sleep(for: .milliseconds(100))
+        presenter.flash([.sessionNeedsYou(project: "vitastir")])
+        presenter.flash([.sessionFinished(project: "a", worked: 60)])
+        await settle(presenter)
+        #expect(haptics.performed == [.alert])
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func theAlertTapComesWithTheExpansion() async {
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        var expansionsAtTap: [Int] = []
+        haptics.onPerform = { [surface] in expansionsAtTap.append(surface.alertsAtExpand.count) }
+        presenter.flash([.sessionNeedsYou(project: "vitastir")])
+        await settle(presenter)
+        #expect(expansionsAtTap == [1])
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func turningHapticsOffWhileAnAlertWaitsStopsItsTap() async {
+        let enabled = Box(true)
+        let (presenter, _) = makePresenter(hapticsEnabled: { enabled.value })
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.showRecap(WeeklyRecapSummary(weekStart: fixedNow), for: .milliseconds(300))
+        await waitFor { presenter.appliedTarget == .expanded }
+        presenter.flash([.sessionFinished(project: "a", worked: 60)])
+        enabled.value = false
+        // The recap's expansion carries the alert on: it may come up without a new expand.
+        await waitFor { presenter.model.alerts == [.sessionFinished(project: "a", worked: 60)] }
+        await settle(presenter)
+        #expect(haptics.performed.isEmpty)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func hapticsCanBeTurnedOff() async {
+        let (presenter, _) = makePresenter(hapticsEnabled: { false })
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.flash([.sessionNeedsYou(project: "vitastir")])
+        await settle(presenter)
+        surface.onHoverChange?(true)
+        await settle(presenter)
+        #expect(presenter.appliedTarget == .expanded)
+        #expect(haptics.performed.isEmpty)
     }
 
     @Test func aBriefHoverDoesNotExpand() async {

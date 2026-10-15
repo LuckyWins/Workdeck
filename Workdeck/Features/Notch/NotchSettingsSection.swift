@@ -48,6 +48,10 @@ struct NotchSettingsSection: View {
             }
             // Alerts appear in the notch, which only shows while a tool is on.
             .disabled(!isNotchEnabled)
+            Toggle("Haptic feedback", isOn: $settings.hapticFeedback)
+            Text("On a Force Touch trackpad, when the notch opens under the pointer and on alerts.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Toggle("Keep Mac awake while an agent works", isOn: $settings.keepAwakeWhileWorking)
             if !isNotchEnabled {
                 Text("Turn on Claude Code or Codex in the menu bar popover to see the notch and its alerts.")

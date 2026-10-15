@@ -20,6 +20,20 @@ struct NotchSettingsTests {
         #expect(!settings.notifyWhenNeedsYou)
     }
 
+    @Test func hapticFeedbackIsOnUntilTurnedOff() {
+        let settings = NotchSettings(defaults: defaults)
+        #expect(settings.hapticFeedback)
+        settings.hapticFeedback = false
+        #expect(!NotchSettings(defaults: defaults).hapticFeedback)
+    }
+
+    @Test func onlyAResetDoesNotTap() {
+        #expect(LimitsAlert.sessionNeedsYou(project: "a").tapsHaptic)
+        #expect(LimitsAlert.sessionFinished(project: "a", worked: 60).tapsHaptic)
+        #expect(LimitsAlert.threshold(window(.fiveHour, 96), threshold: 95).tapsHaptic)
+        #expect(!LimitsAlert.reset([.fiveHour]).tapsHaptic)
+    }
+
     @Test func savedChoicesCarryOver() {
         defaults.set("nearLimits", forKey: "claudeLimits.mode")
         defaults.set(70, forKey: "claudeLimits.firstThreshold")

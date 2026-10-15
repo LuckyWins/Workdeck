@@ -24,6 +24,7 @@ final class NotchSettings {
         static let notifyFinished = "claudeSessions.notifyFinished"
         static let finishedAfterMinutes = "claudeSessions.finishedAfterMinutes"
         static let notifyNeedsYou = "claudeSessions.notifyNeedsYou"
+        static let hapticFeedback = "notch.hapticFeedback"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -92,6 +93,11 @@ final class NotchSettings {
         didSet { defaults.set(notifyWhenNeedsYou, forKey: Keys.notifyNeedsYou) }
     }
 
+    /// Tap the trackpad when hover opens the notch and on alerts that ask for attention.
+    var hapticFeedback: Bool {
+        didSet { defaults.set(hapticFeedback, forKey: Keys.hapticFeedback) }
+    }
+
     var thresholds: [Int] {
         [firstThreshold, secondThreshold]
     }
@@ -111,6 +117,7 @@ final class NotchSettings {
         let minutes = defaults.object(forKey: Keys.finishedAfterMinutes) as? Int ?? 10
         finishedAfterMinutes = Self.finishedAfterOptions.contains(minutes) ? minutes : 10
         notifyWhenNeedsYou = defaults.bool(forKey: Keys.notifyNeedsYou)
+        hapticFeedback = defaults.object(forKey: Keys.hapticFeedback) as? Bool ?? true
     }
 
     /// 50–95 in steps of 5.

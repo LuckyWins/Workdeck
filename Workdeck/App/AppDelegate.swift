@@ -20,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // The demo always draws a notch, the virtual one on a screen without one (demo mode spec §2.3).
             presenter: NotchPresenter(screen: { [demo] in
                 NotchPresenter.targetScreen(notchless: demo.isActive ? .virtualNotch : settings.notchlessDisplay)
-            })
+            }, isHapticsEnabled: { settings.hapticFeedback })
         )
     }()
 

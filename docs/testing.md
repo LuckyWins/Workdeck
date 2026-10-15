@@ -154,7 +154,8 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 
 | # | Case | Steps | Expected |
 |---|------|-------|----------|
-| N1 | Settings moved | Open Settings; check the Notch section; change Show, the alert thresholds, the forecast and Keep Mac awake; relaunch Workdeck. | The Notch section sits after Closed-Lid Mode with Show, Without a notch (lid closed only), both alert thresholds, reset alert, forecast, finished and needs-you alerts and keep-awake; the Claude Code sections no longer have them. Every change shows at once in the notch (and `pmset -g assertions` for keep-awake) and survives the relaunch, as do the values chosen before this version. |
+| N1 | Settings moved | Open Settings; check the Notch section; change Show, the alert thresholds, the forecast and Keep Mac awake; relaunch Workdeck. | The Notch section sits after Closed-Lid Mode with Show, Without a notch (lid closed only), both alert thresholds, reset alert, forecast, finished and needs-you alerts, haptic feedback and keep-awake; the Claude Code sections no longer have them. Every change shows at once in the notch (and `pmset -g assertions` for keep-awake) and survives the relaunch, as do the values chosen before this version. |
+| N2 | Haptics | On a Force Touch trackpad: hover the compact notch until it opens; with a finger resting on the trackpad, let a needs-you alert come up (or run the demo); hover the open alert; turn off Settings → Notch → Haptic feedback and repeat. | A light tap when hover opens the notch, a stronger one when the alert comes up, nothing when hovering the open alert or on collapse; with the switch off, nothing taps. |
 
 ## Codex Checklist
 
