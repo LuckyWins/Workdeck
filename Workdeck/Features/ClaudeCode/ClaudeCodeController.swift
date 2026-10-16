@@ -197,7 +197,7 @@ final class ClaudeCodeController {
                         ? frame.sessions.contains { $0.agent == .codex }
                         : withSessions.contains(account.name),
                     agent: account.agent,
-                    detail: account.detail
+                    freeResets: account.freeResets
                 )
             },
             compactIndex: 0,

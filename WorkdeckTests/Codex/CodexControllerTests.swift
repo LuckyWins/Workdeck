@@ -42,7 +42,7 @@ struct CodexControllerTests {
         #expect(block.name == "codex")
         #expect(block.agent == .codex)
         #expect(block.plan == "Pro Lite")
-        #expect(block.detail == "3 free resets")
+        #expect(block.freeResets == 3)
         #expect(block.age == 120)
         #expect(block.refresh == .ready)
         let shown = try #require(presenter.shown.last)

@@ -110,7 +110,7 @@ final class CodexController: AgentSource {
                 // Without a Codex session its block is a dim line next to an agent at work.
                 isActive: !listed.isEmpty,
                 agent: .codex,
-                detail: current.resetCredits.flatMap { $0 > 0 ? "\($0) free reset\($0 == 1 ? "" : "s")" : nil }
+                freeResets: current.resetCredits
             )
         }
         return AgentNotchPart(

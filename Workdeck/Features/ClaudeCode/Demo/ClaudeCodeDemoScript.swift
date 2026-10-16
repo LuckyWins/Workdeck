@@ -7,8 +7,8 @@ nonisolated struct ClaudeCodeDemoAccount: Equatable, Sendable {
     var windows: [UsageWindow]
     var age: TimeInterval
     var agent: AgentKind = .claudeCode
-    /// A dim line under the bars, e.g. Codex's free resets.
-    var detail: String?
+    /// Codex's free resets, shown in its header.
+    var freeResets: Int?
 }
 
 /// What the notch shows at one moment of the demo.
@@ -136,7 +136,7 @@ nonisolated enum ClaudeCodeDemoScript {
             windows: [UsageWindow(kind: .sevenDay, usedPercent: 3 + elapsed / 30, resetsAt: demoStart.addingTimeInterval(5 * 86_400))],
             age: 5,
             agent: .codex,
-            detail: "3 free resets"
+            freeResets: 3
         )
         // Codex works in parallel on another project (Codex spec §3.5).
         if elapsed >= 12 {

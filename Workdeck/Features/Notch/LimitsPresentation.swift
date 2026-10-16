@@ -72,8 +72,8 @@ nonisolated struct AccountLimitsViewState: Equatable, Sendable, Identifiable {
     var isActive = true
     /// Whose limits these are; the mark shows while more than one agent is on.
     var agent: AgentKind = .claudeCode
-    /// A dim line under the bars, e.g. "3 free resets" for Codex.
-    var detail: String?
+    /// Free resets the account can still use; shown in its header after the plan.
+    var freeResets: Int?
 
     /// The agent is part of it: a Claude instance may be called "codex".
     var id: String { "\(agent.rawValue)/\(name)" }
@@ -156,6 +156,22 @@ nonisolated enum LimitsPresentation {
     /// "personal" when several accounts have blocks; a lone block is just "limits". The plan goes at the right.
     static func blockTitle(_ account: AccountLimitsViewState, isOnlyBlock: Bool) -> String {
         isOnlyBlock ? "limits" : account.name
+    }
+
+    /// The right side of a block's header: "Plus · ↺×2", the plan alone without free resets.
+    static func headerTrailing(_ account: AccountLimitsViewState) -> String? {
+        let resets = availableResets(account).map { "↺×\($0)" }
+        let parts = [account.plan, resets].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// The header's tooltip: "2 free resets", "1 free reset".
+    static func freeResetsHelp(_ account: AccountLimitsViewState) -> String? {
+        availableResets(account).map { "\($0) free reset\($0 == 1 ? "" : "s")" }
+    }
+
+    private static func availableResets(_ account: AccountLimitsViewState) -> Int? {
+        account.freeResets.flatMap { $0 > 0 ? $0 : nil }
     }
 
     /// The window rows of a block: Claude's missing 5-hour window has not started and keeps its row; a window Codex

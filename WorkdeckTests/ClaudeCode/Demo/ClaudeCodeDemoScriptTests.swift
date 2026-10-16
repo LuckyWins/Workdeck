@@ -120,6 +120,6 @@ struct ClaudeCodeDemoScriptTests {
         #expect(docs?.status == .working)
         #expect(session("demo-docs-site", at: 48)?.status == .idle)
         #expect(frame(0).accounts.last?.agent == .codex)
-        #expect(frame(0).accounts.last?.detail == "3 free resets")
+        #expect(frame(0).accounts.last?.freeResets == 3)
     }
 }

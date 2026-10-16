@@ -137,4 +137,31 @@ struct LimitsPresentationTests {
         #expect(state.fullBlocks.map(\.name) == ["main", "personal"])
         #expect(state.quietBlocks.isEmpty)
     }
+
+    @Test func headerTrailingAddsFreeResetsAfterThePlan() {
+        var account = AccountLimitsViewState(name: "codex", windows: [], plan: "Plus", agent: .codex)
+        account.freeResets = 2
+        #expect(LimitsPresentation.headerTrailing(account) == "Plus · ↺×2")
+        #expect(LimitsPresentation.freeResetsHelp(account) == "2 free resets")
+        account.freeResets = 1
+        #expect(LimitsPresentation.freeResetsHelp(account) == "1 free reset")
+        account.plan = nil
+        #expect(LimitsPresentation.headerTrailing(account) == "↺×1")
+    }
+
+    @Test func headerTrailingHidesZeroAndNegative() {
+        var account = AccountLimitsViewState(name: "codex", windows: [], plan: "Plus", agent: .codex)
+        for count in [0, -1] {
+            account.freeResets = count
+            #expect(LimitsPresentation.headerTrailing(account) == "Plus")
+            #expect(LimitsPresentation.freeResetsHelp(account) == nil)
+        }
+    }
+
+    @Test func headerTrailingWithoutResetsIsThePlan() {
+        var account = AccountLimitsViewState(name: "main", windows: [], plan: "Max 5x")
+        #expect(LimitsPresentation.headerTrailing(account) == "Max 5x")
+        account.plan = nil
+        #expect(LimitsPresentation.headerTrailing(account) == nil)
+    }
 }

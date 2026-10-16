@@ -309,7 +309,7 @@ struct LimitsExpandedView: View {
                 let blocks = model.state.limitBlocks
                 if model.state.collapsesOtherAccounts, blocks.count > 1 {
                     // The short view: one line per account, in the accounts' fixed order.
-                    accountsHeader(title: "limits", mark: nil, plan: nil, collapsed: true)
+                    accountsHeader(title: "limits", mark: nil, trailing: nil, help: nil, collapsed: true)
                     let width = blocks.map { $0.name.count }.max() ?? 0
                     ForEach(blocks) { account in
                         summaryRow(account, nameWidth: width)
@@ -320,10 +320,10 @@ struct LimitsExpandedView: View {
                     ForEach(full) { account in
                         let isFirst = account.id == full.first?.id
                         if blocks.count > 1, isFirst {
-                            accountsHeader(title: LimitsPresentation.blockTitle(account, isOnlyBlock: false), mark: model.state.showsAgentMarks ? account.agent : nil, plan: account.plan, collapsed: false)
+                            accountsHeader(title: LimitsPresentation.blockTitle(account, isOnlyBlock: false), mark: model.state.showsAgentMarks ? account.agent : nil, trailing: LimitsPresentation.headerTrailing(account), help: LimitsPresentation.freeResetsHelp(account), collapsed: false)
                                 .flashGlow(model.flash, color: ringFlash(for: account))
                         } else {
-                            TerminalHeader(title: LimitsPresentation.blockTitle(account, isOnlyBlock: blocks.count == 1), trailing: account.plan, mark: model.state.showsAgentMarks && blocks.count > 1 ? account.agent : nil)
+                            TerminalHeader(title: LimitsPresentation.blockTitle(account, isOnlyBlock: blocks.count == 1), trailing: LimitsPresentation.headerTrailing(account), mark: model.state.showsAgentMarks && blocks.count > 1 ? account.agent : nil, help: LimitsPresentation.freeResetsHelp(account))
                                 .flashGlow(model.flash, color: ringFlash(for: account))
                                 .padding(.top, isFirst ? 0 : 4)
                         }
@@ -337,11 +337,6 @@ struct LimitsExpandedView: View {
                         }
                         if account.age != nil || account.refresh != .hidden || account.isWaiting {
                             ageRow(account)
-                        }
-                        if let detail = account.detail {
-                            Text(detail)
-                                .foregroundStyle(Terminal.dim)
-                                .lineLimit(1)
                         }
                     }
                     // Accounts without sessions: one dim line each, with how old their figures are.
@@ -370,7 +365,7 @@ struct LimitsExpandedView: View {
     }
 
     /// The limits header with the control that switches between the short view and the full one.
-    private func accountsHeader(title: String, mark: AgentKind?, plan: String?, collapsed: Bool) -> some View {
+    private func accountsHeader(title: String, mark: AgentKind?, trailing: String?, help: String?, collapsed: Bool) -> some View {
         HStack(spacing: 4) {
             (Text("─ ") + (mark.map { $0.marked(title, size: 10) } ?? Text(title)))
                 .lineLimit(1)
@@ -378,10 +373,11 @@ struct LimitsExpandedView: View {
             Rectangle()
                 .fill(Terminal.faint)
                 .frame(height: 1)
-            if let plan {
-                Text(plan)
+            if let trailing {
+                Text(trailing)
                     .lineLimit(1)
                     .fixedSize()
+                    .help(help ?? "")
             }
             Button {
                 model.onToggleAccounts?()

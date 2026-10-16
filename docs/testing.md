@@ -163,7 +163,7 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 
 | # | Case | Steps | Expected |
 |---|------|-------|----------|
-| X1 | Limits without a session | Turn on Codex in the popover with no Codex session running. | A `codex` block (plan Pro Lite or yours, weekly bar, `N free resets`); Settings → Codex shows Installed and the version. |
+| X1 | Limits without a session | Turn on Codex in the popover with no Codex session running. | A `codex` block (plan Pro Lite or yours, weekly bar, `↺×N` after the plan in the header with the words in its tooltip); Settings → Codex shows Installed and the version. |
 | X2 | Limits after a turn | Run one Codex turn (CLI or VS Code). | The block's age resets to `updated just now` within a second or two of the turn ending. |
 | X3 | Both agents | Work in Claude Code with Codex on. | Blocks start with the Claude and Codex icons; session dots become the agents' icons; the compact notch shows the icon before the ring; a Codex alert starts with the Codex icon and opens nothing on click. |
 | X4 | Codex off | Turn Codex off. | The notch looks exactly as before Codex: no marks, no Codex block. |

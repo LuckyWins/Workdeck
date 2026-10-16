@@ -50,6 +50,8 @@ struct TerminalHeader: View {
     var trailing: String?
     /// The agent's mark before the title, while more than one agent is on.
     var mark: AgentKind?
+    /// The trailing text's tooltip, e.g. what Codex's "↺×2" means.
+    var help: String?
 
     var body: some View {
         HStack(spacing: 4) {
@@ -61,6 +63,7 @@ struct TerminalHeader: View {
                 .frame(height: 1)
             if let trailing {
                 Text(trailing)
+                    .help(help ?? "")
                 Text("─")
             }
         }
