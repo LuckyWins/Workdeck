@@ -132,11 +132,6 @@ nonisolated enum LimitsText {
         }
     }
 
-    /// The alert's title, after its agent's mark while more than one agent shows (Codex spec §3.1).
-    static func alertHeadline(_ alert: LimitsAlert, showsAccount: Bool = false, showsMark: Bool) -> String {
-        (showsMark ? "\(alert.agent.mark) " : "") + alertTitle(alert, showsAccount: showsAccount)
-    }
-
     /// Only a Claude limit alert opens the Chats window; a Codex one opens nothing (Codex spec §3.2).
     static func opensChats(_ alert: LimitsAlert) -> Bool {
         alertProject(alert) == nil && alert.agent == .claudeCode

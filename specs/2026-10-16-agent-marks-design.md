@@ -1,7 +1,7 @@
 # Workdeck — Clearer Agent Marks Design
 
 **Date:** 2026-10-16
-**Status:** Draft
+**Status:** Approved; implemented
 
 ## 1. Overview
 
@@ -26,8 +26,8 @@ This change draws the marks as two bold vector icons in the agents' colors, keep
 
 - **Claude Code:** eight even, bold rays (a heavier `✳`) in terracotta `#D97757`. Terracotta becomes Claude Code's agent color everywhere it is used (it was `.orange`), so the mark no longer matches the orange of the first threshold.
 - **Codex:** a filled circle with a `>_` prompt cut out of it, in `.mint` (unchanged).
-- Both are SwiftUI shapes sized to the text they sit in (about the cap height plus a little; 13 pt next to the 14 pt ring in the compact notch, 14 pt in a 13 pt session row). Where a mark sits inside a line of text it is an image inside the `Text`, so it wraps and truncates with it.
-- The text glyphs `✳` and `◎` go everywhere.
+- Both are SwiftUI shapes sized to the text they sit in (about the cap height plus a little: 13 pt next to the 14 pt ring in the compact notch, 12 pt in session rows and alerts, 10 pt in headers). Where a mark sits inside a line of text it is an image inside the `Text`, so it wraps and truncates with it.
+- The text glyphs `✳` and `◎` go from the notch, the recap and Statistics. The menu bar text (no notch screen) keeps them before the account letter, as today: it is plain template text, which cannot hold a colored icon.
 
 ## 3. Where Marks Show
 
@@ -38,7 +38,7 @@ Only while more than one agent is on, as today:
 - Session rows (§3.1).
 - Alerts: a single alert's headline and each line of an alert batch.
 - The recap card: the split line (`✳ Claude 10h 05m · ◎ Codex 4h 10m` becomes the icons with the same text), the longest stretch, and the Codex limits row.
-- The Statistics window: Longest, the limits rows, and the segments of the agent filter (`All · [Claude icon] Claude Code · [Codex icon] Codex`).
+- The Statistics window: Longest and the limits rows. The agent filter keeps its plain names: macOS draws only the text of a segmented control's segments (checked by rendering, 2026-10-16).
 
 ### 3.1 Session Rows
 

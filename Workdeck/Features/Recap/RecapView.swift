@@ -37,7 +37,8 @@ struct RecapView: View {
             Text("\(RecapText.number(recap.commands)) commands · \(RecapText.number(recap.agents)) agents")
                 .lineLimit(1)
             if let longest = recap.longest {
-                row("longest", "\(longestMark)\(longest.project) · \(RecapText.duration(longest.seconds))")
+                let value = "\(longest.project) · \(RecapText.duration(longest.seconds))"
+                row("longest", longestAgent.map { $0.marked(value, size: 12) } ?? Text(value))
             }
             if !recap.topProjects.isEmpty {
                 header("top projects")
@@ -73,26 +74,25 @@ struct RecapView: View {
         }
     }
 
-    /// "✳ Claude 10h 05m · ◎ Codex 4h 10m", marks in the agents' colors.
+    /// "Claude 10h 05m · Codex 4h 10m", each after its agent's icon.
     private var agentSplit: some View {
         RecapText.agentSplit(recap.agentSeconds).enumerated().reduce(Text("")) { line, item in
-            line + Text(item.offset > 0 ? " · " : "") + item.element.agent.marked(item.element.text)
+            line + Text(item.offset > 0 ? " · " : "") + item.element.agent.marked(item.element.text, size: 12)
         }
         .foregroundStyle(Terminal.dim)
         .lineLimit(1)
     }
 
     /// The longest stretch's agent, while two agents worked.
-    private var longestMark: String {
-        guard recap.showsAgentSplit, let agent = recap.longestAgent else { return "" }
-        return agent.mark + " "
+    private var longestAgent: AgentKind? {
+        recap.showsAgentSplit ? recap.longestAgent : nil
     }
 
     /// An account's name, with its agent's mark when accounts of two agents are listed.
     private func accountName(_ account: RecapAccountSummary) -> Text {
         let name = Text(account.name).foregroundStyle(.purple)
         guard Set(recap.accounts.map(\.agent)).count > 1 else { return name }
-        return Text(account.agent.mark + " ").foregroundStyle(account.agent.color) + name
+        return account.agent.markText(size: 12) + Text(" ") + name
     }
 
     private func button(_ title: String, action: @escaping () -> Void) -> some View {
@@ -114,10 +114,10 @@ struct RecapView: View {
         .padding(.top, 2)
     }
 
-    private func row(_ label: String, _ value: String) -> some View {
+    private func row(_ label: String, _ value: Text) -> some View {
         HStack(spacing: 0) {
             Text(label.padding(toLength: 10, withPad: " ", startingAt: 0)).foregroundStyle(Terminal.dim)
-            Text(value).lineLimit(1).truncationMode(.tail)
+            value.lineLimit(1).truncationMode(.tail)
         }
     }
 }

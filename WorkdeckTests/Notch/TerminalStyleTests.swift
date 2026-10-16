@@ -31,11 +31,17 @@ struct TerminalStyleTests {
         #expect(SessionsText.branch(isLast: true) == "└")
     }
 
-    @Test func compactNotchTextLabelsOnlyTheWeeklyWindow() {
-        #expect(LimitsPresentation.compactNotchText(pressing: window(.fiveHour, 42), hasData: true) == "42%")
-        #expect(LimitsPresentation.compactNotchText(pressing: window(.sevenDay, 91), hasData: true) == "7d 91%")
-        #expect(LimitsPresentation.compactNotchText(pressing: nil, hasData: true) == "0%")
-        #expect(LimitsPresentation.compactNotchText(pressing: nil, hasData: false) == "—")
+    @Test func compactTextFollowsTheFirstThreshold() {
+        let defaults = [80, 95]
+        #expect(LimitsPresentation.compactNotchText(pressing: window(.fiveHour, 42), hasData: true, thresholds: defaults) == "")
+        #expect(LimitsPresentation.compactNotchText(pressing: window(.sevenDay, 42), hasData: true, thresholds: defaults) == "7d")
+        #expect(LimitsPresentation.compactNotchText(pressing: window(.fiveHour, 84), hasData: true, thresholds: defaults) == "84%")
+        #expect(LimitsPresentation.compactNotchText(pressing: window(.sevenDay, 96), hasData: true, thresholds: defaults) == "7d 96%")
+        #expect(LimitsPresentation.compactNotchText(pressing: nil, hasData: true, thresholds: defaults) == "")
+        #expect(LimitsPresentation.compactNotchText(pressing: nil, hasData: false, thresholds: defaults) == "—")
+        // A lower first threshold brings the percent back with the orange ring.
+        #expect(LimitsPresentation.compactNotchText(pressing: window(.fiveHour, 62), hasData: true, thresholds: [60, 90]) == "62%")
+        #expect(LimitsPresentation.displayLevel(pressing: window(.fiveHour, 62), hasData: true, thresholds: [60, 90]) == .warning)
     }
 
     @Test func spinnerCyclesThroughBrailleFrames() {

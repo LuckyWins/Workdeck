@@ -53,7 +53,7 @@ struct TerminalHeader: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            (Text("─ ") + (mark.map { $0.marked(title) } ?? Text(title)))
+            (Text("─ ") + (mark.map { $0.marked(title, size: 10) } ?? Text(title)))
                 .lineLimit(1)
                 .fixedSize()
             Rectangle()

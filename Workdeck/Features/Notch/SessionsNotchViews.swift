@@ -125,15 +125,21 @@ struct SessionsList: View {
         let isHovered = hoveredID == row.id
         return VStack(alignment: .leading, spacing: 1) {
             HStack(spacing: 6) {
-                Text(state.showsAgentMarks ? row.agent.mark : (row.status == .idle ? "○" : "●"))
-                    .foregroundStyle(row.status.notchColor)
-                    .opacity(dotOpacity(row.status, at: date))
-                    .flashGlow(
-                        flash,
-                        color: flash?.projects.contains(row.projectName) == true ? flash?.dot : nil,
-                        blinks: flash?.dotBlinks == true,
-                        radius: 4
-                    )
+                Group {
+                    if state.showsAgentMarks {
+                        AgentIcon(agent: row.agent, size: 12)
+                    } else {
+                        Text(row.status == .idle ? "○" : "●")
+                            .foregroundStyle(row.status.notchColor)
+                    }
+                }
+                .opacity(Self.leadingOpacity(row.status, at: date, isAgentMark: state.showsAgentMarks, isFlashing: flash?.projects.contains(row.projectName) == true))
+                .flashGlow(
+                    flash,
+                    color: flash?.projects.contains(row.projectName) == true ? flash?.dot : nil,
+                    blinks: flash?.dotBlinks == true,
+                    radius: 4
+                )
                 Text(row.projectName)
                     .fontWeight(.semibold)
                     .lineLimit(1)
@@ -359,11 +365,17 @@ struct SessionsList: View {
     }
 
     /// Working sessions pulse, sessions waiting for you blink slowly, idle ones stay still.
-    private func dotOpacity(_ status: SessionStatus, at date: Date) -> Double {
-        switch status {
+    /// The leading mark's strength: the dot pulses while working and waiting; an agent's icon pulses while working,
+    /// stays full while it waits for you and dims while idle (agent marks spec §3.1). A flashing icon stays full: its
+    /// glow is drawn from it.
+    static func leadingOpacity(_ status: SessionStatus, at date: Date, isAgentMark: Bool, isFlashing: Bool = false) -> Double {
+        if isAgentMark, isFlashing {
+            return 1
+        }
+        return switch status {
         case .working, .compacting: TerminalPulse.opacity(at: date, period: 1.2, minimum: 0.4)
-        case .waiting: TerminalPulse.opacity(at: date, period: 2, minimum: 0.25)
-        case .idle: 1
+        case .waiting: isAgentMark ? 1 : TerminalPulse.opacity(at: date, period: 2, minimum: 0.25)
+        case .idle: isAgentMark ? 0.4 : 1
         }
     }
 }

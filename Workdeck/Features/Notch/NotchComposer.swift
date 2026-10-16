@@ -157,7 +157,8 @@ final class NotchComposer {
         let showsMarks = Set(shown.filter { ($0.isEnabled || $0.isDemo) && $0.hasSource }.flatMap { part in
             [part.agent] + part.accounts.map(\.agent) + part.sessions.map(\.agent)
         }).count > 1
-        let label: String? = showsMarks ? compact.agent.mark + (compact.compactLabel ?? "") : compact.compactLabel
+        // The menu bar text keeps its glyph; the notch draws the icon (agent marks spec §2).
+        let menuBarLabel: String? = showsMarks ? compact.agent.menuBarMark + (compact.compactLabel ?? "") : compact.compactLabel
         let block = compact.compactBlock
         let pressing = UsageFormatting.mostPressing((block?.windows ?? []).filter { $0.resetsAt > compact.now })
         let hasData = block?.age != nil
@@ -181,7 +182,7 @@ final class NotchComposer {
                 thresholds: thresholds,
                 hasSessions: isActive || (settings.mode == .whenActive && isLingering) || keepsVisible,
                 isPeeking: isPeeking,
-                label: label
+                label: menuBarLabel
             )
         }
         var display: LimitsDisplay
@@ -234,7 +235,8 @@ final class NotchComposer {
             isPeeking: isDemo ? false : isPeeking,
             sessions: sessions,
             accounts: accounts,
-            compactLabel: label,
+            compactLabel: compact.compactLabel,
+            compactAgent: showsMarks ? compact.agent : nil,
             collapsesOtherAccounts: settings.collapsesOtherAccounts,
             showsAgentMarks: showsMarks
         )

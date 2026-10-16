@@ -244,7 +244,15 @@ struct NotchComposerTests {
         let shown = try #require(presenter.shown.last)
         #expect(shown.showsAgentMarks)
         #expect(shown.sessions.showsAgentMarks)
-        #expect(shown.compactLabel == "◎")
+        #expect(shown.compactAgent == .codex)
+        #expect(shown.compactLabel == nil)
+    }
+
+    @Test func oneAgentDrawsNoCompactIcon() throws {
+        let composer = makeComposer()
+        add(part(.claudeCode, sessions: [session("a", at: 0)]), to: composer)
+        composer.refresh()
+        #expect(try #require(presenter.shown.last).compactAgent == nil)
     }
 
     @Test func oneEnabledAgentShowsNoMarks() throws {
@@ -281,7 +289,9 @@ struct NotchComposerTests {
         add(claude, to: composer)
         add(part(.codex, account: "codex"), to: composer)
         composer.refresh()
-        #expect(try #require(presenter.shown.last).compactLabel == "✳p")
+        let shown = try #require(presenter.shown.last)
+        #expect(shown.compactAgent == .claudeCode)
+        #expect(shown.compactLabel == "p")
     }
 
     @Test func theDemoShowsOnlyItself() throws {

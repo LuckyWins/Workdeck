@@ -86,17 +86,32 @@ struct LimitsCompactLeading: View {
     var body: some View {
         if model.state.showsLimits {
             HStack(spacing: 6) {
+                if let agent = model.state.compactAgent {
+                    AgentIcon(agent: agent, size: 13)
+                }
                 UsageRing(
                     percent: model.state.pressing?.usedPercent ?? (model.state.hasData ? 0 : nil),
                     color: level(of: model.state).notchColor,
                     flash: model.flash
                 )
                 .frame(width: 14, height: 14)
-                Text((model.state.compactLabel.map { "\($0) " } ?? "") + LimitsPresentation.compactNotchText(pressing: model.state.pressing, hasData: model.state.hasData))
-                    .font(Terminal.font(12, weight: .semibold))
-                    .foregroundStyle(level(of: model.state).compactTextColor)
-                    .contentTransition(.numericText(value: model.state.pressing?.usedPercent ?? 0))
-                    .animation(.snappy, value: model.state.pressing?.usedPercent)
+                if let label = model.state.compactLabel {
+                    // An extra account's letter in the purple of its session tags (agent marks spec §4).
+                    Text(label.uppercased())
+                        .font(Terminal.font(9, weight: .bold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 3)
+                        .padding(.vertical, 1)
+                        .background(.purple, in: RoundedRectangle(cornerRadius: 3))
+                }
+                let text = LimitsPresentation.compactNotchText(pressing: model.state.pressing, hasData: model.state.hasData, thresholds: model.state.thresholds)
+                if !text.isEmpty {
+                    Text(text)
+                        .font(Terminal.font(12, weight: .semibold))
+                        .foregroundStyle(level(of: model.state).compactTextColor)
+                        .contentTransition(.numericText(value: model.state.pressing?.usedPercent ?? 0))
+                        .animation(.snappy, value: model.state.pressing?.usedPercent)
+                }
             }
         }
     }
@@ -173,12 +188,24 @@ struct LimitsExpandedView: View {
         return model.recap != nil ? .indigo : nil
     }
 
+    /// An alert's title, after its agent's icon while more than one agent shows.
+    private func headline(_ alert: LimitsAlert) -> Text {
+        let title = LimitsText.alertTitle(alert, showsAccount: model.state.showsClaudeAccounts)
+        return model.state.showsAgentMarks ? alert.agent.marked(title, size: 12) : Text(title)
+    }
+
+    /// A line of an alert batch, after its agent's icon while more than one agent shows.
+    private func batchLine(_ alert: LimitsAlert) -> Text {
+        let line = LimitsText.batchLine(alert, now: model.state.now, showsAccount: model.state.showsClaudeAccounts)
+        return model.state.showsAgentMarks ? alert.agent.marked(line, size: 12) : Text(line)
+    }
+
     private func alertView(_ alert: LimitsAlert) -> some View {
         openable(alert, id: "single") {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     AlertBadge(symbol: LimitsText.alertSymbol(alert), color: flashColor(alert))
-                    Text(LimitsText.alertHeadline(alert, showsAccount: model.state.showsClaudeAccounts, showsMark: model.state.showsAgentMarks))
+                    headline(alert)
                         .fontWeight(.semibold)
                     Spacer(minLength: 6)
                     if hoveredAlert == "single", let hint = clickTarget(alert)?.hint {
@@ -249,7 +276,7 @@ struct LimitsExpandedView: View {
                     HStack(spacing: 6) {
                         Text(LimitsText.alertSymbol(alert))
                             .foregroundStyle(flashColor(alert).color)
-                        Text((model.state.showsAgentMarks ? "\(alert.agent.mark) " : "") + LimitsText.batchLine(alert, now: model.state.now, showsAccount: model.state.showsClaudeAccounts))
+                        batchLine(alert)
                             .lineLimit(1)
                             .truncationMode(.tail)
                         Spacer(minLength: 6)
@@ -283,7 +310,7 @@ struct LimitsExpandedView: View {
                 if model.state.collapsesOtherAccounts, blocks.count > 1 {
                     // The short view: one line per account, in the accounts' fixed order.
                     accountsHeader(title: "limits", mark: nil, plan: nil, collapsed: true)
-                    let width = blocks.map { LimitsPresentation.displayName($0, showsMark: model.state.showsAgentMarks).count }.max() ?? 0
+                    let width = blocks.map { $0.name.count }.max() ?? 0
                     ForEach(blocks) { account in
                         summaryRow(account, nameWidth: width)
                             .flashGlow(model.flash, color: ringFlash(for: account))
@@ -320,7 +347,7 @@ struct LimitsExpandedView: View {
                     // Accounts without sessions: one dim line each, with how old their figures are.
                     let quiet = model.state.quietBlocks
                     if !quiet.isEmpty {
-                        let width = quiet.map { LimitsPresentation.displayName($0, showsMark: model.state.showsAgentMarks).count }.max() ?? 0
+                        let width = quiet.map { $0.name.count }.max() ?? 0
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(quiet) { account in
                                 summaryRow(account, nameWidth: width, showsAge: true)
@@ -345,7 +372,7 @@ struct LimitsExpandedView: View {
     /// The limits header with the control that switches between the short view and the full one.
     private func accountsHeader(title: String, mark: AgentKind?, plan: String?, collapsed: Bool) -> some View {
         HStack(spacing: 4) {
-            (Text("─ ") + (mark.map { $0.marked(title) } ?? Text(title)))
+            (Text("─ ") + (mark.map { $0.marked(title, size: 10) } ?? Text(title)))
                 .lineLimit(1)
                 .fixedSize()
             Rectangle()
@@ -385,8 +412,8 @@ struct LimitsExpandedView: View {
         let windows = LimitsPresentation.summaryWindows(account, now: model.state.now)
         return HStack(spacing: 6) {
             // The mark in its color; the name padded so the figures line up.
-            let name = LimitsPresentation.displayName(account, showsMark: model.state.showsAgentMarks).padding(toLength: nameWidth, withPad: " ", startingAt: 0)
-            model.state.showsAgentMarks ? Text(account.agent.mark).foregroundStyle(account.agent.color) + Text(name.dropFirst(account.agent.mark.count)) : Text(name)
+            let name = Text(account.name.padding(toLength: nameWidth, withPad: " ", startingAt: 0))
+            model.state.showsAgentMarks ? account.agent.markText(size: 12) + Text(" ") + name : name
             if windows.isEmpty {
                 Text(account.hasData ? "5h 0%" : "—")
                     .foregroundStyle(Terminal.dim)

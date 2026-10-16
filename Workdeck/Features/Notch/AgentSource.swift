@@ -6,8 +6,9 @@ nonisolated enum AgentKind: String, CaseIterable, Sendable {
     case claudeCode
     case codex
 
-    /// Starts every block, session row and alert while more than one agent is on.
-    var mark: String {
+    /// The menu bar text's mark (no notch screen): plain template text cannot hold the colored icon (agent marks
+    /// spec §2).
+    var menuBarMark: String {
         switch self {
         case .claudeCode: "✳"
         case .codex: "◎"
@@ -34,15 +35,13 @@ extension AgentKind {
     /// The mark's color in block headers and short lines.
     var color: Color {
         switch self {
-        case .claudeCode: .orange
+        case .claudeCode: Self.claudeTerracotta
         case .codex: .mint
         }
     }
 
-    /// "✳ main": the mark in its color, then the name.
-    func marked(_ name: String) -> Text {
-        Text(mark).foregroundStyle(color) + Text(" \(name)")
-    }
+    /// Claude Code's color: terracotta, so its mark stays apart from the orange of the first threshold.
+    static let claudeTerracotta = Color(red: 0xD9 / 255, green: 0x77 / 255, blue: 0x57 / 255)
 }
 
 /// What one agent tool shows in the notch right now (Codex spec §4).

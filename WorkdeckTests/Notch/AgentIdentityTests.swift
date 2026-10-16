@@ -13,12 +13,11 @@ struct AgentIdentityTests {
         #expect(LimitsAlert.sessionNeedsYou(project: "a").agent == .claudeCode)
     }
 
-    @Test func aCodexAlertNamesNoAccountButMayCarryAMark() {
+    @Test func alertHeadlinesCarryNoGlyph() {
         let codex = LimitsAlert.threshold(window(.sevenDay, 82), threshold: 80).forAccount("codex").forAgent(.codex)
-        #expect(LimitsText.alertHeadline(codex, showsAccount: true, showsMark: false) == "Weekly limit at 80%")
-        #expect(LimitsText.alertHeadline(codex, showsAccount: true, showsMark: true) == "◎ Weekly limit at 80%")
+        #expect(LimitsText.alertTitle(codex, showsAccount: true) == "Weekly limit at 80%")
         let personal = LimitsAlert.threshold(window(.fiveHour, 82), threshold: 80).forAccount("personal")
-        #expect(LimitsText.alertHeadline(personal, showsAccount: true, showsMark: true) == "✳ 5-hour limit at 80% · personal")
+        #expect(LimitsText.alertTitle(personal, showsAccount: true) == "5-hour limit at 80% · personal")
     }
 
     @Test func codexAlertsAreNotClickableForChats() {
@@ -28,14 +27,11 @@ struct AgentIdentityTests {
         #expect(!LimitsText.opensChats(.sessionNeedsYou(project: "a")))
     }
 
-    @Test func blockNamesTakeTheMarkWhenShown() {
+    @Test func blockNamesCarryNoGlyph() {
         let codex = AccountLimitsViewState(name: "codex", windows: [], age: 60, agent: .codex)
         let main = AccountLimitsViewState(name: "main", windows: [], age: 60)
-        #expect(LimitsPresentation.displayName(codex, showsMark: true) == "◎ codex")
-        #expect(LimitsPresentation.displayName(main, showsMark: true) == "✳ main")
-        #expect(LimitsPresentation.displayName(main, showsMark: false) == "main")
-        #expect(LimitsPresentation.blockTitle(codex, isOnlyBlock: false, showsMark: true) == "◎ codex")
-        #expect(LimitsPresentation.blockTitle(main, isOnlyBlock: true, showsMark: false) == "limits")
+        #expect(LimitsPresentation.blockTitle(codex, isOnlyBlock: false) == "codex")
+        #expect(LimitsPresentation.blockTitle(main, isOnlyBlock: true) == "limits")
     }
 
     @Test func codexShowsOnlyTheWindowsItHas() {

@@ -103,8 +103,10 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
     var sessions = SessionsViewState.none
     /// One block per account with data; the main account alone when none has data.
     var accounts: [AccountLimitsViewState] = []
-    /// The compact account's first letter before its percent; `nil` for the main account.
+    /// The compact account's first letter, drawn in a badge; `nil` for the main account.
     var compactLabel: String?
+    /// The agent whose icon starts the compact notch, while more than one agent is on.
+    var compactAgent: AgentKind?
     /// The short view: one line per account instead of full blocks.
     var collapsesOtherAccounts = false
     /// More than one agent is on: blocks, sessions and alerts carry their agent's mark (Codex spec §3.1).
@@ -152,8 +154,8 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
 
 nonisolated enum LimitsPresentation {
     /// "personal" when several accounts have blocks; a lone block is just "limits". The plan goes at the right.
-    static func blockTitle(_ account: AccountLimitsViewState, isOnlyBlock: Bool, showsMark: Bool = false) -> String {
-        isOnlyBlock ? "limits" : displayName(account, showsMark: showsMark)
+    static func blockTitle(_ account: AccountLimitsViewState, isOnlyBlock: Bool) -> String {
+        isOnlyBlock ? "limits" : account.name
     }
 
     /// The window rows of a block: Claude's missing 5-hour window has not started and keeps its row; a window Codex
@@ -161,11 +163,6 @@ nonisolated enum LimitsPresentation {
     static func shownKinds(_ account: AccountLimitsViewState) -> [UsageWindowKind] {
         guard account.agent == .codex else { return UsageWindowKind.allCases }
         return UsageWindowKind.allCases.filter { kind in account.windows.contains { $0.kind == kind } }
-    }
-
-    /// "main", or "✳ main" while more than one agent is on.
-    static func displayName(_ account: AccountLimitsViewState, showsMark: Bool) -> String {
-        showsMark ? "\(account.agent.mark) \(account.name)" : account.name
     }
 
     /// A collapsed account's line: its running windows, the most used first.
@@ -227,10 +224,14 @@ nonisolated enum LimitsPresentation {
         return !(mode == .whenActive && (level == .noData || level == .normal))
     }
 
-    /// Next to the ring in the compact notch: "42%", labeled only for the weekly window ("7d 91%"),
-    /// since the 5-hour window is the usual one.
-    static func compactNotchText(pressing: UsageWindow?, hasData: Bool) -> String {
-        guard let pressing else { return hasData ? "0%" : "—" }
+    /// Next to the ring in the compact notch (agent marks spec §4): until the first threshold the ring alone tells,
+    /// so nothing for the 5-hour window and only the label of another ("7d"); from then on the percent, labeled only
+    /// for a window other than the usual 5-hour one ("42%", "7d 91%").
+    static func compactNotchText(pressing: UsageWindow?, hasData: Bool, thresholds: [Int]) -> String {
+        guard let pressing else { return hasData ? "" : "—" }
+        if level(of: pressing, thresholds: thresholds) == .normal {
+            return pressing.kind == .fiveHour ? "" : pressing.kind.shortLabel
+        }
         let percent = UsageFormatting.percentText(pressing.usedPercent)
         return pressing.kind == .fiveHour ? percent : "\(pressing.kind.shortLabel) \(percent)"
     }

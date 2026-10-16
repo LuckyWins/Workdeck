@@ -333,7 +333,8 @@ struct StatisticsContent: View {
             // The longest stretch is kept one per day, not per project.
             if filter == nil, let longest = summary.longest {
                 Divider()
-                row("Longest") { Text("\(summary.showsAgentSplit ? (summary.longestAgent?.mark ?? "") + " " : "")\(longest.project) · \(RecapText.duration(longest.seconds))") }
+                let text = "\(longest.project) · \(RecapText.duration(longest.seconds))"
+                row("Longest") { summary.showsAgentSplit ? (summary.longestAgent.map { $0.marked(text, size: 11) } ?? Text(text)) : Text(text) }
             }
         }
     }
@@ -344,7 +345,8 @@ struct StatisticsContent: View {
                 if index > 0 {
                     Divider()
                 }
-                row((Set(summary.accounts.map(\.agent)).count > 1 ? account.agent.mark + " " : "") + account.name, color: .purple) {
+                let name = Text(account.name).foregroundStyle(.purple)
+                row(Set(summary.accounts.map(\.agent)).count > 1 ? account.agent.markText(size: 11) + Text(" ") + name : name) {
                     HStack(spacing: 6) {
                         if account.hasFiveHour {
                             Text("5h hit \(account.hits)×").foregroundStyle(.secondary)
@@ -413,8 +415,12 @@ struct StatisticsContent: View {
 
     /// A compact list row: the title on the left, its value on the right.
     private func row<Value: View>(_ title: String, color: Color = .primary, @ViewBuilder value: () -> Value) -> some View {
+        row(Text(title).foregroundStyle(color), value: value)
+    }
+
+    private func row<Value: View>(_ title: Text, @ViewBuilder value: () -> Value) -> some View {
         HStack {
-            Text(title).foregroundStyle(color)
+            title
             Spacer(minLength: 12)
             value().monospacedDigit()
         }
