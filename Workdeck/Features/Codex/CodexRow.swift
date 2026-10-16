@@ -5,10 +5,10 @@ struct CodexRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "chevron.left.forwardslash.chevron.right")
-                .font(.title3)
-                .foregroundStyle(.secondary)
+            AgentIcon(agent: .codex, size: 18)
                 .frame(width: 24)
+                // The row's title already names the agent.
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Codex")

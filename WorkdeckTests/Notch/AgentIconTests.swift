@@ -8,7 +8,33 @@ struct AgentIconTests {
     @Test func claudeIsTerracotta() {
         #expect(AgentKind.claudeCode.color == AgentKind.claudeTerracotta)
         #expect(AgentKind.claudeTerracotta == Color(red: 0xD9 / 255, green: 0x77 / 255, blue: 0x57 / 255))
-        #expect(AgentKind.codex.color == .mint)
+    }
+
+    @Test func codexIsMintAndDarkerOnLight() throws {
+        func resolved(_ color: NSColor, _ name: NSAppearance.Name) throws -> NSColor {
+            var result: NSColor?
+            try #require(NSAppearance(named: name)).performAsCurrentDrawingAppearance {
+                result = color.usingColorSpace(.sRGB)
+            }
+            return try #require(result)
+        }
+        let codex = NSColor(AgentKind.codex.color)
+        // Dark (the notch is always dark): the system mint. Light: darker than the system's light mint, so it stands
+        // out on a light popover.
+        let dark = try resolved(codex, .darkAqua)
+        let systemDark = try resolved(.systemMint, .darkAqua)
+        #expect(abs(dark.greenComponent - systemDark.greenComponent) < 0.02)
+        let light = try resolved(codex, .aqua)
+        let systemLight = try resolved(.systemMint, .aqua)
+        #expect(light.greenComponent < systemLight.greenComponent - 0.1)
+    }
+
+    @Test func codexMarkHasARealHoleForItsPrompt() {
+        let rect = CGRect(x: 0, y: 0, width: 24, height: 24)
+        let path = CodexMarkShape().path(in: rect)
+        #expect(path.contains(CGPoint(x: 6, y: 6)))
+        #expect(!path.contains(CGPoint(x: 11, y: 12)))
+        #expect(!path.contains(CGPoint(x: 14.5, y: 15.5)))
     }
 
     @Test func theMenuBarKeepsItsGlyphs() {

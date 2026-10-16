@@ -172,6 +172,7 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | X9 | Running sessions | Connect the hooks while a Codex session runs. | That session does not appear until it restarts; nothing else changes. |
 | X10 | Disconnect | Settings → Codex → Disconnect…; confirm. | Only Workdeck's entries leave `hooks.json`; other hooks stay; Codex sessions disappear from the notch. |
 | X11 | Agent icons | Turn on both agents; work in one session of each; let a limit cross the first threshold (or set it lower); open Statistics with both agents' weeks. | Blocks, session rows, alerts, the recap and Statistics show the Claude rays (terracotta) and the Codex circle (mint); a working session's icon pulses, a waiting one stays full, an idle one is dim; the compact notch shows the icon, the ring and a `P` badge for an extra account, and the percent only from the orange ring on (`7d` alone below it for the weekly window); the menu bar text (no notch screen) keeps `✳`/`◎`. |
+| X12 | Agent icons outside the notch | Open the popover and Settings in light and dark appearance. | The Claude Code and Codex rows start with the terracotta rays and the mint circle; the Claude Code · Limits, Sessions and Instances headers show the white rays on terracotta, Codex the white circle with its `>_` cut out on mint (darker mint in light appearance); other rows and sections unchanged. |
 
 ## Virtual Notch Checklist
 

@@ -33,7 +33,7 @@ struct CodexSettingsSection: View {
                     .foregroundStyle(.secondary)
             }
         } header: {
-            SettingsHeader("Codex", symbol: "chevron.left.forwardslash.chevron.right", color: .mint)
+            SettingsHeader("Codex", agent: .codex)
         } footer: {
             Text("Reads Codex's plan limits from its session files in ~/.codex/sessions (only the limits, never prompts or code) and asks the Codex CLI (codex app-server) when you open the popover. Workdeck reads no Codex credentials. Session hooks add `workdeck-hook --agent codex` to ~/.codex/hooks.json (a diff first, then a backup) so the notch lists Codex sessions and agents; prompts, answers and command output are never stored. Sessions already running appear once restarted.")
                 .foregroundStyle(.secondary)

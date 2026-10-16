@@ -18,7 +18,7 @@ Agreed on 2026-10-16, from a survey of other agent companions (see the links in 
 7. ~~**Notch haptics.**~~ Done. A Force Touch tap when hover opens the notch and on needs-you, threshold and finished alerts; a switch in Settings → Notch. Spec: `specs/2026-10-16-notch-haptics-design.md`.
 8. ~~**Codex sessions as full as Claude's.**~~ Done. Spec: `specs/2026-10-16-codex-sessions-full-design.md`.
 9. ~~**Clearer agent marks in the notch.**~~ Done. Spec: `specs/2026-10-16-agent-marks-design.md`.
-   - **Agent icons outside the notch.** The Claude Code and Codex rows of the menu bar popover and their Settings sections could use the same icons instead of SF Symbols.
+   - ~~**Agent icons outside the notch.**~~ Done. Spec: `specs/2026-10-17-agent-icons-outside-notch-design.md`.
 10. **Activity in Statistics.** Two views from other companions: a 24-hour strip per day with the projects of an hour on hover ([Notch-Pilot](https://github.com/devmegablaster/Notch-Pilot)), and a GitHub-style grid of days with streaks and active-day counts ([limitter](https://github.com/admnov38/limitter), 21 weeks). Both can come from `recap.json`, which keeps twelve weeks of days but no hours today: the strip needs coding time per hour.
 11. **Resource measurements.** A `make resources` script that samples the running app's CPU, memory, footprint and leaks and times `workdeck-hook` and `workdeck-statusline`; run it in a few states and add a Resource use section to the README, as [hyderay/notch](https://github.com/hyderay/notch) does.
 

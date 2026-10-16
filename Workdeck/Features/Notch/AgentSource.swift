@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 
@@ -36,11 +37,16 @@ extension AgentKind {
     var color: Color {
         switch self {
         case .claudeCode: Self.claudeTerracotta
-        case .codex: .mint
+        case .codex: Self.codexMint
         }
     }
 
     /// Claude Code's color: terracotta, so its mark stays apart from the orange of the first threshold.
+    /// Codex's color: the system mint, a darker mint in light appearance so it stands out on a light popover.
+    static let codexMint = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .systemMint : NSColor(red: 0, green: 0.6, blue: 0.56, alpha: 1)
+    })
+
     static let claudeTerracotta = Color(red: 0xD9 / 255, green: 0x77 / 255, blue: 0x57 / 255)
 }
 

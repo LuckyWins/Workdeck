@@ -28,7 +28,7 @@ struct ClaudeLimitsSettingsSection: View {
                     .foregroundStyle(controller.pollerStatus.isProblem ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
             }
         } header: {
-            SettingsHeader("Claude Code · Limits", symbol: "gauge.with.dots.needle.50percent", color: .orange)
+            SettingsHeader("Claude Code · Limits", agent: .claudeCode)
         } footer: {
             VStack(alignment: .leading, spacing: 6) {
                 Text(footer)

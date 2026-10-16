@@ -35,6 +35,18 @@ nonisolated struct CodexPromptShape: Shape {
     }
 }
 
+/// Codex's mark: a filled circle with its `>_` prompt cut out of the path itself, so the hole shows whatever is
+/// behind it everywhere (a flattened Settings header, a template image, the notch).
+nonisolated struct CodexMarkShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let side = min(rect.width, rect.height)
+        let square = CGRect(x: rect.midX - side / 2, y: rect.midY - side / 2, width: side, height: side)
+        let prompt = CodexPromptShape().path(in: square)
+            .strokedPath(StrokeStyle(lineWidth: side * 0.1, lineCap: .round, lineJoin: .round))
+        return Path(ellipseIn: square).subtracting(prompt)
+    }
+}
+
 /// An agent's mark in its color, sized to the text beside it (agent marks spec §2).
 struct AgentIcon: View {
     let agent: AgentKind
@@ -47,7 +59,7 @@ struct AgentIcon: View {
             .accessibilityLabel(agent.name)
     }
 
-    /// The shape alone in the current foreground style; Codex's prompt is transparent.
+    /// The shape alone in the current foreground style; Codex's prompt is a hole in its circle.
     @ViewBuilder
     static func glyph(_ agent: AgentKind, size: CGFloat) -> some View {
         switch agent {
@@ -56,13 +68,7 @@ struct AgentIcon: View {
                 .stroke(style: StrokeStyle(lineWidth: size * 0.13, lineCap: .round))
                 .padding(size * 0.07)
         case .codex:
-            ZStack {
-                Circle()
-                CodexPromptShape()
-                    .stroke(style: StrokeStyle(lineWidth: size * 0.1, lineCap: .round, lineJoin: .round))
-                    .blendMode(.destinationOut)
-            }
-            .compositingGroup()
+            CodexMarkShape()
         }
     }
 }

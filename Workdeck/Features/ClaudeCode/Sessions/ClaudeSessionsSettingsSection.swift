@@ -17,7 +17,7 @@ struct ClaudeSessionsSettingsSection: View {
                 SettingsChangeReview(review: review, onCancel: controller.cancelHooksReview, onConfirm: controller.confirmHooksReview)
             }
         } header: {
-            SettingsHeader("Claude Code · Sessions", symbol: "terminal.fill", color: .green)
+            SettingsHeader("Claude Code · Sessions", agent: .claudeCode)
         } footer: {
             Text(footer)
                 .foregroundStyle(controller.hooksError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
