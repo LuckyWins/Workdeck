@@ -157,6 +157,25 @@ struct CodexLimitsSourceTests {
         source.stop()
     }
 
+    @Test(.timeLimit(.minutes(1)))
+    func aFileAppendedWithoutAnEventIsReadOnTheTick() async throws {
+        let url = try writeSession(3, at: "2026-10-05T11:00:00.000Z")
+        let source = CodexLimitsSource(root: root, watcher: watcher, fetcher: FakeFetcher(.failed), clock: { [now] in now.value }, tickInterval: .milliseconds(20))
+        source.start(asks: false)
+        #expect(source.limits?.windows.first?.usedPercent == 3)
+        // Codex keeps its session file open: FSEvents reports no event for an append, so the watcher stays quiet.
+        let handle = try FileHandle(forWritingTo: url)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data((CodexRateLimitsTests.line(primary: (7, 10080, 1_792_581_359), at: "2026-10-05T11:30:00.000Z") + "\n").utf8))
+        try handle.close()
+        let deadline = Date().addingTimeInterval(5)
+        while source.limits?.windows.first?.usedPercent != 7, Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(source.limits?.windows.first?.usedPercent == 7)
+        source.stop()
+    }
+
     @Test func theSameFiguresAgainDoNotCountAsAChange() async {
         let first = CodexLimits(windows: [window(.sevenDay, 4)], plan: "prolite", resetCredits: 3, capturedAt: fixedNow)
         let (source, fetcher) = makeSource(.limits(first, version: nil))

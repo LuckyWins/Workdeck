@@ -4,7 +4,7 @@ Workdeck shows [Codex](https://developers.openai.com/codex)'s plan limits in the
 
 ## Limits
 
-- Codex writes its plan limits into its session files (`~/.codex/sessions/…/rollout-*.jsonl`) after every turn. Workdeck watches that folder and reads only the limits from those lines: never prompts, answers or code.
+- Codex writes its plan limits into its session files (`~/.codex/sessions/…/rollout-*.jsonl`) after every turn. Workdeck watches that folder (new files at once, the files being written about once a minute) and reads only the limits from those lines: never prompts, answers or code.
 - When you open the popover (at most once a minute), at launch and from ↻ in the expanded notch, Workdeck asks the Codex CLI itself (`codex app-server`, the same source as Codex's `/status`). Codex answers with its own sign-in; Workdeck reads no Codex credentials and makes no network call of its own. This also brings how many free limit resets you have left.
 - The notch shows a `codex` block with your plan, the weekly window (and the 5-hour one on plans that have it), a forecast, and the free resets. Alerts at the thresholds of Settings → Notch start with the Codex icon while Claude Code is on too; clicking one opens nothing.
 - With both Claude Code and Codex on, every block, session and alert starts with its agent's icon: Claude Code's eight terracotta rays, Codex's mint circle with `>_`. In a session row the icon shows the status as the dot did: it pulses while the session works and dims while it is idle. The compact notch follows your latest session.

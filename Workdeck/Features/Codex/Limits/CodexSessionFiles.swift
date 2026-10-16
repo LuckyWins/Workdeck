@@ -1,3 +1,4 @@
+import OSLog
 import CoreServices
 import Foundation
 
@@ -28,13 +29,18 @@ nonisolated enum CodexSessionFiles {
 
     /// Session files from the most recently modified, at most `limit`.
     static func recent(in root: URL, limit: Int) -> [URL] {
+        recentlyModified(in: root, limit: limit).map(\.url)
+    }
+
+    /// Session files with their modification dates, the most recent first, at most `limit`.
+    static func recentlyModified(in root: URL, limit: Int) -> [(url: URL, date: Date)] {
         guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.contentModificationDateKey]) else { return [] }
         let resolvedRoot = root.resolvingSymlinksInPath().path
         var files: [(url: URL, date: Date)] = []
         for case let url as URL in enumerator where isSessionFile(url, resolvedRoot: resolvedRoot) {
             files.append((url, (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast))
         }
-        return files.sorted { $0.date > $1.date }.prefix(limit).map(\.url)
+        return Array(files.sorted { $0.date > $1.date }.prefix(limit))
     }
 
     /// The limits of the most recent session files that have any: a session that just started has none yet.
@@ -85,11 +91,13 @@ final class FSEventsSessionsWatcher: CodexSessionsWatching {
         guard FileManager.default.fileExists(atPath: root.path) else { return false }
         self.onChange = onChange
         var context = FSEventStreamContext(version: 0, info: Unmanaged.passUnretained(self).toOpaque(), retain: nil, release: nil, copyDescription: nil)
-        let callback: FSEventStreamCallback = { _, info, count, paths, _, _ in
+        let callback: FSEventStreamCallback = { _, info, count, paths, flags, _ in
             guard let info else { return }
             let watcher = Unmanaged<FSEventsSessionsWatcher>.fromOpaque(info).takeUnretainedValue()
             let array = unsafeBitCast(paths, to: NSArray.self)
             let urls = (0..<count).compactMap { (array[$0] as? String).map { URL(filePath: $0) } }
+            let allFlags = (0..<count).reduce(UInt32(0)) { $0 | flags[$1] }
+            WorkdeckLog.codexLimits.debug("FSEvents: \(count, privacy: .public) paths, flags 0x\(String(allFlags, radix: 16), privacy: .public)")
             MainActor.assumeIsolated { watcher.onChange?(urls) }
         }
         let flags = FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagNoDefer)
