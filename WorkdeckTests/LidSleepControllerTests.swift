@@ -278,6 +278,35 @@ struct LidSleepControllerTests {
         #expect(helper.sleepDisabled)
     }
 
+    @Test func aHelperStillStartingAtLaunchIsRetried() async {
+        // The new build replaced the helper: the first version check fails, the reinstalled helper is not up yet.
+        settings.closedLidModeWanted = true
+        helper.versionErrors = [HelperClientError.connectionFailed("replaced")]
+        helper.setFailures = 1
+        let controller = makeController()
+        await controller.refresh()
+        #expect(controller.isActive)
+        #expect(helper.sleepDisabled)
+    }
+
+    @Test func aFailedReadAtLaunchStillResumes() async {
+        settings.closedLidModeWanted = true
+        helper.readFailures = 1
+        let controller = makeController()
+        await controller.refresh()
+        #expect(controller.isActive)
+    }
+
+    @Test func resumingGivesUpAfterAFewTries() async {
+        settings.closedLidModeWanted = true
+        helper.setFailures = 100
+        let controller = makeController()
+        await controller.refresh()
+        #expect(!controller.isActive)
+        #expect(controller.isWanted)
+        #expect(helper.setCalls.count == 5)
+    }
+
     @Test func takingOverHappensOnce() async {
         helper.sleepDisabled = true
         let controller = makeController()

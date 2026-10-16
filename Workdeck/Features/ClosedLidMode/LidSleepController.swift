@@ -153,7 +153,8 @@ final class LidSleepController {
     /// Sleep already off (a Workdeck that restarted within the grace period, or the first launch of this version) is
     /// taken over and remembered; a remembered choice turns the mode on (closed-lid persistence spec §3.1, §3.3).
     private func resumeRememberedMode() async {
-        guard helperStatus == .enabled, lastError == nil else { return }
+        // An error in this refresh (a helper just replaced and not up yet) must not stop the mode from coming back.
+        guard helperStatus == .enabled else { return }
         if isActive {
             // A Workdeck that comes back applies the safeguards before it keeps the Mac awake (spec §3.1, §3.5).
             power = powerMonitor.current
@@ -173,7 +174,15 @@ final class LidSleepController {
                 }
             }
         } else if isWanted {
-            await enable()
+            // A helper the new build just replaced may need a moment to start: try a few times, 1, 2, 4, 8 s apart.
+            for attempt in 0..<5 where isWanted && !isActive {
+                if attempt > 0 {
+                    try? await Task.sleep(for: takeoverRetryDelay * (1 << (attempt - 1)))
+                    // Check the helper's version again: the last attempt may have reinstalled it.
+                    helperVersionChecked = false
+                }
+                await enable()
+            }
         }
     }
 

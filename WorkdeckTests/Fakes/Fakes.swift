@@ -20,6 +20,8 @@ final class FakeHelperClient: HelperClientProtocol {
 
     /// The next calls of `setSleepDisabled` that fail before it starts succeeding.
     var setFailures = 0
+    /// The next calls of `isSleepDisabled` that fail before it starts succeeding.
+    var readFailures = 0
 
     func setSleepDisabled(_ disabled: Bool) async throws {
         setCalls.append(disabled)
@@ -47,6 +49,10 @@ final class FakeHelperClient: HelperClientProtocol {
             await withCheckedContinuation { heldReads.append($0) }
         }
         if let readError { throw readError }
+        if readFailures > 0 {
+            readFailures -= 1
+            throw HelperClientError.connectionFailed("starting")
+        }
         return sleepDisabled
     }
 
