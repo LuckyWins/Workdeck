@@ -7,6 +7,7 @@ struct ClosedLidModeRow: View {
         let subtitle = ClosedLidModeSubtitle.make(
             helperStatus: controller.helperStatus,
             isActive: controller.isActive,
+            isWanted: controller.isWanted,
             power: controller.power,
             threshold: controller.threshold,
             notice: controller.notice,
@@ -38,7 +39,7 @@ struct ClosedLidModeRow: View {
             Spacer(minLength: 8)
 
             Toggle("Closed-Lid Mode", isOn: Binding(
-                get: { controller.isActive },
+                get: { controller.isActive || controller.isWanted },
                 set: { enabled in Task { await controller.setEnabled(enabled) } }
             ))
             .toggleStyle(.switch)

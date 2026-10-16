@@ -24,14 +24,16 @@ pmset -g | grep SleepDisabled
 | 3 | Lid closed on adapter | With the mode on, run `while true; do date +%T >> ~/lid-test.log; sleep 1; done` in Terminal, close the lid for 2 minutes, open it, check `tail -200 ~/lid-test.log` and `pmset -g log \| grep -E " Sleep \| Wake " \| tail -5`. | Timestamps continue through the closed-lid period (isolated one-second skips are loop drift, not sleep); no `Sleep` entry in that window. |
 | 4 | Lid closed on battery | Unplug, repeat scenario 3. | Same as 3; subtitle mentions "Turns off below 20% battery". |
 | 5 | Turn off | Turn the toggle off. | Icon becomes outline; `SleepDisabled` gone. |
-| 6 | Quit restores sleep | Turn on, choose Quit Workdeck. | `SleepDisabled` gone. |
-| 7 | Crash restores sleep | Turn on, then `pkill -9 -x Workdeck`. | `SleepDisabled` gone within a few seconds. |
-| 8 | Reboot restores sleep | Turn on, restart the Mac without quitting Workdeck first. | After login, `SleepDisabled` gone. |
+| 6 | Quit restores sleep, the mode comes back | Turn on, choose Quit Workdeck; launch Workdeck again. | `SleepDisabled` gone after the quit; after the launch the mode is on again and `SleepDisabled 1`. |
+| 7 | Crash: a minute to come back | Turn on, then `pkill -9 -x Workdeck`; check `pmset -g \| grep SleepDisabled` at once and after 70 s. | `SleepDisabled 1` for about a minute, then gone; the helper log shows "waiting for a new client" and then "no client after". |
+| 8 | Reboot: the mode comes back after login | With Launch at login on, turn the mode on and restart the Mac. | Before login sleep works; after login Workdeck turns the mode on again (`SleepDisabled 1`). |
 | 9 | Battery cutoff | On battery, set "Turn off below" just above the current charge in Settings while the mode is on. | Mode turns off; subtitle "Turned off: battery below N%". |
 | 10 | Battery refusal | With charge below the threshold on battery, try to turn the mode on. | Toggle stays off; subtitle "Battery is below N%". |
-| 11 | Helper restart | Turn on, then `sudo launchctl kickstart -k system/com.appcreators.workdeck.helper`, reopen the popover. | Mode is off; subtitle "Turned off: helper restarted"; `SleepDisabled` gone. |
+| 11 | Helper restart | Turn on, then `sudo launchctl kickstart -k system/com.appcreators.workdeck.helper`, reopen the popover. | The mode is on again (the helper reset sleep at its start, Workdeck turned it back on); no "Turned off" notice. |
 | 12 | Launch at login | Enable "Launch at login" in Settings, log out and back in. | Workdeck icon appears in the menu bar. |
-| 13 | Helper stopped | Turn on, then turn Workdeck off in **System Settings → General → Login Items & Extensions**. | `SleepDisabled` gone; the popover shows the approval state. |
+| 13 | Helper stopped | Turn on, then turn Workdeck off in **System Settings → General → Login Items & Extensions**. | `SleepDisabled` gone at once (no restart was announced); the popover shows "Requires a one-time approval" with the switch still on; turning the switch off forgets the mode, and allowing Workdeck again then leaves it off. |
+| 13a | Reinstall keeps the Mac awake | With the mode on, the lid closed on battery and a session over SSH, run `make install` (a new build, so the helper is replaced). | The SSH session survives; the helper log shows "announced a restart", "Handed sleep over to the next helper" and "Kept sleep disabled from the previous helper"; after the launch the mode is on. The first install of this version does not keep it yet. |
+| 13b | Killed and not back | With the mode on, `pkill -x Workdeck` and do not relaunch for 70 s. | `SleepDisabled 1` for about a minute, then gone. |
 | 14 | Settings tiles | Open Settings. | Each section header has a colored icon tile: General gray gear, Closed-Lid Mode indigo laptop, Limits orange gauge, Sessions green terminal, Instances blue people, About gray info. |
 
 Thermal cutoff is covered by unit tests only; it cannot be triggered reliably by hand.

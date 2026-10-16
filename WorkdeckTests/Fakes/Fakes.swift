@@ -12,26 +12,39 @@ final class FakeHelperClient: HelperClientProtocol {
     var readError: (any Error)?
     private(set) var setCalls: [Bool] = []
     private(set) var synchronousRestoreCount = 0
+    private(set) var announceCount = 0
+
+    func announceRestartSynchronously() {
+        announceCount += 1
+    }
+
+    /// The next calls of `setSleepDisabled` that fail before it starts succeeding.
+    var setFailures = 0
 
     func setSleepDisabled(_ disabled: Bool) async throws {
         setCalls.append(disabled)
         if let setError { throw setError }
+        if setFailures > 0 {
+            setFailures -= 1
+            throw HelperClientError.connectionFailed("busy")
+        }
         sleepDisabled = disabled
     }
 
-    /// When set, `isSleepDisabled()` suspends until `releaseHeldRead()` is called.
+    /// When set, `isSleepDisabled()` suspends until `releaseHeldRead()` is called; every held read is released.
     var holdReads = false
-    private var heldRead: CheckedContinuation<Void, Never>?
-    var isReadHeld: Bool { heldRead != nil }
+    private var heldReads: [CheckedContinuation<Void, Never>] = []
+    var isReadHeld: Bool { !heldReads.isEmpty }
 
     func releaseHeldRead() {
-        heldRead?.resume()
-        heldRead = nil
+        let held = heldReads
+        heldReads = []
+        held.forEach { $0.resume() }
     }
 
     func isSleepDisabled() async throws -> Bool {
         if holdReads {
-            await withCheckedContinuation { heldRead = $0 }
+            await withCheckedContinuation { heldReads.append($0) }
         }
         if let readError { throw readError }
         return sleepDisabled

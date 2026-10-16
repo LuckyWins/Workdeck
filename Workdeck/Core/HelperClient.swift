@@ -24,6 +24,8 @@ protocol HelperClientProtocol: AnyObject {
     func version() async throws -> String
     /// Blocking variant for `applicationWillTerminate`, where awaiting is not possible.
     func restoreSleepSynchronously()
+    /// Blocking, from the SIGTERM handler: tells the helper Workdeck will be back (closed-lid persistence spec §3.4).
+    func announceRestartSynchronously()
 }
 
 final class HelperClient: HelperClientProtocol {
@@ -80,6 +82,18 @@ final class HelperClient: HelperClientProtocol {
         }
         guard let helper = proxy as? any HelperProtocol else { return }
         helper.setSleepDisabled(false) { _ in
+            finished.signal()
+        }
+        _ = finished.wait(timeout: .now() + terminationTimeout)
+    }
+
+    func announceRestartSynchronously() {
+        let finished = DispatchSemaphore(value: 0)
+        let proxy = activeConnection().remoteObjectProxyWithErrorHandler { @Sendable _ in
+            finished.signal()
+        }
+        guard let helper = proxy as? any HelperProtocol else { return }
+        helper.announceRestart {
             finished.signal()
         }
         _ = finished.wait(timeout: .now() + terminationTimeout)

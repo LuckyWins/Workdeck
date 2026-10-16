@@ -8,6 +8,7 @@ struct ClosedLidModeSubtitle: Equatable {
     static func make(
         helperStatus: HelperStatus,
         isActive: Bool,
+        isWanted: Bool = false,
         power: PowerSnapshot,
         threshold: Int,
         notice: LidSleepController.Notice?,
@@ -39,6 +40,10 @@ struct ClosedLidModeSubtitle: Equatable {
         case let .refused(reason):
             return ClosedLidModeSubtitle(text: refusalText(reason), isError: false)
         case nil:
+            // Remembered but not on yet: the helper is not ready (closed-lid persistence spec §3.7).
+            if isWanted {
+                return ClosedLidModeSubtitle(text: "Turns on when the helper is ready", isError: false)
+            }
             return ClosedLidModeSubtitle(text: "Mac sleeps normally when the lid is closed", isError: false)
         }
     }

@@ -30,6 +30,9 @@ final class LidSleepController {
     @ObservationIgnored private let settings: AppSettings
     @ObservationIgnored private let appVersion: String
     @ObservationIgnored private var helperVersionChecked = false
+    @ObservationIgnored private let takeoverRetryDelay: Duration
+    /// This Workdeck turned sleep off itself, so the helper counts it as the holder.
+    @ObservationIgnored private var holdsHelper = false
     /// Set when a safeguard check arrived while another helper call was in flight.
     @ObservationIgnored private var safeguardCheckPending = false
 
@@ -39,8 +42,10 @@ final class LidSleepController {
         powerMonitor: any PowerSourceMonitoring,
         thermalMonitor: any ThermalMonitoring,
         settings: AppSettings,
-        appVersion: String
+        appVersion: String,
+        takeoverRetryDelay: Duration = .seconds(1)
     ) {
+        self.takeoverRetryDelay = takeoverRetryDelay
         self.helper = helper
         self.installer = installer
         self.powerMonitor = powerMonitor
@@ -66,8 +71,14 @@ final class LidSleepController {
         settings.batteryThreshold
     }
 
+    /// The remembered choice: on until the user turns it off or a safeguard does (closed-lid persistence spec §3.1).
+    var isWanted: Bool {
+        settings.closedLidModeWanted
+    }
+
+    /// A remembered choice can always be turned off, also while the helper waits for approval.
     var canToggle: Bool {
-        !isBusy && (helperStatus == .enabled || helperStatus == .notRegistered)
+        !isBusy && (helperStatus == .enabled || helperStatus == .notRegistered || (isWanted && !isActive))
     }
 
     func setEnabled(_ enabled: Bool) async {
@@ -89,13 +100,17 @@ final class LidSleepController {
         let decision = SafeguardPolicy.evaluate(power: power, thermal: thermalMonitor.current, threshold: threshold)
         if case let .cutoff(reason) = decision {
             notice = .refused(reason)
+            settings.closedLidModeWanted = false
             return
         }
+        // Remembered even while the helper waits for approval: it turns on once the helper is ready.
+        settings.closedLidModeWanted = true
         guard await prepareHelper(registerIfNeeded: true) else { return }
 
         do {
             try await helper.setSleepDisabled(true)
             isActive = true
+            holdsHelper = true
         } catch {
             lastError = error.localizedDescription
             await syncState()
@@ -104,6 +119,8 @@ final class LidSleepController {
 
     /// Turns the mode off. `reason` is set when a safeguard, not the user, triggered it.
     func disable(reason: CutoffReason?) async {
+        // The user's switch or a safeguard: either way the choice is forgotten (closed-lid persistence spec §3.1).
+        settings.closedLidModeWanted = false
         guard isActive, !isBusy else { return }
         isBusy = true
         defer { endBusy() }
@@ -112,6 +129,7 @@ final class LidSleepController {
         do {
             try await helper.setSleepDisabled(false)
             isActive = false
+            holdsHelper = false
             notice = reason.map(Notice.cutoff)
         } catch {
             lastError = error.localizedDescription
@@ -123,10 +141,40 @@ final class LidSleepController {
     func refresh() async {
         guard !isBusy else { return }
         isBusy = true
-        defer { endBusy() }
+        // An error left by an earlier call must not stop the mode from coming back.
+        lastError = nil
         power = powerMonitor.current
         _ = await prepareHelper(registerIfNeeded: false)
         await syncState()
+        endBusy()
+        await resumeRememberedMode()
+    }
+
+    /// Sleep already off (a Workdeck that restarted within the grace period, or the first launch of this version) is
+    /// taken over and remembered; a remembered choice turns the mode on (closed-lid persistence spec §3.1, §3.3).
+    private func resumeRememberedMode() async {
+        guard helperStatus == .enabled, lastError == nil else { return }
+        if isActive {
+            // A Workdeck that comes back applies the safeguards before it keeps the Mac awake (spec §3.1, §3.5).
+            power = powerMonitor.current
+            if case let .cutoff(reason) = SafeguardPolicy.evaluate(power: power, thermal: thermalMonitor.current, threshold: threshold) {
+                await disable(reason: reason)
+                return
+            }
+            settings.closedLidModeWanted = true
+            // Become the holder in the helper once, so its grace period ends and a later crash starts a new one. A
+            // helper that was just replaced may not answer at once: retry before its grace runs out.
+            for attempt in 0..<3 where !holdsHelper {
+                if attempt > 0 {
+                    try? await Task.sleep(for: takeoverRetryDelay)
+                }
+                if (try? await helper.setSleepDisabled(true)) != nil {
+                    holdsHelper = true
+                }
+            }
+        } else if isWanted {
+            await enable()
+        }
     }
 
     /// Re-checks safeguards, e.g. after the battery threshold changed.
@@ -136,6 +184,14 @@ final class LidSleepController {
 
     func openApprovalSettings() {
         installer.openApprovalSettings()
+    }
+
+    /// Terminated by a signal (a restart, `make install`): tells the helper Workdeck will be back, so the mode survives
+    /// (closed-lid persistence spec §3.4).
+    func announceRestart() {
+        if isActive {
+            helper.announceRestartSynchronously()
+        }
     }
 
     /// Restores sleep before the app exits; the helper also does this when the connection drops.
@@ -170,6 +226,7 @@ final class LidSleepController {
         helperStatus = installer.status
         guard helperStatus == .enabled else {
             isActive = false
+            holdsHelper = false
             return
         }
         do {
@@ -223,11 +280,19 @@ final class LidSleepController {
     private func handleHelperInterruption() {
         let wasActive = isActive
         isActive = false
+        holdsHelper = false
         helperVersionChecked = false
         // The relaunched helper resets sleep on startup; resync to confirm.
         interruptionTask = Task {
             await syncState()
-            if wasActive, !isActive {
+            // The remembered choice survives the helper's restart: turn the mode on again once it answers.
+            guard wasActive, !isActive else { return }
+            if isWanted {
+                // Not when the user turned the helper off (Login Items): that would register it again.
+                if helperStatus == .enabled {
+                    await enable()
+                }
+            } else {
                 notice = .cutoff(.helperRestarted)
             }
         }

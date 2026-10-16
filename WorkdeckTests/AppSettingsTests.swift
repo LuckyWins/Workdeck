@@ -11,6 +11,13 @@ struct AppSettingsTests {
         return defaults
     }
 
+    @Test func theChoiceIsStored() {
+        let defaults = makeDefaults()
+        #expect(!AppSettings(defaults: defaults).closedLidModeWanted)
+        AppSettings(defaults: defaults).closedLidModeWanted = true
+        #expect(AppSettings(defaults: defaults).closedLidModeWanted)
+    }
+
     @Test func defaultsToTwentyPercent() {
         #expect(AppSettings(defaults: makeDefaults()).batteryThreshold == 20)
     }

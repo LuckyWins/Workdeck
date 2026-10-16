@@ -12,9 +12,15 @@ struct ClosedLidModeSubtitleTests {
         active: Bool = false,
         power: PowerSnapshot? = nil,
         notice: LidSleepController.Notice? = nil,
-        error: String? = nil
+        error: String? = nil,
+        wanted: Bool = false
     ) -> ClosedLidModeSubtitle {
-        .make(helperStatus: status, isActive: active, power: power ?? adapter, threshold: 20, notice: notice, lastError: error)
+        .make(helperStatus: status, isActive: active, isWanted: wanted, power: power ?? adapter, threshold: 20, notice: notice, lastError: error)
+    }
+
+    @Test func waitingForTheHelperIsShown() {
+        #expect(make(status: .enabled, wanted: true) == .init(text: "Turns on when the helper is ready", isError: false))
+        #expect(make(status: .requiresApproval, wanted: true) == .init(text: "Requires a one-time approval", isError: false))
     }
 
     @Test func off() {

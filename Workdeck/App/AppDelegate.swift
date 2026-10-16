@@ -111,6 +111,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Unit tests are hosted in this app; keep them away from the real privileged helper.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        restartSignal = RestartSignal.install { [unowned self] in
+            lidSleep.announceRestart()
+            // What a quit from the menu would also do, except restoring sleep.
+            demo.stop()
+            recap.save()
+        }
         Task { await lidSleep.refresh() }
         instances.onAdded = { [unowned self] in claudeCode.instanceAdded($0) }
         instances.onRemoving = { [unowned self] in claudeCode.instanceRemoving($0) }
@@ -129,6 +135,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         demo.register(claudeCode)
         demo.register(recap)
     }
+
+    /// Keeps the SIGTERM handler alive (closed-lid persistence spec §3.4).
+    private var restartSignal: (any DispatchSourceSignal)?
 
     func applicationWillTerminate(_ notification: Notification) {
         demo.stop()

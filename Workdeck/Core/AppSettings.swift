@@ -11,6 +11,7 @@ final class AppSettings {
 
     private enum Keys {
         static let batteryThreshold = "batteryThreshold"
+        static let closedLidModeWanted = "closedLidMode.wanted"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -26,12 +27,19 @@ final class AppSettings {
         }
     }
 
+    /// The user wants Closed-Lid Mode: kept across restarts of Workdeck and the Mac until the user turns it off or a
+    /// safeguard does (closed-lid persistence spec §3.1).
+    var closedLidModeWanted: Bool {
+        didSet { defaults.set(closedLidModeWanted, forKey: Keys.closedLidModeWanted) }
+    }
+
     private(set) var launchAtLogin: Bool
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let stored = defaults.object(forKey: Keys.batteryThreshold) as? Int
         batteryThreshold = Self.normalizedThreshold(stored ?? Self.defaultThreshold)
+        closedLidModeWanted = defaults.bool(forKey: Keys.closedLidModeWanted)
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 

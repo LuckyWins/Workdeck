@@ -17,8 +17,8 @@ final class HelperService: NSObject, HelperProtocol {
 
     func setSleepDisabled(_ disabled: Bool, reply: @escaping @Sendable (NSError?) -> Void) {
         do {
-            try power.setSleepDisabled(disabled)
-            tracker.clientDidSet(clientID, sleepDisabled: disabled)
+            // pmset and the holders change together: a grace expiring now cannot slip in between.
+            try tracker.set(clientID, sleepDisabled: disabled) { try power.setSleepDisabled($0) }
             HelperLog.power.notice("Client \(self.clientPID) set sleep disabled: \(disabled)")
             reply(nil)
         } catch {
@@ -39,6 +39,12 @@ final class HelperService: NSObject, HelperProtocol {
 
     func version(reply: @escaping @Sendable (String) -> Void) {
         reply(HelperConstants.version(of: .main))
+    }
+
+    func announceRestart(reply: @escaping @Sendable () -> Void) {
+        tracker.noteRestarting(clientID, at: Date())
+        HelperLog.power.notice("Client \(self.clientPID) announced a restart")
+        reply()
     }
 
     /// Only plain strings cross the XPC boundary in errors.

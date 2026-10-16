@@ -54,6 +54,11 @@ final class StubHelper: NSObject, Workdeck.HelperProtocol, NSXPCListenerDelegate
         let (respond, value) = state.withLock { ($0.respond, $0.versionString) }
         if respond { reply(value) }
     }
+
+    func announceRestart(reply: @escaping @Sendable () -> Void) {
+        let respond = state.withLock { $0.respond }
+        if respond { reply() }
+    }
 }
 
 @MainActor

@@ -22,7 +22,8 @@ struct LidSleepControllerTests {
             powerMonitor: power,
             thermalMonitor: thermal,
             settings: settings,
-            appVersion: appVersion
+            appVersion: appVersion,
+            takeoverRetryDelay: .zero
         )
     }
 
@@ -60,7 +61,9 @@ struct LidSleepControllerTests {
         #expect(controller.helperStatus == .requiresApproval)
         #expect(controller.lastError == nil)
         #expect(!controller.isActive)
-        #expect(!controller.canToggle)
+        // The choice is remembered and waits for the approval; the switch can still take it back.
+        #expect(controller.isWanted)
+        #expect(controller.canToggle)
     }
 
     @Test func refreshPicksUpApprovalGrantedInSystemSettings() async {
@@ -149,13 +152,167 @@ struct LidSleepControllerTests {
         #expect(controller.notice == nil)
     }
 
-    @Test func helperRestartTurnsModeOffWithNotice() async {
+    @Test func aHelperInterruptionTurnsTheModeOnAgain() async {
         let controller = makeController()
         await controller.enable()
         helper.simulateRestart()
         await controller.interruptionTask?.value
+        #expect(controller.isActive)
+        #expect(helper.sleepDisabled)
+        #expect(controller.notice == nil)
+    }
+
+    @Test func enablingRemembersTheChoice() async {
+        let controller = makeController()
+        await controller.enable()
+        #expect(controller.isWanted)
+        #expect(settings.closedLidModeWanted)
+    }
+
+    @Test func turningOffForgetsIt() async {
+        let controller = makeController()
+        await controller.enable()
+        await controller.setEnabled(false)
+        #expect(!controller.isWanted)
+    }
+
+    @Test func turningOffWhileWaitingForgets() async {
+        settings.closedLidModeWanted = true
+        installer.status = .requiresApproval
+        let controller = makeController()
+        await controller.refresh()
         #expect(!controller.isActive)
-        #expect(controller.notice == .cutoff(.helperRestarted))
+        await controller.setEnabled(false)
+        #expect(!controller.isWanted)
+    }
+
+    @Test func aSafeguardCutoffForgetsTheChoice() async {
+        let controller = makeController()
+        await controller.enable()
+        power.emit(PowerSnapshot(isOnBattery: true, batteryPercent: 15))
+        await controller.safeguardTask?.value
+        #expect(!controller.isWanted)
+    }
+
+    @Test func launchTurnsARememberedChoiceOn() async {
+        settings.closedLidModeWanted = true
+        let controller = makeController()
+        await controller.refresh()
+        #expect(controller.isActive)
+        #expect(helper.setCalls == [true])
+    }
+
+    @Test func launchTakesOverSleepAlreadyOff() async {
+        helper.sleepDisabled = true
+        let controller = makeController()
+        await controller.refresh()
+        #expect(controller.isActive)
+        #expect(controller.isWanted)
+        #expect(helper.setCalls == [true])
+    }
+
+    @Test func takingOverAppliesTheSafeguards() async {
+        helper.sleepDisabled = true
+        power.current = PowerSnapshot(isOnBattery: true, batteryPercent: 10)
+        let controller = makeController()
+        await controller.refresh()
+        #expect(!controller.isActive)
+        #expect(!helper.sleepDisabled)
+        #expect(!controller.isWanted)
+        #expect(controller.notice == .cutoff(.lowBattery(threshold: 20)))
+    }
+
+    @Test func aFailedTakeoverIsRetried() async {
+        helper.sleepDisabled = true
+        helper.setFailures = 1
+        let controller = makeController()
+        await controller.refresh()
+        #expect(helper.setCalls == [true, true])
+        await controller.refresh()
+        #expect(helper.setCalls == [true, true])
+    }
+
+    @Test func anEarlierErrorDoesNotStopResuming() async {
+        settings.closedLidModeWanted = true
+        helper.setFailures = 1
+        let controller = makeController()
+        await controller.enable()
+        #expect(controller.lastError != nil)
+        await controller.refresh()
+        #expect(controller.isActive)
+        #expect(controller.lastError == nil)
+    }
+
+    @Test func theChoiceCanBeTurnedOffWhileTheHelperWaits() async {
+        settings.closedLidModeWanted = true
+        installer.status = .requiresApproval
+        let controller = makeController()
+        #expect(controller.canToggle)
+        await controller.setEnabled(false)
+        #expect(!controller.isWanted)
+    }
+
+    @Test func anInterruptionWithTheHelperTurnedOffDoesNotRegisterIt() async {
+        let controller = makeController()
+        await controller.enable()
+        let registered = installer.registerCount
+        installer.status = .requiresApproval
+        helper.simulateRestart()
+        await controller.interruptionTask?.value
+        #expect(installer.registerCount == registered)
+        #expect(controller.isWanted)
+    }
+
+    @Test func anInterruptionDuringARefreshIsResumed() async {
+        let controller = makeController()
+        await controller.enable()
+        helper.holdReads = true
+        let refresh = Task { await controller.refresh() }
+        while !helper.isReadHeld { await Task.yield() }
+        helper.simulateRestart()
+        helper.holdReads = false
+        helper.releaseHeldRead()
+        await refresh.value
+        await controller.interruptionTask?.value
+        #expect(controller.isActive)
+        #expect(helper.sleepDisabled)
+    }
+
+    @Test func takingOverHappensOnce() async {
+        helper.sleepDisabled = true
+        let controller = makeController()
+        await controller.refresh()
+        await controller.refresh()
+        #expect(helper.setCalls == [true])
+    }
+
+    @Test func aRefusalAtLaunchForgetsTheChoice() async {
+        settings.closedLidModeWanted = true
+        power.current = PowerSnapshot(isOnBattery: true, batteryPercent: 10)
+        let controller = makeController()
+        await controller.refresh()
+        #expect(!controller.isActive)
+        #expect(!controller.isWanted)
+        #expect(controller.notice == .refused(.lowBattery(threshold: 20)))
+        await controller.refresh()
+        #expect(helper.setCalls.isEmpty)
+    }
+
+    @Test func quitKeepsTheChoice() async {
+        let controller = makeController()
+        await controller.enable()
+        controller.prepareForTermination()
+        #expect(helper.synchronousRestoreCount == 1)
+        #expect(controller.isWanted)
+    }
+
+    @Test func aSignalAnnouncesARestartOnlyWhileActive() async {
+        let controller = makeController()
+        controller.announceRestart()
+        #expect(helper.announceCount == 0)
+        await controller.enable()
+        controller.announceRestart()
+        #expect(helper.announceCount == 1)
     }
 
     @Test func staleHelperIsReinstalled() async {

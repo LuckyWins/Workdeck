@@ -25,7 +25,7 @@ A Claude Code plan limit runs out in the middle of a task, a session sits waitin
 
 ## Features
 
-- 💻 **Closed-Lid Mode** — keeps the Mac awake with the lid closed, for long builds, SSH sessions or a working Mac in a bag. Turns itself off on low battery or when the Mac gets too hot, and sleep always comes back on quit, crash or restart. [More](docs/closed-lid-mode.md)
+- 💻 **Closed-Lid Mode** — keeps the Mac awake with the lid closed, for long builds, SSH sessions or a working Mac in a bag. Stays on across restarts of Workdeck and the Mac until you turn it off; turns itself off on low battery or when the Mac gets too hot, and sleep comes back whenever Workdeck is not running to watch over it. [More](docs/closed-lid-mode.md)
 - 📊 **Claude Code limits in the notch** — a ring for the window closest to its limit, with the percent once it nears the limit; hover for both windows with reset times and a forecast (`runs out ~16:40 · resets 18:00`). [More](docs/claude-code.md#limits)
 - 🧩 **Codex too** — Codex's plan limits and live sessions in the same notch, each with its own icon: Claude Code's terracotta rays, Codex's mint `>_` circle. [More](docs/codex.md)
 - 🤖 **Live sessions and agents** — every session working, waiting for you or idle, its agents as a tree, the focused session's last steps as a ticker, and each edit's `+12 −3`. [More](docs/claude-code.md#sessions)

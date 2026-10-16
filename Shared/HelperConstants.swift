@@ -9,6 +9,8 @@ nonisolated enum HelperConstants {
     static let machServiceName = appIdentifier + ".helper"
     static let launchDaemonPlistName = machServiceName + ".plist"
     static let errorDomain = machServiceName
+    /// The handover record a stopped helper leaves for its successor (closed-lid persistence spec §3.4); root-owned.
+    static let handoverRecordURL = URL(filePath: "/Library/Application Support/com.appcreators.workdeck.helper/handover.plist")
     static let teamIdentifier = "J55BY69CVU"
 
     /// Requirement the helper enforces on every connecting client.
