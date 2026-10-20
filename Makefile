@@ -1,5 +1,4 @@
 SHELL := /bin/bash
-.SHELLFLAGS := -o pipefail -c
 
 SCHEME := Workdeck
 DESTINATION := platform=macOS
@@ -12,12 +11,12 @@ INSTALLED_BIN := $(INSTALL_DIR)/Workdeck.app/Contents/MacOS/Workdeck
 
 ## build: Release build into ./build (signed with the project's development team)
 build:
-	xcodebuild -scheme $(SCHEME) -destination 'generic/platform=macOS' -configuration Release \
+	set -o pipefail; xcodebuild -scheme $(SCHEME) -destination 'generic/platform=macOS' -configuration Release \
 		-derivedDataPath $(BUILD_DIR) build 2>&1 | grep -E "error:|warning:|\*\* BUILD" | grep -v appintents
 
 ## test: run the unit test suite
 test:
-	xcodebuild -scheme $(SCHEME) -destination '$(DESTINATION)' test 2>&1 \
+	set -o pipefail; xcodebuild -scheme $(SCHEME) -destination '$(DESTINATION)' test 2>&1 \
 		| grep -E "error:|recorded an issue|Test run with|\*\* TEST"
 
 ## install: build, quit the installed Workdeck, copy it to /Applications, and launch it
