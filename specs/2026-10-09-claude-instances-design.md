@@ -32,7 +32,7 @@ Documented (https://code.claude.com/docs/en/authentication.md, https://code.clau
 Observed on this Mac (Claude Code 2.1.292, structure only):
 
 - Chats are `<config dir>/projects/<project dir name>/<session id>.jsonl`; the project directory name is the project path with `/` and `.` replaced by `-` (`-Users-andreu-Development-xcodeProjects-Workdeck`). Subagent transcripts and tool results live in `<session id>/` next to the file.
-- Lines with `"type": "ai-title"` carry `aiTitle`, the title shown in the VS Code chat history; it is appended again as the chat goes on (332 times in a 15 MB chat). `user` lines carry `cwd`, the project folder.
+- Lines with `"type": "ai-title"` carry `aiTitle`, the title shown in the VS Code chat history; it is appended again as the chat goes on (332 times in a 15 MB chat). Renaming a chat adds `"type": "custom-title"` lines with `customTitle`; from then on Claude Code appends a `custom-title` line and then an `ai-title` line each time, up to megabytes apart during a long turn. `user` lines carry `cwd`, the project folder.
 - An empty chat has no transcript (spec `2026-10-06-claude-sessions-design.md` §14).
 
 To verify in the first implementation task, with the user's consent (results recorded in §10):
@@ -106,7 +106,7 @@ New folders `Workdeck/Features/ClaudeCode/Instances/` and `Workdeck/Features/Cla
 
 - A chat is a regular file or a symbolic link `projects/*/<id>.jsonl` whose `<id>` passes `HookPayloadFilter.isSafeIdentifier`. A link whose target is another instance's chat is not listed again: it adds the instance to that chat's `linkedInto`. A broken link is ignored.
 - `owner`: the instance whose `projects/` holds the regular file.
-- Title: the last `ai-title` in the last 512 KB of the file; if none, the first in the first 512 KB; otherwise none. Titles are trimmed to 80 characters.
+- Title: the file is read backwards 512 KB at a time, up to its last 16 MB, until a part has a title: its last non-empty `custom-title`, else its last `ai-title`. If none, the same rule in the first 512 KB; otherwise none. Titles are trimmed to 80 characters.
 - `cwd`: the first `cwd` in the first 512 KB.
 - `modifiedAt` and `size` come from the file (through links).
 - Titles live only in Workdeck's memory (kept between openings of the window so it opens at once); they are never written to disk, logged, or included in Diagnostics.
@@ -144,7 +144,7 @@ Unit tests use temporary directories and never touch the real `~/.zshrc`, `~/.cl
 - `ShellAliasFile`: add to a missing file, add twice, remove, keep a foreign alias, write through a symbolic link, back up once, refuse non-UTF-8.
 - `ClaudeInstanceStore`: valid and invalid names, uniqueness, persistence.
 - `ShellCommand`: quoting of paths with spaces and quotes; rejected IDs.
-- `TranscriptPeek`: title at the end, only at the start, none, a long title, `cwd`, malformed lines, a file larger than both windows.
+- `TranscriptPeek`: title at the end, only at the start, none, a long title, a rename before a later `ai-title`, an empty rename, a title more than one window from the end, beyond the search limit, `cwd`, malformed lines, a file larger than both windows.
 - `ChatIndex`: owners, links counted into `linkedInto`, broken links ignored, unsafe names ignored, cache reuse.
 - `ChatLinker`: link, link again, conflict with a file, link the subagent folder, unlink, unlink never removes a file.
 - `ChatsController` with a fake `TerminalLauncher`: continue on a live chat asks first; continue links then launches; a launch failure offers the command.

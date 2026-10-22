@@ -10,6 +10,7 @@ struct TranscriptPeekTests {
     }
 
     private func title(_ text: String) -> String { line(["type": "ai-title", "aiTitle": text, "sessionId": "s"]) }
+    private func renamed(_ text: String) -> String { line(["type": "custom-title", "customTitle": text, "sessionId": "s"]) }
     private func user(cwd: String) -> String { line(["type": "user", "cwd": cwd]) }
     private func filler(_ bytes: Int) -> String { line(["type": "assistant", "text": String(repeating: "x", count: bytes)]) }
 
@@ -34,9 +35,42 @@ struct TranscriptPeekTests {
         #expect(TranscriptPeek.peek(url, window: 1024).title == "Early")
     }
 
-    @Test func theMiddleOfAHugeFileIsNotRead() throws {
+    @Test func titlesBeyondTheSearchLimitAreNotRead() throws {
         let url = try write(filler(3000) + title("Middle") + filler(3000))
-        #expect(TranscriptPeek.peek(url, window: 1024) == TranscriptPeek.Peek())
+        #expect(TranscriptPeek.peek(url, window: 1024, titleSearchLimit: 2048) == TranscriptPeek.Peek())
+    }
+
+    @Test func aRenameWinsOverTheAITitleWrittenAfterIt() throws {
+        // Claude Code appends `custom-title` and then `ai-title` each time it updates a renamed chat.
+        let url = try write(title("Auto") + renamed("Renamed") + title("Auto again"))
+        #expect(TranscriptPeek.peek(url).title == "Renamed")
+    }
+
+    @Test func aRenameAtTheEndOfALargeFileWins() throws {
+        let url = try write(user(cwd: "/p/A") + title("Old") + filler(3000) + renamed("Renamed") + title("Auto") + filler(100))
+        #expect(TranscriptPeek.peek(url, window: 1024) == TranscriptPeek.Peek(title: "Renamed", cwd: "/p/A"))
+    }
+
+    @Test func aRenameAtTheStartOfALargeFileWins() throws {
+        let url = try write(renamed("Early") + title("Auto") + user(cwd: "/p/A") + filler(3000))
+        #expect(TranscriptPeek.peek(url, window: 1024).title == "Early")
+    }
+
+    @Test func anEmptyRenameIsIgnored() throws {
+        let url = try write(title("Auto") + renamed("  \n"))
+        #expect(TranscriptPeek.peek(url).title == "Auto")
+    }
+
+    @Test func titlesAreSearchedBackwardsPastTheLastWindow() throws {
+        // A long turn: more than a window of output since Claude Code last appended the titles.
+        let output = String(repeating: filler(300), count: 10)
+        let url = try write(user(cwd: "/p/A") + title("First") + filler(3000) + renamed("Renamed") + title("Auto") + output)
+        #expect(TranscriptPeek.peek(url, window: 1024) == TranscriptPeek.Peek(title: "Renamed", cwd: "/p/A"))
+    }
+
+    @Test func titlesAreFoundBeforeLinesLongerThanTheWindow() throws {
+        let url = try write(filler(3000) + title("Middle") + filler(3000))
+        #expect(TranscriptPeek.peek(url, window: 1024).title == "Middle")
     }
 
     @Test func longTitlesAreShortenedAndWhitespaceCollapsed() throws {
