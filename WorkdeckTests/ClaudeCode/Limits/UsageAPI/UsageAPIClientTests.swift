@@ -19,6 +19,12 @@ struct UsageAPIClientTests {
         #expect(result == .snapshot(UsageSnapshot(capturedAt: fixedNow, fiveHour: window(.fiveHour, 10), sevenDay: nil)))
     }
 
+    @Test func passesNotStartedWindows() async {
+        let body = #"{"five_hour": {"utilization": 0.0, "resets_at": null}, "seven_day": null}"#
+        let result = await UsageAPIClient(transport: FakeTransport(.init(status: 200, body: body))).fetch(token: "t", now: fixedNow)
+        #expect(result == .snapshot(UsageSnapshot(capturedAt: fixedNow, fiveHour: nil, sevenDay: nil), notStarted: [.fiveHour]))
+    }
+
     @Test(arguments: [401, 403])
     func unauthorizedMeansLoginExpired(status: Int) async {
         let result = await UsageAPIClient(transport: FakeTransport(.init(status: status, body: ""))).fetch(token: "t", now: fixedNow)

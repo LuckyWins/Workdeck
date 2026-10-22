@@ -66,6 +66,7 @@ Watch the snapshot with `cat ~/Library/Application\ Support/Workdeck/claude-usag
 | L20 | Settings layout | Disconnect the status line and turn the API off. Then turn either on. | Only "Status line" and the API toggle are shown; turning either on reveals Show, the alert pickers, the reset toggle and the forecast toggle. |
 | L21 | Forecast | Use Claude Code heavily in a running 5-hour window, then hover the notch. Turn off "Forecast when limits run out". | When the limit would run out before the reset, the row shows "runs out ~HH:mm · resets HH:mm" with the first part orange; with the setting off, the usual "resets in …" text returns. |
 | L22 | Waiting for Claude Code | With "Fetch usage from Anthropic" on, quit every Claude Code window and wait until the token expires (`expiresAt`, about eight hours), or check the next morning. Then start Claude Code. | Each account shows `13h ago · waiting for Claude Code` in grey, no orange error and no second line; Settings shows "Waiting for Claude Code to renew its login". Within five minutes of Claude Code starting, the line returns to `updated … ago`. |
+| L23 | Reset on claude.ai | With the API on and the weekly window above the first threshold, reset the limits on claude.ai, then click refresh in the notch. Repeat with the API off and a running session. | With the API on, the weekly percent drops within seconds and, with "Notify when a limit resets" on, the reset alert shows. With the API off, the percent drops after a few messages. |
 
 ## Claude Code Sessions Checklist
 
@@ -141,6 +142,7 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | A4 | Limit alert | Lower the first threshold below an account's usage. | The notch expands with the alert and the account (`· personal`) for about 6 s, a click opens Chats on that account's latest session; then the compact ring flashes orange once. |
 | A5 | Remove | Settings → Remove… personal. | Its entries leave `~/.claude-personal/settings.json` (previous status line restored), `claude-usage-personal.json` is deleted, and its block and tag disappear. |
 | A6 | Account without sessions | With two accounts, work in one of them only and hover the notch. | The working account has its full block; the other is one dim line after it (`personal  7d 34% · 5h 12%` and its age, e.g. `13h ago`), without a waiting or refresh line. With no session at all, the compact notch's account has the full block. |
+| A7 | Account switch | Sign an extra instance in to another claude.ai account. | Its limits block disappears until that instance runs (or the next poll), then shows the new account's figures; no reset alert; the email in Settings → Instances and the plan in the notch header follow. |
 
 ## Demo Mode Checklist
 

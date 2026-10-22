@@ -29,3 +29,10 @@ func statusLineInput(fiveHour: (Double, TimeInterval)? = nil, sevenDay: (Double,
     }
     return try! JSONSerialization.data(withJSONObject: root)
 }
+
+/// A Claude Code `.claude.json` with an account ID and an email that must never be copied anywhere.
+func writeAccountFile(_ accountID: String, to url: URL) {
+    try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let root: [String: Any] = ["oauthAccount": ["accountUuid": accountID, "emailAddress": "x@example.com"]]
+    try! JSONSerialization.data(withJSONObject: root).write(to: url)
+}

@@ -58,6 +58,8 @@ final class UsagePoller: UsagePolling {
     @ObservationIgnored private let credentials: any ClaudeCredentialsReading
     @ObservationIgnored private let client: UsageAPIClient
     @ObservationIgnored private let snapshotURL: URL
+    /// The instance's `.claude.json`, whose account tags the snapshot.
+    @ObservationIgnored private let accountFile: URL?
     @ObservationIgnored private let clock: () -> Date
     @ObservationIgnored private let schedulesTimer: Bool
     @ObservationIgnored private var timer: Timer?
@@ -74,12 +76,14 @@ final class UsagePoller: UsagePolling {
         credentials: any ClaudeCredentialsReading,
         client: UsageAPIClient,
         snapshotURL: URL,
+        accountFile: URL? = nil,
         clock: @escaping () -> Date = { Date() },
         schedulesTimer: Bool = true
     ) {
         self.credentials = credentials
         self.client = client
         self.snapshotURL = snapshotURL
+        self.accountFile = accountFile
         self.clock = clock
         self.schedulesTimer = schedulesTimer
     }
@@ -172,9 +176,15 @@ final class UsagePoller: UsagePolling {
         let result = await client.fetch(token: login.token, now: now)
         guard isRunning else { return }
         switch result {
-        case let .snapshot(incoming):
+        case let .snapshot(incoming, notStarted):
             let existing = try? UsageSnapshotFile.read(from: snapshotURL)
-            let merged = existing?.merged(with: incoming, now: now) ?? incoming
+            let merged = (existing ?? UsageSnapshot(capturedAt: now, fiveHour: nil, sevenDay: nil)).merged(
+                with: incoming,
+                from: .api,
+                account: accountFile.flatMap(ClaudeAccountFile.accountID(in:)),
+                notStarted: notStarted,
+                now: now
+            )
             do {
                 try UsageSnapshotFile.write(merged, to: snapshotURL)
                 pausedUntil = nil

@@ -14,6 +14,15 @@ nonisolated enum StatusLineInputParser {
         return UsageSnapshot(capturedAt: capturedAt, fiveHour: fiveHour, sevenDay: sevenDay)
     }
 
+    /// The session the input belongs to; `nil` when it carries none.
+    static func sessionID(from data: Data) -> String? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let id = root["session_id"] as? String,
+              !id.isEmpty
+        else { return nil }
+        return id
+    }
+
     private static func window(_ kind: UsageWindowKind, from value: Any?) -> UsageWindow? {
         guard let fields = value as? [String: Any],
               let used = fields["used_percentage"] as? NSNumber,

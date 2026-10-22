@@ -111,4 +111,54 @@ struct LimitsAlertPolicyTests {
         let result = evaluate(current: [], fired: [stale, fresh, "garbage"])
         #expect(result.firedKeys == [fresh])
     }
+
+    // MARK: A drop within a period (spec 2026-10-22 §2)
+
+    private func keys(_ window: UsageWindow, _ thresholds: [Int] = [80, 95]) -> Set<String> {
+        Set(thresholds.map { LimitsAlertPolicy.key(window, threshold: $0) })
+    }
+
+    @Test func dropWithinPeriodIsAReset() {
+        let before = window(.sevenDay, 98, resetsIn: 86_400)
+        let after = window(.sevenDay, 1, resetsIn: 86_400)
+        #expect(evaluate(previous: [before], current: [after], fired: keys(before)).alerts == [.reset([.sevenDay])])
+    }
+
+    @Test func dropJoinsOtherResetsInOneAlert() {
+        let fiveHour = window(.fiveHour, 90, resetsIn: -1)
+        let before = window(.sevenDay, 98, resetsIn: 86_400)
+        let result = evaluate(previous: [fiveHour, before], current: [window(.sevenDay, 1, resetsIn: 86_400)], fired: keys(before))
+        #expect(result.alerts == [.reset([.fiveHour, .sevenDay])])
+    }
+
+    @Test func smallDropIsNotAReset() {
+        let before = window(.sevenDay, 85, resetsIn: 86_400)
+        let result = evaluate(previous: [before], current: [window(.sevenDay, 76, resetsIn: 86_400)], fired: keys(before, [80]))
+        #expect(result.alerts.isEmpty)
+        #expect(result.firedKeys == keys(before, [80]))
+    }
+
+    @Test func dropRearmsThresholdsAboveNewValue() {
+        let before = window(.sevenDay, 98, resetsIn: 86_400)
+        let after = window(.sevenDay, 85, resetsIn: 86_400)
+        let result = evaluate(previous: [before], current: [after], notifyOnReset: false, fired: keys(before))
+        #expect(result.alerts.isEmpty)
+        #expect(result.firedKeys == keys(before, [80]))
+        let climbed = window(.sevenDay, 96, resetsIn: 86_400)
+        #expect(evaluate(previous: [after], current: [climbed], fired: result.firedKeys).alerts == [.threshold(climbed, threshold: 95)])
+    }
+
+    @Test func keysWellAboveAnUnseenDropRearm() {
+        // The reset happened while Workdeck was not running: there is no previous window to compare with.
+        let stuck = window(.sevenDay, 98, resetsIn: 86_400)
+        let result = evaluate(current: [window(.sevenDay, 1, resetsIn: 86_400)], fired: keys(stuck))
+        #expect(result.alerts.isEmpty)
+        #expect(result.firedKeys.isEmpty)
+    }
+
+    @Test func keysNearTheCurrentValueStay() {
+        let reached = window(.sevenDay, 81, resetsIn: 86_400)
+        let result = evaluate(current: [window(.sevenDay, 75, resetsIn: 86_400)], fired: keys(reached, [80]))
+        #expect(result.firedKeys == keys(reached, [80]))
+    }
 }

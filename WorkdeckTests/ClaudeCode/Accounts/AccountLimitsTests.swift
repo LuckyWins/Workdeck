@@ -23,7 +23,7 @@ struct AccountLimitsTests {
         let support = root.appending(path: "support")
         let controller = ClaudeLimitsController(
             settings: settings,
-            store: ClaudeUsageStore(fileURL: support.appending(path: "claude-usage.json")) { fixedNow },
+            store: ClaudeUsageStore(fileURL: support.appending(path: "claude-usage.json"), accountFile: root.appending(path: ".claude.json")) { fixedNow },
             connector: mainConnector,
             poller: mainPoller,
             activity: activity,
@@ -145,6 +145,48 @@ struct AccountLimitsTests {
         #expect(settings.firedAlertKeys(for: nil).count == 1)
         #expect(settings.firedAlertKeys(for: "personal").count == 1)
         #expect(controller.takeAlerts().isEmpty)
+    }
+
+    @Test func accountSwitchRaisesNoResetAndRepeatsNoAlert() throws {
+        mainConnector.status = .connected
+        // "Notify when a limit resets" is on by default.
+        let (controller, settings) = makeController()
+        var changes = 0
+        controller.onAccountChanged = { changes += 1 }
+        let accountURL = root.appending(path: ".claude.json")
+        let store = controller.main.store
+        func show(_ account: String, _ usage: UsageWindow) throws {
+            writeAccountFile(account, to: accountURL)
+            try FileManager.default.createDirectory(at: store.fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try UsageSnapshotFile.write(UsageSnapshot(capturedAt: fixedNow, fiveHour: usage, sevenDay: nil, account: account), to: store.fileURL)
+            store.tick()
+            store.reload()
+        }
+        let first = window(.fiveHour, 85)
+        try show("A", first)
+        controller.start()
+        #expect(controller.takeAlerts() == [.threshold(first, threshold: 80)])
+        try show("B", window(.fiveHour, 30, resetsIn: 7200))
+        // No "limit reset" from A's window.
+        #expect(controller.takeAlerts().isEmpty)
+        try show("A", first)
+        // A's 80% alert was already shown.
+        #expect(controller.takeAlerts().isEmpty)
+        #expect(settings.firedAlertKeys(for: nil).contains(LimitsAlertPolicy.key(first, threshold: 80)))
+        #expect(changes == 2)
+    }
+
+    @Test func checkingAccountsNoticesASwitch() {
+        let (controller, _) = makeController()
+        var changes = 0
+        controller.onAccountChanged = { changes += 1 }
+        let accountURL = root.appending(path: ".claude.json")
+        writeAccountFile("A", to: accountURL)
+        controller.start()
+        writeAccountFile("B", to: accountURL)
+        // What reading the accounts in Settings → Instances does.
+        controller.checkAccounts()
+        #expect(changes == 1)
     }
 
     @Test func fetchAndRefreshApplyToEveryAccount() {

@@ -65,6 +65,12 @@ struct UsageAPIResponseParserTests {
         #expect(snapshot.sevenDay?.usedPercent == 0)
     }
 
+    @Test func reportsNotStartedWindows() {
+        let body = #"{"five_hour": {"utilization": 0.0, "resets_at": null}, "seven_day": null}"#
+        #expect(UsageAPIResponseParser.notStartedKinds(from: Data(body.utf8)) == [.fiveHour])
+        #expect(UsageAPIResponseParser.notStartedKinds(from: Data(usageBody().utf8)).isEmpty)
+    }
+
     @Test(arguments: ["", "[]", #"{"error": "nope"}"#, "<html></html>"])
     func rejectsNonUsageBodies(_ body: String) {
         #expect(UsageAPIResponseParser.snapshot(from: Data(body.utf8), capturedAt: fixedNow) == nil)

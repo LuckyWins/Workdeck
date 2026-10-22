@@ -1,7 +1,8 @@
 import Foundation
 
 nonisolated enum UsageAPIResult: Equatable, Sendable {
-    case snapshot(UsageSnapshot)
+    /// `notStarted`: windows the server reports as not started, which clear the shown ones.
+    case snapshot(UsageSnapshot, notStarted: Set<UsageWindowKind> = [])
     case loginExpired
     case rateLimited(retryAfter: TimeInterval)
     case failed(String)
@@ -59,7 +60,7 @@ nonisolated struct UsageAPIClient: Sendable {
             guard let snapshot = UsageAPIResponseParser.snapshot(from: data, capturedAt: now) else {
                 return .failed("Unexpected response")
             }
-            return .snapshot(snapshot)
+            return .snapshot(snapshot, notStarted: UsageAPIResponseParser.notStartedKinds(from: data))
         case 401, 403:
             return .loginExpired
         case 429:

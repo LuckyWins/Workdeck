@@ -7,11 +7,17 @@ struct UsagePollerTests {
     let snapshotURL = makeTemporaryDirectory().appending(path: "Workdeck/claude-usage.json")
     let transport = FakeTransport()
 
-    private func makePoller(token: String? = "t", expiresAt: Date? = nil, now: @escaping () -> Date = { fixedNow }) -> UsagePoller {
+    private func makePoller(
+        token: String? = "t",
+        expiresAt: Date? = nil,
+        accountFile: URL? = nil,
+        now: @escaping () -> Date = { fixedNow }
+    ) -> UsagePoller {
         UsagePoller(
             credentials: FakeCredentials(token: token, expiresAt: expiresAt),
             client: UsageAPIClient(transport: transport),
             snapshotURL: snapshotURL,
+            accountFile: accountFile,
             clock: now,
             schedulesTimer: false
         )
@@ -27,6 +33,29 @@ struct UsagePollerTests {
         #expect(saved.fiveHour == window(.fiveHour, 42))
         #expect(saved.sevenDay == window(.sevenDay, 30, resetsIn: 86_400))
         #expect(poller.status == .ok(fetchedAt: fixedNow))
+    }
+
+    @Test func lowerAPIValueReplacesStuckPercent() async throws {
+        let stuck = UsageSnapshot(capturedAt: fixedNow, fiveHour: nil, sevenDay: window(.sevenDay, 98, resetsIn: 86_400))
+        try UsageSnapshotFile.write(stuck, to: snapshotURL)
+        transport.enqueue(.init(status: 200, body: usageBody(sevenDay: (1, 86_400))))
+        let poller = makePoller()
+        poller.start()
+        await poller.pollTask?.value
+        #expect(try UsageSnapshotFile.read(from: snapshotURL).sevenDay?.usedPercent == 1)
+    }
+
+    @Test func notStartedClearsWindowAndTagsAccount() async throws {
+        let accountURL = makeTemporaryDirectory().appending(path: ".claude.json")
+        writeAccountFile("A", to: accountURL)
+        try UsageSnapshotFile.write(UsageSnapshot(capturedAt: fixedNow, fiveHour: window(.fiveHour, 90), sevenDay: nil), to: snapshotURL)
+        transport.enqueue(.init(status: 200, body: #"{"five_hour": {"utilization": 0.0, "resets_at": null}, "seven_day": null}"#))
+        let poller = makePoller(accountFile: accountURL)
+        poller.start()
+        await poller.pollTask?.value
+        let saved = try UsageSnapshotFile.read(from: snapshotURL)
+        #expect(saved.fiveHour == nil)
+        #expect(saved.account == "A")
     }
 
     @Test func missingCredentials() async {

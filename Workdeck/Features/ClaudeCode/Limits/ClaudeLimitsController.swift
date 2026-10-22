@@ -15,6 +15,8 @@ final class ClaudeLimitsController {
 
     /// Limits data or their settings changed; the composer redraws.
     @ObservationIgnored var onChange: (() -> Void)?
+    /// An instance was found signed in to another account; its labels need reading again.
+    @ObservationIgnored var onAccountChanged: (() -> Void)?
     /// The screen became active (unlocked, displays awake) or not.
 
     @ObservationIgnored private let activity: any SessionActivityMonitoring
@@ -169,6 +171,13 @@ final class ClaudeLimitsController {
         guard main.isConnected else { return }
         for account in extras where !account.isConnected {
             account.connect()
+        }
+    }
+
+    /// Reads every instance's account again, as Settings → Instances does when it shows them.
+    func checkAccounts() {
+        for account in accounts {
+            account.store.checkAccount()
         }
     }
 
@@ -333,7 +342,10 @@ final class ClaudeLimitsController {
     }
 
     private func begin(_ account: AccountLimits) {
-        account.start { [weak self] in self?.onChange?() }
+        account.start(
+            onChange: { [weak self] in self?.onChange?() },
+            onAccountChange: { [weak self] in self?.onAccountChanged?() }
+        )
         account.poller.setPaused(!activity.isActive)
         if settings.fetchFromAPI {
             account.poller.start()

@@ -44,6 +44,9 @@ nonisolated enum LimitsAlertPolicy {
 
     /// Keys older than this are dropped; no window period lasts longer than a week.
     static let keyRetention: TimeInterval = 8 * 24 * 60 * 60
+    /// A fall of at least this many points within one period is a reset (one done on claude.ai keeps the
+    /// period's end); smaller ones are rounding between sources (spec 2026-10-22 §2).
+    static let inPeriodResetDrop: Double = 10
 
     static func evaluate(
         previous: [UsageWindow],
@@ -60,13 +63,33 @@ nonisolated enum LimitsAlertPolicy {
         }
         var alerts: [LimitsAlert] = []
 
+        var dropped: Set<UsageWindowKind> = []
+        for window in previous {
+            guard let latest = current.first(where: { $0.kind == window.kind && $0.resetsAt == window.resetsAt }),
+                  latest.usedPercent <= window.usedPercent - inPeriodResetDrop
+            else { continue }
+            dropped.insert(window.kind)
+            // Thresholds above the new value alert again when usage climbs back within this period.
+            for threshold in sortedThresholds where Double(threshold) > latest.usedPercent {
+                fired.remove(key(latest, threshold: threshold))
+            }
+        }
+        // A reset Workdeck did not see (it was not running, or the snapshot was hidden) re-arms too: within a
+        // period usage never sits this far below a threshold it reached.
+        for window in current {
+            for threshold in sortedThresholds where Double(threshold) - inPeriodResetDrop > window.usedPercent {
+                fired.remove(key(window, threshold: threshold))
+            }
+        }
+
         if notifyOnReset, let first = sortedThresholds.first {
             var resetKinds: [UsageWindowKind] = []
             for window in previous where window.usedPercent >= Double(first) {
-                // A window only resets when its time passes or a new period arrives; missing data is not a reset.
+                // A window resets when its time passes, a new period arrives or it drops within its period;
+                // missing data is not a reset.
                 let expired = window.resetsAt <= now
                 let newPeriod = current.contains { $0.kind == window.kind && $0.resetsAt != window.resetsAt }
-                if expired || newPeriod {
+                if expired || newPeriod || dropped.contains(window.kind) {
                     resetKinds.append(window.kind)
                 }
             }

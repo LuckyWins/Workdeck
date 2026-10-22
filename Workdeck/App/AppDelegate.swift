@@ -30,12 +30,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settings: settings,
             limits: ClaudeLimitsController(
                 settings: settings,
-                store: ClaudeUsageStore(fileURL: WorkdeckPaths.standard().snapshotURL),
+                store: ClaudeUsageStore(
+                    fileURL: WorkdeckPaths.standard().snapshotURL,
+                    accountFile: ClaudeInstance.main(home: FileManager.default.homeDirectoryForCurrentUser).accountFile
+                ),
                 connector: ClaudeCodeConnector.standard(),
                 poller: UsagePoller(
                     credentials: SecurityCLICredentialsReader(),
                     client: UsageAPIClient(transport: URLSessionTransport()),
-                    snapshotURL: WorkdeckPaths.standard().snapshotURL
+                    snapshotURL: WorkdeckPaths.standard().snapshotURL,
+                    accountFile: ClaudeInstance.main(home: FileManager.default.homeDirectoryForCurrentUser).accountFile
                 ),
                 activity: SessionActivityMonitor(),
                 makeAccount: { instance in
@@ -43,14 +47,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     return AccountLimits(
                         name: instance.name,
                         directory: instance.directory,
-                        store: ClaudeUsageStore(fileURL: snapshot),
+                        store: ClaudeUsageStore(fileURL: snapshot, accountFile: instance.accountFile),
                         connector: ClaudeCodeConnector.forInstance(instance),
                         poller: UsagePoller(
                             credentials: SecurityCLICredentialsReader(
                                 service: ClaudeCredentials.keychainService(forConfigDirectory: instance.directory.path)
                             ),
                             client: UsageAPIClient(transport: URLSessionTransport()),
-                            snapshotURL: snapshot
+                            snapshotURL: snapshot,
+                            accountFile: instance.accountFile
                         ),
                         mainSettingsURL: ClaudeSettingsFile.standard().url
                     )
@@ -126,7 +131,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         recap.onOpenStatistics = { WindowOpener.shared.open(StatisticsWindow.id) }
         claudeCode.planLabels = { [unowned self] in instances.plans }
-        instances.onAccountsRefreshed = { [unowned self] in claudeCode.refresh() }
+        instances.onAccountsRefreshed = { [unowned self] in
+            claudeCode.limits.checkAccounts()
+            claudeCode.refresh()
+        }
+        claudeCode.limits.onAccountChanged = { [unowned self] in Task { await instances.refreshAccounts() } }
         Task { await instances.refreshAccounts() }
         claudeCode.setInstances(instances.instances)
         claudeCode.start()

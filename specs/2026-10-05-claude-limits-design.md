@@ -90,6 +90,8 @@ On every invocation:
 
 Concurrent sessions write the same file, so new data is merged into the existing snapshot rather than replacing it: an unexpired window missing from the input is kept, a later `resets_at` wins, and within the same period — reset times within 5 minutes of each other, since the status line and the usage API report them with different precision — the higher percent wins (usage never decreases within a period) while the existing reset time is kept so alerts see one stable period. This keeps an idle session from erasing or rolling back a window that another session is updating.
 
+> Amended 2026-10-22: freshness per source and account binding replace the higher-percent rule; see `specs/2026-10-22-limits-fresh-samples-and-account-binding-design.md`.
+
 Performance target: well under 100 ms for the command itself (excluding the chained command).
 
 ## 5. App Behavior

@@ -57,7 +57,7 @@ final class AccountLimits {
         return ClaudeSettingsFile.isSameFile(directory.appending(path: "settings.json"), as: mainSettingsURL)
     }
 
-    func start(onChange: @escaping () -> Void) {
+    func start(onChange: @escaping () -> Void, onAccountChange: @escaping () -> Void = {}) {
         if sharesMainSettings {
             connectError = ClaudeSettingsFile.sharedSettingsMessage
         } else {
@@ -70,6 +70,11 @@ final class AccountLimits {
                 poller.loginMayHaveRenewed()
             }
             onChange()
+        }
+        store.onAccountChange = { [weak self] in
+            // The other account's windows must not read as a reset at the next alert check.
+            self?.previousWindows = []
+            onAccountChange()
         }
         poller.onChange = { [weak self] in
             guard let self else { return }

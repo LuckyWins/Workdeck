@@ -33,4 +33,13 @@ struct StatusLineInputParserTests {
         #expect(snapshot.fiveHour?.usedPercent == 100)
         #expect(snapshot.sevenDay?.usedPercent == 0)
     }
+
+    @Test func readsSessionID() {
+        #expect(StatusLineInputParser.sessionID(from: statusLineInput()) == "abc")
+    }
+
+    @Test(arguments: [#"{"model": {}}"#, #"{"session_id": ""}"#, "not json"])
+    func missingSessionIDIsNil(_ text: String) {
+        #expect(StatusLineInputParser.sessionID(from: Data(text.utf8)) == nil)
+    }
 }

@@ -7,6 +7,8 @@ nonisolated struct StatusLineRunner: Sendable {
     var environment = ProcessInfo.processInfo.environment
     /// The extra instance this status line belongs to (`--instance <name>`); `nil` for the main one.
     var instance: String?
+    /// The instance's `.claude.json`, whose account tags the snapshot; `nil` leaves the account unknown.
+    var accountFile: URL?
 
     /// The value of `--instance` when it is a valid instance name (spec §3.1); otherwise the main instance.
     /// The same rule as `HookRunner.instance(from:)`: the two binaries share no code.
@@ -23,7 +25,12 @@ nonisolated struct StatusLineRunner: Sendable {
         var snapshot = StatusLineInputParser.snapshot(from: stdin, capturedAt: now)
         if let incoming = snapshot {
             let existing = try? UsageSnapshotFile.read(from: paths.snapshotURL(for: instance))
-            let merged = existing?.merged(with: incoming, now: now) ?? incoming
+            let merged = (existing ?? UsageSnapshot(capturedAt: now, fiveHour: nil, sevenDay: nil)).merged(
+                with: incoming,
+                from: .session(StatusLineInputParser.sessionID(from: stdin)),
+                account: accountFile.flatMap(ClaudeAccountFile.accountID(in:)),
+                now: now
+            )
             try? UsageSnapshotFile.write(merged, to: paths.snapshotURL(for: instance))
             snapshot = merged
         }

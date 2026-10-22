@@ -19,12 +19,11 @@ nonisolated struct ClaudeInstance: Equatable, Hashable, Sendable, Identifiable {
     var vscodeProfile: String? { isMain ? nil : "Claude \(name)" }
 
     static func main(home: URL) -> ClaudeInstance {
-        ClaudeInstance(name: mainName, directory: home.appending(path: ".claude"), accountFile: home.appending(path: ".claude.json"))
+        ClaudeInstance(name: mainName, directory: home.appending(path: ".claude"), accountFile: ClaudeAccountFile.url(home: home, instance: nil))
     }
 
     static func extra(named name: String, home: URL) -> ClaudeInstance {
-        let directory = home.appending(path: ".claude-\(name)")
-        return ClaudeInstance(name: name, directory: directory, accountFile: directory.appending(path: ".claude.json"))
+        ClaudeInstance(name: name, directory: home.appending(path: ".claude-\(name)"), accountFile: ClaudeAccountFile.url(home: home, instance: name))
     }
 
     /// "~/.claude-work".
