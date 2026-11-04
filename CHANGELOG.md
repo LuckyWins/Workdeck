@@ -4,6 +4,8 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 
 ## Unreleased
 
+## 1.1.1 — 2026-11-04
+
 ### Improved
 - The install steps now show both ways to open Workdeck the first time: Open Anyway in System Settings, or one Terminal command.
 
