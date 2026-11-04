@@ -37,7 +37,9 @@ jobs:
           set -euo pipefail
           # The image's default Xcode is its stable release; Xcode_27.x aliases can point to release candidates.
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          VERSION_LINE="$(xcodebuild -version | head -1)"
+          # No `| head`: xcodebuild aborts on a broken pipe when head closes it early (run of 2026-11-04).
+          VERSION_LINE="$(xcodebuild -version)"
+          VERSION_LINE="${VERSION_LINE%%$'\n'*}"
           echo "$VERSION_LINE"
           case "$VERSION_LINE" in
             "Xcode 27"*) ;;
