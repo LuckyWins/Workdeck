@@ -1,0 +1,145 @@
+# Builds, signs and publishes a release when a version tag is pushed (in-app updates spec §5).
+# Secrets live in the `release` environment, which only `v*` tags can deploy to (spec §5.1, docs/releasing.md).
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # Sparkle's command-line tools, checked against this hash before they touch the private key.
+  SPARKLE_VERSION: "2.10.1"
+  SPARKLE_SHA256: "1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27"
+  TEAM_ID: "J55BY69CVU"
+
+jobs:
+  release:
+    runs-on: macos-26
+    environment: release
+    timeout-minutes: 45
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Pick Xcode 27
+        run: |
+          set -euo pipefail
+          # A release Xcode only: betas sort after release builds of the same version.
+          XCODE="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | grep -vi beta | sort -V | tail -1 || true)"
+          if [ -z "$XCODE" ]; then
+            echo "::error::No Xcode 27 on this runner image; update runs-on in release.yml"
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcodebuild -version
+
+      - name: Check the tag against the project and the changelog
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          python3 -I scripts/release/release.py check "$VERSION"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Import the signing certificate
+        env:
+          CERTIFICATE_P12_BASE64: ${{ secrets.CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/release.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+          # The decoded certificate never outlives this step, also when it fails.
+          trap 'rm -f "$RUNNER_TEMP/certificate.p12"' EXIT
+          printf '%s' "$CERTIFICATE_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          # Known to the cleanup step before anything else can fail.
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$KEYCHAIN" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 > /dev/null
+          rm -f "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+
+      - name: Build and sign
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -scheme Workdeck \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -archivePath "$RUNNER_TEMP/Workdeck.xcarchive" \
+            -onlyUsePackageVersionsFromResolvedFile \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Development" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN" \
+            > "$RUNNER_TEMP/archive.log" 2>&1 || {
+              grep -E "error:" "$RUNNER_TEMP/archive.log" || tail -50 "$RUNNER_TEMP/archive.log"
+              exit 1
+            }
+          APP="$RUNNER_TEMP/Workdeck.xcarchive/Products/Applications/Workdeck.app"
+          test -d "$APP" || { echo "::error::The archive has no Workdeck.app"; exit 1; }
+          # Sparkle's helpers come ad-hoc signed; they do the installing, so they get the release identity too.
+          scripts/release/resign-sparkle.sh "$APP" "Apple Development" "$KEYCHAIN"
+          scripts/release/check-signatures.sh "$APP" "$TEAM_ID"
+          BUILT="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
+          test "$BUILT" = "$VERSION" || { echo "::error::Built $BUILT, tag says $VERSION"; exit 1; }
+          echo "BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")" >> "$GITHUB_ENV"
+          mkdir -p dist
+          ditto -c -k --keepParent "$APP" "dist/Workdeck-$VERSION.zip"
+
+      - name: Fetch Sparkle's tools
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/sparkle.tar.xz" \
+            "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz"
+          echo "$SPARKLE_SHA256  $RUNNER_TEMP/sparkle.tar.xz" | shasum -a 256 -c -
+          mkdir -p "$RUNNER_TEMP/sparkle"
+          tar -xf "$RUNNER_TEMP/sparkle.tar.xz" -C "$RUNNER_TEMP/sparkle"
+
+      - name: Sign the update and write the appcast
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          ZIP="dist/Workdeck-$VERSION.zip"
+          SIGNATURE="$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$RUNNER_TEMP/sparkle/bin/sign_update" --ed-key-file - -p "$ZIP")"
+          test -n "$SIGNATURE" || { echo "::error::sign_update printed no signature"; exit 1; }
+          python3 -I scripts/release/release.py notes "$VERSION" --format html > "$RUNNER_TEMP/notes.html"
+          python3 -I scripts/release/release.py notes "$VERSION" --format markdown > "$RUNNER_TEMP/notes.md"
+          python3 -I scripts/release/release.py appcast \
+            --version "$VERSION" \
+            --build "$BUILD" \
+            --url "https://github.com/${GITHUB_REPOSITORY}/releases/download/v$VERSION/Workdeck-$VERSION.zip" \
+            --length "$(stat -f%z "$ZIP")" \
+            --signature "$SIGNATURE" \
+            --min-system "$(python3 -I scripts/release/release.py min-system)" \
+            --notes-file "$RUNNER_TEMP/notes.html" \
+            --out dist/appcast.xml
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "v$VERSION" "dist/Workdeck-$VERSION.zip" dist/appcast.xml \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Workdeck $VERSION" \
+            --notes-file "$RUNNER_TEMP/notes.md"
+
+      - name: Remove the keychain
+        if: always()
+        run: |
+          if [ -n "${KEYCHAIN:-}" ]; then security delete-keychain "$KEYCHAIN" || true; fi
