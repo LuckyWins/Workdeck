@@ -22,7 +22,8 @@ env:
 
 jobs:
   release:
-    runs-on: macos-26
+    # GitHub's macos-26 image tops out at Xcode 26.x; the project needs Xcode 27 (public preview image).
+    runs-on: xcode-27
     environment: release
     timeout-minutes: 45
     steps:
@@ -34,15 +35,14 @@ jobs:
       - name: Pick Xcode 27
         run: |
           set -euo pipefail
-          # A release Xcode only: betas sort after release builds of the same version.
-          XCODE="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | grep -vi beta | sort -V | tail -1 || true)"
-          if [ -z "$XCODE" ]; then
-            echo "::error::No Xcode 27 on this runner image; update runs-on in release.yml"
-            ls -d /Applications/Xcode*.app
-            exit 1
-          fi
-          sudo xcode-select -s "$XCODE/Contents/Developer"
-          xcodebuild -version
+          # The image's default Xcode is its stable release; Xcode_27.x aliases can point to release candidates.
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          VERSION_LINE="$(xcodebuild -version | head -1)"
+          echo "$VERSION_LINE"
+          case "$VERSION_LINE" in
+            "Xcode 27"*) ;;
+            *) echo "::error::Expected Xcode 27, the runner has $VERSION_LINE"; ls -d /Applications/Xcode*.app; exit 1 ;;
+          esac
 
       - name: Check the tag against the project and the changelog
         run: |

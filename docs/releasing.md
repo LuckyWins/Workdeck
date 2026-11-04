@@ -43,5 +43,6 @@ Because the signing secrets live in GitHub, whoever took over the GitHub account
 
 ## Notes From the First Runs
 
+- The first run (2026-11-04) failed before building: `macos-26` has only Xcode 26.x. Releases run on the `xcode-27` image (public preview, macOS 27) with its default Xcode; move to a GA label once GitHub has one with Xcode 27.
 - Signing on the runner uses `CODE_SIGN_STYLE=Manual` with the Apple Development identity from the temporary keychain, and the app is taken from the archive (no `-exportArchive`). Record here what the first run proved.
 - Xcode's "Code Sign on Copy" signs `Sparkle.framework` but leaves its helpers (`Autoupdate`, `Updater.app`, `Installer.xpc`, `Downloader.xpc`) ad-hoc signed; `scripts/release/resign-sparkle.sh` signs them with the release identity, innermost first, and reseals the app, and `scripts/release/check-signatures.sh` fails the run if any code in the app is ad-hoc or another team's. Both can be run locally on a copy of a built app (pass the identity's SHA-1 from `security find-identity -v -p codesigning` when the Keychain holds more than one Apple Development identity).
