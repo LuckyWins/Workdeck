@@ -8,6 +8,7 @@ on:
     paths:
       - "site/**"
       - "docs/media/icon.png"
+      - "docs/media/screenshots/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -38,6 +39,7 @@ jobs:
           mkdir _site
           cp site/index.html site/install.sh _site/
           cp docs/media/icon.png _site/icon.png
+          cp -R docs/media/screenshots _site/screenshots
 
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0

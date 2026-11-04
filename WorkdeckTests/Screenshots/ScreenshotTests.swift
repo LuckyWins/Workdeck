@@ -1,0 +1,136 @@
+import Foundation
+import SwiftUI
+import Testing
+@testable import Workdeck
+
+/// Renders the README and landing page images (screenshots spec). Off unless `make screenshots` sets
+/// `WORKDECK_SCREENSHOTS=1`, so `make test` never writes to `docs/media/screenshots/`.
+@MainActor
+@Suite(.serialized)
+struct ScreenshotTests {
+    @Test(.enabled(if: !ScreenshotRenderer.isEnabled))
+    func withoutTheSwitchNothingIsWritten() {
+        // No rendering test runs in this process (they need the switch); the folder is left as it was.
+        #expect(!ScreenshotRenderer.isEnabled)
+        #expect(ScreenshotRenderer.writtenThisRun.isEmpty)
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func theRendererWritesATwiceSizedImage() throws {
+        let url = try ScreenshotRenderer.write(Text("Workdeck").padding(), name: "renderer-check", dark: false, width: 120)
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(try ScreenshotRenderer.pixelWidth(of: url) == 240)
+    }
+
+    // MARK: Notch and Statistics (screenshots spec §2)
+
+    private let fixtures = ScreenshotFixtures()
+
+    private func expectWritten(_ url: URL, points: CGFloat) throws {
+        #expect(try ScreenshotRenderer.pixelWidth(of: url) == Int(points * 2))
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func notchCompact() throws {
+        let model = fixtures.notchModel()
+        // As DynamicNotchKit lays the compact notch out: each half inset 8 pt outside, 4 pt top, 8 pt bottom, the camera
+        // housing between them, the top radius on each side, clipped to the compact outline.
+        let compact = HStack(spacing: 0) {
+            LimitsCompactLeading(model: model).padding(.leading, 8).padding(.top, 4).padding(.bottom, 8)
+            Color.black.frame(width: NotchGeometry.housing.width)
+            LimitsCompactTrailing(model: model).padding(.trailing, 8).padding(.top, 4).padding(.bottom, 8)
+        }
+        .frame(height: NotchGeometry.housing.height)
+        .padding(.horizontal, NotchGeometry.compactRadii.top)
+        .fixedSize()
+        .background(Color.black)
+        .clipShape(NotchOutline(topCornerRadius: NotchGeometry.compactRadii.top, bottomCornerRadius: NotchGeometry.compactRadii.bottom))
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        // A fixed width: fitting the compact views' own width loops AppKit's layout.
+        let url = try ScreenshotRenderer.write(compact, name: "notch-compact", dark: true, width: 400)
+        try expectWritten(url, points: 400)
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func notchExpanded() throws {
+        let url = try ScreenshotRenderer.write(notchFrame(LimitsExpandedView(model: fixtures.notchModel())), name: "notch-expanded", dark: true, width: nil)
+        #expect(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func notchAlert() throws {
+        // The demo's limit alert, 30 s in: "5-hour limit at 80%".
+        let shown = fixtures.demoNotch(elapsed: 30)
+        let model = LimitsNotchModel()
+        model.state = shown.state
+        model.alerts = try #require(shown.alerts.filter { if case .threshold = $0 { true } else { false } }.last.map { [$0] })
+        let url = try ScreenshotRenderer.write(notchFrame(LimitsExpandedView(model: model)), name: "notch-alert", dark: true, width: nil)
+        #expect(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func notchRecap() throws {
+        let model = fixtures.notchModel()
+        model.recap = RecapDemoScript.recap(now: fixtures.monday, calendar: fixtures.calendar)
+        let url = try ScreenshotRenderer.write(notchFrame(LimitsExpandedView(model: model)), name: "notch-recap", dark: true, width: nil)
+        #expect(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func statistics() throws {
+        let controller = fixtures.statistics()
+        for dark in [false, true] {
+            let view = StatisticsContent(controller: controller).background(Color(nsColor: .windowBackgroundColor))
+            let url = try ScreenshotRenderer.write(view, name: "statistics-\(dark ? "dark" : "light")", dark: dark, width: 460)
+            try expectWritten(url, points: 460)
+        }
+    }
+
+    @Test func theFixturesUseTemporaryFolders() {
+        let fixtures = ScreenshotFixtures()
+        _ = fixtures.notchModel()
+        _ = fixtures.statistics()
+        #expect(!fixtures.handedOut.isEmpty)
+        #expect(fixtures.handedOut.allSatisfy { $0.path.hasPrefix(fixtures.temporaryRoot.path) })
+        #expect(fixtures.handedOut.allSatisfy { !$0.path.contains("/.claude") && !$0.path.contains("/.codex") })
+    }
+
+    // MARK: Popover and Chats
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func popover() async throws {
+        let claudeCode = try fixtures.claudeCode()
+        let codex = await fixtures.codex()
+        let lid = await fixtures.closedLidMode()
+        #expect(lid.isActive)
+        let composer = NotchComposer(settings: NotchSettings(defaults: fixtures.defaults()), presenter: FakePresenter(), cameraHousings: { [true] }, clock: { Date() })
+        let popover = PopoverView(
+            controller: lid, claudeCode: claudeCode, codex: codex,
+            recap: fixtures.recap(composer: composer), demo: DemoMode(), updates: fixtures.updates()
+        )
+        for dark in [false, true] {
+            let url = try ScreenshotRenderer.write(popover.background(Color(nsColor: .windowBackgroundColor)), name: "popover-\(dark ? "dark" : "light")", dark: dark, width: 300)
+            try expectWritten(url, points: 300)
+        }
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func chats() async throws {
+        let controller = try await fixtures.chats()
+        for dark in [false, true] {
+            let view = ChatsWindow(controller: controller).frame(height: 480).background(Color(nsColor: .windowBackgroundColor))
+            let url = try ScreenshotRenderer.write(view, name: "chats-\(dark ? "dark" : "light")", dark: dark, width: 640)
+            try expectWritten(url, points: 640)
+        }
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func everyImageWasWritten() {
+        // The suite is serialized and runs in declaration order, so this comes last: every image of spec §2 must have
+        // been written in this run, not merely be on disk from an earlier one.
+        let expected: Set = ["notch-compact", "notch-expanded", "notch-alert", "notch-recap", "popover-light", "popover-dark",
+                             "statistics-light", "statistics-dark", "chats-light", "chats-dark"]
+        #expect(expected.isSubset(of: ScreenshotRenderer.writtenThisRun), "missing: \(expected.subtracting(ScreenshotRenderer.writtenThisRun).sorted())")
+    }
+}

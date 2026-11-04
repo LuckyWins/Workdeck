@@ -35,10 +35,25 @@
   .small a, a { color: var(--accent); text-decoration: none; }
   section { border-top: 1px solid var(--line); padding: 26px 0 4px; margin-top: 30px; }
   section h2 { font-size: 22px; margin: 0 0 10px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px 22px; }
-  .grid h3 { font-size: 16px; margin: 0 0 3px; }
-  .grid p { margin: 0; color: var(--dim); font-size: 14px; }
   ol { padding-left: 20px; } ol li { margin: 6px 0; }
+  .tour { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 34px; }
+  .step { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: center; }
+  .step:nth-child(even) .shot { order: 2; }
+  /* Every picture sits in a frame of the same height, scaled to fit. */
+  .shot { height: 300px; display: flex; align-items: center; justify-content: center; background: var(--code); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .shot img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+  .shot picture { display: contents; }
+  .num { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 13px; background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+  .text h3 { font-size: 19px; margin: 0 0 6px; }
+  .text p { margin: 0; color: var(--dim); }
+  @media (max-width: 640px) { .step { grid-template-columns: 1fr; } .step:nth-child(even) .shot { order: 0; } .shot { height: 240px; } }
+  /* Click a screenshot to see it full screen; Esc or a click closes it. */
+  img[data-zoom] { cursor: zoom-in; }
+  .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.82); display: none; align-items: center; justify-content: center; z-index: 10; cursor: zoom-out; padding: 24px; }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 100%; max-height: 100%; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+  img[data-zoom]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  body.zoomed { overflow: hidden; }
   footer { border-top: 1px solid var(--line); margin-top: 36px; padding-top: 16px; color: var(--dim); font-size: 13px; text-align: center; }
 </style>
 </head>
@@ -57,15 +72,37 @@
   </div>
 
   <section>
-    <h2>What does Workdeck do?</h2>
-    <div class="grid">
-      <div><h3>💻 Closed-Lid Mode</h3><p>Keeps the Mac awake with the lid closed; turns itself off on low battery or heat.</p></div>
-      <div><h3>📊 Limits in the notch</h3><p>Claude Code and Codex plan limits at a glance, with reset times and a forecast.</p></div>
-      <div><h3>🤖 Live sessions</h3><p>Every session working, waiting for you or idle, with its agents and last steps.</p></div>
-      <div><h3>🔔 Alerts</h3><p>A limit near its end, a session that needs you, a long session that finished.</p></div>
-      <div><h3>📅 Weekly recap</h3><p>Coding time by project, a Statistics window and a half-year activity grid.</p></div>
-      <div><h3>🔒 Private</h3><p>No account, no telemetry; prompts and answers are never stored.</p></div>
-    </div>
+    <h2>How it works</h2>
+    <ol class="tour">
+      <li class="step">
+        <div class="shot"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/popover-dark.png"><img src="screenshots/popover-light.png" alt="The menu bar popover" loading="lazy" data-zoom></picture></div>
+        <div class="text"><span class="num">1</span><h3>Turn on what you need</h3><p>Click the Workdeck icon in the menu bar. Each tool is one row: Closed-Lid Mode keeps the Mac awake with the lid closed, Claude Code and Codex show your limits and sessions. Connect them once in Settings.</p></div>
+      </li>
+      <li class="step">
+        <div class="shot"><img src="screenshots/notch-compact.png" alt="The compact notch: the limit ring and session counters" loading="lazy" data-zoom></div>
+        <div class="text"><span class="num">2</span><h3>While you work</h3><p>The notch shows the limit closest to running out and how many sessions are working. It stays out of the way until something changes.</p></div>
+      </li>
+      <li class="step">
+        <div class="shot"><img src="screenshots/notch-expanded.png" alt="The expanded notch: limits of two Claude Code accounts and Codex, and live sessions with an agent" loading="lazy" data-zoom></div>
+        <div class="text"><span class="num">3</span><h3>Hover to see everything</h3><p>Rest the pointer on the notch: every account's 5-hour and weekly limits with reset times and a forecast, and every session with its agents, last steps and changed lines.</p></div>
+      </li>
+      <li class="step">
+        <div class="shot"><img src="screenshots/notch-alert.png" alt="A limit alert in the notch" loading="lazy" data-zoom></div>
+        <div class="text"><span class="num">4</span><h3>When something needs you</h3><p>A limit at 80 % or 95 %, a session waiting for a permission, a long session that finished: the notch opens with the alert. Click it to jump to the right window.</p></div>
+      </li>
+      <li class="step">
+        <div class="shot"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/chats-dark.png"><img src="screenshots/chats-light.png" alt="The Chats window with two accounts" loading="lazy" data-zoom></picture></div>
+        <div class="text"><span class="num">5</span><h3>Out of limit? Carry on with another account</h3><p>Run a second Claude Code account side by side. In Chats, open any chat on the other account and continue where you stopped.</p></div>
+      </li>
+      <li class="step">
+        <div class="shot"><img src="screenshots/notch-recap.png" alt="Last week's recap in the notch" loading="lazy" data-zoom></div>
+        <div class="text"><span class="num">6</span><h3>Your week, on Monday</h3><p>On the first unlock of a week the notch shows last week: coding time by project, sessions, files, lines and limit hits.</p></div>
+      </li>
+      <li class="step">
+        <div class="shot"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/statistics-dark.png"><img src="screenshots/statistics-light.png" alt="The Statistics window with the activity grid" loading="lazy" data-zoom></picture></div>
+        <div class="text"><span class="num">7</span><h3>And everything before</h3><p>Statistics keeps half a year: any week in detail, an activity grid of days and your streak, for Claude Code and Codex.</p></div>
+      </li>
+    </ol>
   </section>
 
   <section>
@@ -94,6 +131,49 @@
       });
     });
   });
+</script>
+<div class="lightbox" role="dialog" aria-modal="true" aria-label="Screenshot" tabindex="-1"><img alt=""></div>
+<script>
+  // Screenshots open full screen by click, Enter or Space; Esc, a click or Tab closes and focus goes back.
+  (function () {
+    var box = document.querySelector('.lightbox'), big = box.querySelector('img'), opener = null;
+    var shots = document.querySelectorAll('img[data-zoom]');
+    shots.forEach(function (img) {
+      img.setAttribute('tabindex', '0');
+      img.setAttribute('role', 'button');
+      img.setAttribute('aria-label', 'Show full size: ' + img.alt);
+    });
+    function open(img) {
+      opener = img;
+      big.src = img.currentSrc || img.src;
+      big.alt = img.alt;
+      // 2× images at their real size, never larger than the screen.
+      big.onload = function () { big.style.width = Math.min(big.naturalWidth / 2, window.innerWidth - 48) + 'px'; };
+      box.classList.add('open');
+      document.body.classList.add('zoomed');
+      box.focus();
+    }
+    function close() {
+      if (!box.classList.contains('open')) return;
+      box.classList.remove('open');
+      document.body.classList.remove('zoomed');
+      big.style.width = '';
+      if (opener) opener.focus();
+    }
+    document.addEventListener('click', function (e) {
+      var img = e.target.closest('img[data-zoom]');
+      if (img) { open(img); return; }
+      if (e.target.closest('.lightbox')) close();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (box.classList.contains('open')) {
+        if (e.key === 'Escape' || e.key === 'Tab') { e.preventDefault(); close(); }
+        return;
+      }
+      var img = e.target.closest && e.target.closest('img[data-zoom]');
+      if (img && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(img); }
+    });
+  })();
 </script>
 </body>
 </html>

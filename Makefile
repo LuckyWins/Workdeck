@@ -7,7 +7,7 @@ APP := $(BUILD_DIR)/Build/Products/Release/Workdeck.app
 INSTALL_DIR := /Applications
 INSTALLED_BIN := $(INSTALL_DIR)/Workdeck.app/Contents/MacOS/Workdeck
 
-.PHONY: build test install clean release-prep
+.PHONY: build test install clean release-prep screenshots
 
 ## build: Release build into ./build (signed with the project's development team)
 build:
@@ -47,3 +47,12 @@ clean:
 release-prep:
 	@if [ -z "$(VERSION)" ]; then echo "usage: make release-prep VERSION=1.2.3"; exit 1; fi
 	python3 -I scripts/release/release.py prepare $(VERSION)
+
+## screenshots: render the README and landing page images from demo data into docs/media/screenshots
+screenshots:
+	@mkdir -p $(BUILD_DIR)
+	@set -o pipefail; TEST_RUNNER_WORKDECK_SCREENSHOTS=1 TEST_RUNNER_TZ=Europe/Berlin xcodebuild -scheme $(SCHEME) \
+		-destination '$(DESTINATION)' test -only-testing:WorkdeckTests/ScreenshotTests 2>&1 \
+		| tee $(BUILD_DIR)/screenshots.log | grep -E "error:|recorded an issue|Test run with|\*\* TEST|^Wrote "
+	@n=$$(grep -c '^Wrote .*docs/media/screenshots/[a-z-]*\.png' $(BUILD_DIR)/screenshots.log); \
+		if [ "$$n" -lt 10 ]; then echo "error: only $$n images written; the switch may not have reached the tests"; exit 1; fi
