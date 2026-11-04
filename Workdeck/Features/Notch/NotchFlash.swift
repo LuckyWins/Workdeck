@@ -2,6 +2,8 @@ import Foundation
 
 /// How urgent a flash is; the most urgent alert of a moment colors it (spec §2.1).
 nonisolated enum NotchFlashColor: Int, Comparable, Sendable {
+    /// A new Workdeck: the least urgent, used only for an update alert's wash (in-app updates spec §2.3).
+    case blue
     case green
     case orange
     case red
@@ -35,6 +37,7 @@ nonisolated enum NotchFlash {
         switch alert {
         case .sessionFinished, .reset: .green
         case .sessionNeedsYou: .orange
+        case .updateAvailable: .blue
         case let .threshold(_, threshold, _, _):
             thresholds.count > 1 && threshold >= (thresholds.max() ?? .max) ? .red : .orange
         }
@@ -46,6 +49,8 @@ nonisolated enum NotchFlash {
     }
 
     static func event(for alerts: [LimitsAlert], thresholds: [Int], id: Int) -> NotchFlashEvent? {
+        // An update alert never flashes the compact notch (in-app updates spec §2.3).
+        let alerts = alerts.filter { !$0.isUpdate }
         guard !alerts.isEmpty else { return nil }
         let ring = alerts.filter { !isSessionAlert($0) }.map { color(of: $0, thresholds: thresholds) }.max()
         let dot = alerts.filter(isSessionAlert).map { color(of: $0, thresholds: thresholds) }.max()
@@ -81,7 +86,7 @@ nonisolated enum NotchFlash {
     private static func isSessionAlert(_ alert: LimitsAlert) -> Bool {
         switch alert {
         case .sessionFinished, .sessionNeedsYou: true
-        case .threshold, .reset: false
+        case .threshold, .reset, .updateAvailable: false
         }
     }
 }

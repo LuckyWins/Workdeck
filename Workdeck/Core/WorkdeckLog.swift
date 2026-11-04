@@ -10,4 +10,5 @@ nonisolated enum WorkdeckLog {
     /// Codex's limits from session files and app-server (diagnosing figures that stop updating).
     static let codexLimits = Logger(subsystem: subsystem, category: "codexLimits")
     static let chats = Logger(subsystem: subsystem, category: "chats")
+    static let updates = Logger(subsystem: subsystem, category: "updates")
 }

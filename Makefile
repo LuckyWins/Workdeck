@@ -7,7 +7,7 @@ APP := $(BUILD_DIR)/Build/Products/Release/Workdeck.app
 INSTALL_DIR := /Applications
 INSTALLED_BIN := $(INSTALL_DIR)/Workdeck.app/Contents/MacOS/Workdeck
 
-.PHONY: build test install clean
+.PHONY: build test install clean release-prep
 
 ## build: Release build into ./build (signed with the project's development team)
 build:
@@ -42,3 +42,8 @@ install: build
 ## clean: remove ./build
 clean:
 	rm -rf $(BUILD_DIR)
+
+## release-prep: move CHANGELOG's Unreleased under VERSION, bump the versions, commit (then push and tag v$(VERSION))
+release-prep:
+	@if [ -z "$(VERSION)" ]; then echo "usage: make release-prep VERSION=1.2.3"; exit 1; fi
+	python3 -I scripts/release/release.py prepare $(VERSION)

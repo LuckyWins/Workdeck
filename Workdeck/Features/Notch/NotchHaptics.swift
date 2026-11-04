@@ -27,6 +27,9 @@ final class SystemHaptics: HapticPerforming {
 extension LimitsAlert {
     /// Needs you, a limit threshold and a finished session tap; a limit reset is only news (spec §2.2).
     var tapsHaptic: Bool {
-        if case .reset = self { false } else { true }
+        switch self {
+        case .reset, .updateAvailable: false
+        case .threshold, .sessionFinished, .sessionNeedsYou: true
+        }
     }
 }

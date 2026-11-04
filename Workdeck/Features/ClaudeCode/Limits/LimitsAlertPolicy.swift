@@ -7,6 +7,8 @@ nonisolated enum LimitsAlert: Equatable, Sendable {
     case reset([UsageWindowKind], account: String? = nil, agent: AgentKind = .claudeCode)
     case sessionFinished(project: String, worked: TimeInterval, agent: AgentKind = .claudeCode)
     case sessionNeedsYou(project: String, agent: AgentKind = .claudeCode)
+    /// A newer Workdeck was found; about the app, not an agent (in-app updates spec §2.3).
+    case updateAvailable(version: String)
 }
 
 nonisolated extension LimitsAlert {
@@ -15,7 +17,7 @@ nonisolated extension LimitsAlert {
         switch self {
         case let .threshold(window, threshold, _, agent): .threshold(window, threshold: threshold, account: label, agent: agent)
         case let .reset(kinds, _, agent): .reset(kinds, account: label, agent: agent)
-        case .sessionFinished, .sessionNeedsYou: self
+        case .sessionFinished, .sessionNeedsYou, .updateAvailable: self
         }
     }
 
@@ -24,15 +26,21 @@ nonisolated extension LimitsAlert {
         switch self {
         case let .threshold(window, threshold, account, _): .threshold(window, threshold: threshold, account: account, agent: agent)
         case let .reset(kinds, account, _): .reset(kinds, account: account, agent: agent)
-        case .sessionFinished, .sessionNeedsYou: self
+        case .sessionFinished, .sessionNeedsYou, .updateAvailable: self
         }
     }
 
-    /// The agent an alert is about.
+    /// The agent an alert is about; an update alert is about the app and reports Claude Code, but nothing marks or
+    /// routes it by agent (`isUpdate`).
     var agent: AgentKind {
         switch self {
         case let .threshold(_, _, _, agent), let .reset(_, _, agent), let .sessionFinished(_, _, agent), let .sessionNeedsYou(_, agent): agent
+        case .updateAvailable: .claudeCode
         }
+    }
+
+    var isUpdate: Bool {
+        if case .updateAvailable = self { true } else { false }
     }
 }
 

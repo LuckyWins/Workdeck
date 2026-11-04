@@ -5,7 +5,8 @@ Ideas and deferred work. **Planned** lists what is agreed and in what order; eac
 ## To Discuss First
 
 - **Compare Claude Code instances.** Show what differs between instances (`~/.claude` and each `~/.claude-<name>`): `CLAUDE.md`, rules, skills, MCP servers (and possibly agents, commands, settings), and offer to apply or move an item from one instance to another. Added 2026-11-04 to brainstorm next. Overlaps "Copy shared setup into an instance" under Claude Code Instances (copy versus link, conflicts, plugins with absolute paths); the settings diff review (`SettingsReview/`) could show the changes before they are written.
-- **Updating an installed Workdeck, and CI.** Added 2026-11-04 to discuss after the activity grid. How an installed copy learns of and installs a new version: a light check of GitHub `releases/latest` with an "Update available" line (as [Poirot](https://github.com/a7t-ai/poirot)'s `UpdateChecker.swift` does, no dependency) versus Sparkle (see Distribution below) versus a Homebrew cask (`brew upgrade`). What must survive an update: the privileged helper registered with `SMAppService` (a new build may need re-approval), the status line and hook paths written into each instance's `settings.json` and Codex's `hooks.json` (they point into the app bundle), and `recap.json`. And whether CI can build, sign, notarize and publish on a tag: Poirot's `.github/workflows/release.yml` archives, makes a DMG, notarizes with `notarytool` and an App Store Connect API key, staples with retries, writes release notes from the commits and updates a Homebrew tap. Signing and notarization need the Apple Developer Program ($99 a year); GitHub Actions macOS runners are free for public repositories and billed per minute for private ones.
+- **Updating an installed Workdeck, and CI.** Being designed: `specs/2026-11-04-in-app-updates-design.md` (Sparkle, releases from CI on a tag, Release Notes window, `CHANGELOG.md`).
+- **Landing page and Terminal install (after in-app updates).** Agreed 2026-11-04 to do once the in-app updates plan is done. A one-page site on GitHub Pages (`luckywins.github.io/Workdeck`; free for a public repository, about 1 GB of site and 100 GB of traffic a month; a custom domain optional at about $10–15 a year): what Workdeck does, screenshots or a GIF, the install command with a copy button, a link to the zip for a manual install, a link to the release notes. The install command `curl -fsSL https://luckywins.github.io/Workdeck/install.sh | bash` runs a short, readable script from the repository (no `sudo`): download `releases/latest/download/Workdeck.zip`, quit a running Workdeck, put the app in `/Applications`, open it. Files downloaded by `curl` carry no quarantine attribute, so there is no Gatekeeper "Open" step. Needs: the release workflow to also attach the zip as `Workdeck.zip` (a stable name for `latest/download`), a Pages workflow, and the README's install section pointing to both ways (with the macOS 15+ "Open Anyway" steps in System Settings → Privacy & Security for the manual zip).
 
 ## Planned
 
@@ -32,13 +33,7 @@ Agreed on 2026-10-16, from a survey of other agent companions (see the links in 
 ## Distribution
 
 - **README media.** A demo GIF and MP4 for the README's header and screenshots (compact notch, sessions with an agent, an alert, the recap, the Statistics window) in `docs/media/`, recorded from the demo on the MacBook notch. `screencapture` needs Screen Recording permission for the app that runs it; Terminal works without restarting VS Code. Without screen recording, the notch views can be rendered with `ImageRenderer` from the demo script.
-- **Auto-update with Sparkle.** Sparkle (MIT, free) checks an appcast XML feed, downloads the new version, and replaces the app. Needs:
-  - an EdDSA key pair for signing updates; the private key stays out of the repo;
-  - Developer ID signing and notarization (Apple Developer Program, $99 per year);
-  - appcast and archives hosted somewhere, for example GitHub Releases;
-  - a check that the privileged helper and the status line path survive an update.
-
-  It is a third-party dependency, so it needs agreement before it is added. Only worth doing once someone other than the author installs Workdeck.
+- ~~**Auto-update with Sparkle.**~~ Being built: `specs/2026-11-04-in-app-updates-design.md` (Sparkle with the Apple Development certificate, no notarization; releases from CI on a tag).
 
 ## Claude Code Instances
 

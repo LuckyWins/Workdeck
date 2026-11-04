@@ -21,6 +21,8 @@ final class LimitsNotchModel {
     @ObservationIgnored var onActivateSession: ((String) -> Void)?
     @ObservationIgnored var onActivateProject: ((String, AgentKind) -> Void)?
     @ObservationIgnored var onOpenChats: ((String) -> Void)?
+    /// Opens the Release Notes window on a version (in-app updates spec §2.3).
+    @ObservationIgnored var onOpenReleaseNotes: ((String) -> Void)?
     @ObservationIgnored var onToggleAccounts: (() -> Void)?
     @ObservationIgnored var onDismissRecap: (() -> Void)?
     @ObservationIgnored var onRecapDetails: (() -> Void)?
@@ -191,13 +193,14 @@ struct LimitsExpandedView: View {
     /// An alert's title, after its agent's icon while more than one agent shows.
     private func headline(_ alert: LimitsAlert) -> Text {
         let title = LimitsText.alertTitle(alert, showsAccount: model.state.showsClaudeAccounts)
-        return model.state.showsAgentMarks ? alert.agent.marked(title, size: 12) : Text(title)
+        // An update is about the app, not an agent: never marked.
+        return model.state.showsAgentMarks && !alert.isUpdate ? alert.agent.marked(title, size: 12) : Text(title)
     }
 
     /// A line of an alert batch, after its agent's icon while more than one agent shows.
     private func batchLine(_ alert: LimitsAlert) -> Text {
         let line = LimitsText.batchLine(alert, now: model.state.now, showsAccount: model.state.showsClaudeAccounts)
-        return model.state.showsAgentMarks ? alert.agent.marked(line, size: 12) : Text(line)
+        return model.state.showsAgentMarks && !alert.isUpdate ? alert.agent.marked(line, size: 12) : Text(line)
     }
 
     private func alertView(_ alert: LimitsAlert) -> some View {
@@ -258,6 +261,9 @@ struct LimitsExpandedView: View {
         }
         if LimitsText.opensChats(alert), let account = LimitsText.alertAccount(alert), let open = model.onOpenChats {
             return ({ open(account) }, "Open Chats", "↗ chats")
+        }
+        if case let .updateAvailable(version) = alert, let open = model.onOpenReleaseNotes {
+            return ({ open(version) }, "Show release notes", "↗ notes")
         }
         return nil
     }

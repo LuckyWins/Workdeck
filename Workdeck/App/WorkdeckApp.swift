@@ -6,14 +6,14 @@ struct WorkdeckApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            PopoverView(controller: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode, codex: appDelegate.codex, recap: appDelegate.recap, demo: appDelegate.demo)
+            PopoverView(controller: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode, codex: appDelegate.codex, recap: appDelegate.recap, demo: appDelegate.demo, updates: appDelegate.updates)
         } label: {
             MenuBarLabel(lidSleep: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode)
         }
         .menuBarExtraStyle(.window)
 
         Settings {
-            SettingsView(settings: appDelegate.settings, controller: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode, instances: appDelegate.instances, codex: appDelegate.codex, demo: appDelegate.demo)
+            SettingsView(settings: appDelegate.settings, controller: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode, instances: appDelegate.instances, codex: appDelegate.codex, demo: appDelegate.demo, updates: appDelegate.updates)
         }
 
         Window("Claude Code Chats", id: ChatsWindow.id) {
@@ -27,6 +27,13 @@ struct WorkdeckApp: App {
             StatisticsWindow(controller: appDelegate.recap.statistics)
         }
         .defaultSize(width: 460, height: 680)
+        .defaultLaunchBehavior(.suppressed)
+        .restorationBehavior(.disabled)
+
+        Window("Release Notes", id: ReleaseNotesWindow.id) {
+            ReleaseNotesWindow(updates: appDelegate.updates)
+        }
+        .defaultSize(width: 560, height: 420)
         .defaultLaunchBehavior(.suppressed)
         .restorationBehavior(.disabled)
     }

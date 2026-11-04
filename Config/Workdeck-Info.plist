@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Merged with the generated Info.plist. Sparkle's feed and the public half of the release key
+	     (in-app updates spec §5); the private key lives only in the author's Keychain and the CI secret. -->
+	<key>SUFeedURL</key>
+	<string>https://github.com/LuckyWins/Workdeck/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>DTsU8g/BpGO4Sht/E5AWsw//qtYna1OUVnklMJsIXF4=</string>
+</dict>
+</plist>

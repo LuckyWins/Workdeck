@@ -4,3 +4,6 @@ DerivedData/
 build/
 *.xcuserstate
 .superpowers/
+
+# Python bytecode from the release scripts and their tests
+__pycache__/

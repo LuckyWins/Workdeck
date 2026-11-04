@@ -26,7 +26,9 @@ struct HelperConstantsTests {
     }
 
     @Test func versionCombinesShortVersionAndBuild() {
-        #expect(HelperConstants.version(of: .main) == "1.0 (1)")
+        // The version moves with every release (`make release-prep`); its shape does not: "1.0.0 (1)".
+        let version = HelperConstants.version(of: .main)
+        #expect(version.wholeMatch(of: /\d+\.\d+\.\d+ \(\d+\)/) != nil, "\(version)")
     }
 
     @Test func appBundleEmbedsHelperAndLaunchDaemon() throws {

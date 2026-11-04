@@ -8,6 +8,7 @@ struct SettingsView: View {
     let instances: ClaudeInstancesController
     let codex: CodexController
     let demo: DemoMode
+    let updates: UpdateController
 
     @State private var diagnosticsState = DiagnosticsCopyState.idle
 
@@ -72,7 +73,17 @@ struct SettingsView: View {
             CodexSettingsSection(controller: codex)
 
             Section {
-                LabeledContent("Version", value: HelperConstants.version(of: .main))
+                LabeledContent {
+                    updateButton
+                } label: {
+                    versionText
+                }
+                LabeledContent("Release notes") {
+                    Button("Show…") {
+                        updates.showReleaseNotes(version: nil)
+                        WindowOpener.shared.open(ReleaseNotesWindow.id)
+                    }
+                }
                 LabeledContent("Diagnostics") {
                     Button(diagnosticsButtonTitle) {
                         copyDiagnostics()
@@ -82,7 +93,7 @@ struct SettingsView: View {
             } header: {
                 SettingsHeader("About", symbol: "info.circle.fill", color: .gray)
             } footer: {
-                Text("Copies Workdeck's recent log and current state, without prompts, answers or tool details, for troubleshooting.")
+                Text("With automatic checks on, Workdeck looks for updates on GitHub once a day; updates are signed. Copy Diagnostics copies Workdeck's recent log and current state, without prompts, answers or tool details, for troubleshooting.")
                     .foregroundStyle(.secondary)
             }
         }
@@ -136,6 +147,31 @@ struct SettingsView: View {
         case let .unavailable(message):
             Text(message)
                 .foregroundStyle(.red)
+        }
+    }
+
+    /// "Version 1.2.0 · up to date" with the status part colored (in-app updates spec §2.1).
+    private var versionText: some View {
+        let full = UpdateText.versionRow(installed: updates.installedVersion, status: updates.status)
+        let base = UpdateText.versionRow(installed: updates.installedVersion, status: .idle)
+        let status = String(full.dropFirst(base.count))
+        let color: Color = updates.status == .upToDate ? .green : .secondary
+        return Text("\(base)\(Text(status).foregroundStyle(color))")
+    }
+
+    /// Install while an update waits, else Check for Updates; both open Sparkle's window.
+    @ViewBuilder
+    private var updateButton: some View {
+        if updates.available != nil {
+            Button("Install") {
+                updates.install()
+            }
+            .buttonStyle(.borderedProminent)
+        } else {
+            Button("Check for Updates") {
+                updates.checkForUpdates()
+            }
+            .disabled(updates.status == .checking)
         }
     }
 

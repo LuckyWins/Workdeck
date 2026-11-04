@@ -195,6 +195,17 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | V7 | Hover delays | Move the pointer quickly across the notch (on the virtual notch, along the menu bar); rest on its edge and wiggle. | Passing by does not expand it; resting expands it after a moment; a brief slip off the edge does not collapse it. |
 | V8 | When active | Settings → Show → When active. Let a session finish; wait a minute; then point at the notch's place. | The notch stays about a minute after the session finishes, then hides; pointing at its place shows it, leaving hides it again. |
 
+## Updates Checklist
+
+| # | Case | Steps | Expected |
+|---|------|-------|----------|
+| U1 | About before any release | Settings → About, Check for Updates. | Sparkle's window opens (an error until the first release exists, later "up to date"); the row shows `checking…` meanwhile. |
+| U2 | Release Notes | About → Release notes → Show…. | The window lists the bundled versions, the installed one tagged `installed`; selecting one shows its groups. |
+| U3 | Update found | With a newer release published, wait for the daily check (or Check for Updates). | Scheduled: one notch alert `Workdeck x.y.z available`, blue, no flash, a click opens Release Notes; the popover row above Quit; About shows `· x.y.z available` with Install. |
+| U4 | Install | Click Install (popover, About or the window banner). | Sparkle's window with the notes; Install Update downloads, Install and Relaunch restarts the new version. |
+| U5 | Skip and Remind Me Later | In Sparkle's window choose Skip This Version; on another version choose Remind Me Later; relaunch. | Skip removes the row; Remind Me Later keeps it, also after the relaunch, without a second alert. |
+| U6 | Survives an update | After U4: Closed-Lid Mode, a Claude Code session in every instance, Codex, Statistics. | The helper works without re-approval, sessions and limits update, recap days are there, no Gatekeeper prompt on relaunch. |
+
 ## Results
 
 Mark each run with the date, build commit, and macOS version. Record only scenarios that were actually executed.

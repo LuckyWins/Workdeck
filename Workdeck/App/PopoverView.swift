@@ -7,6 +7,7 @@ struct PopoverView: View {
     let codex: CodexController
     let recap: RecapController
     let demo: DemoMode
+    let updates: UpdateController
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -67,6 +68,15 @@ struct PopoverView: View {
                 .padding(.vertical, 12)
 
             Divider()
+
+            // A waiting update, above Quit; not while the demo plays (in-app updates spec §2.4, §10).
+            if let update = updates.available, !demo.isActive {
+                UpdatePopoverRow(update: update, updates: updates)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+
+                Divider()
+            }
 
             Button {
                 NSApp.terminate(nil)

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		000000000000000131000001 /* DynamicNotchKit in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000500000001 /* DynamicNotchKit */; };
+		000000000000000131000002 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000510000001 /* Sparkle */; };
 		000000000000000150000001 /* WorkdeckHelper in Embed Helper */ = {isa = PBXBuildFile; fileRef = 000000000000000000000121 /* WorkdeckHelper */; };
 		000000000000000160000001 /* com.appcreators.workdeck.helper.plist in Embed Launch Daemon */ = {isa = PBXBuildFile; fileRef = 000000000000000000000130 /* com.appcreators.workdeck.helper.plist */; };
 		000000000000000180000001 /* workdeck-statusline in Embed Status Line */ = {isa = PBXBuildFile; fileRef = 000000000000000000000123 /* workdeck-statusline */; };
@@ -148,6 +149,7 @@
 			isa = PBXFrameworksBuildPhase;
 			files = (
 				000000000000000131000001 /* DynamicNotchKit in Frameworks */,
+				000000000000000131000002 /* Sparkle in Frameworks */,
 			);
 		};
 		000000000000000230000000 /* Frameworks */ = {
@@ -219,6 +221,7 @@
 				000000000000000120000000 /* Sources */,
 				000000000000000130000000 /* Frameworks */,
 				000000000000000140000000 /* Resources */,
+				000000000000000141000000 /* Copy CHANGELOG */,
 				000000000000000150000000 /* Embed Helper */,
 				000000000000000160000000 /* Embed Launch Daemon */,
 				000000000000000180000000 /* Embed Status Line */,
@@ -239,6 +242,7 @@
 			name = Workdeck;
 			packageProductDependencies = (
 				000000000000000500000001 /* DynamicNotchKit */,
+				000000000000000510000001 /* Sparkle */,
 			);
 			productName = Workdeck;
 			productReference = 000000000000000000000120 /* Workdeck.app */;
@@ -359,6 +363,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				000000000000000500000000 /* XCRemoteSwiftPackageReference "DynamicNotchKit" */,
+				000000000000000510000000 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = 000000000000000000000020 /* Products */;
@@ -386,6 +391,29 @@
 			);
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		000000000000000141000000 /* Copy CHANGELOG */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/CHANGELOG.md",
+			);
+			name = "Copy CHANGELOG";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/CHANGELOG.md",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# The release notes window reads the repository's changelog (in-app updates spec §3).\ncp \"$SCRIPT_INPUT_FILE_0\" \"$SCRIPT_OUTPUT_FILE_0\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		000000000000000120000000 /* Sources */ = {
@@ -497,7 +525,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -563,7 +591,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
@@ -584,6 +612,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/Workdeck-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Workdeck;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -605,6 +634,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/Workdeck-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Workdeck;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -773,6 +803,14 @@
 				minimumVersion = 1.1.0;
 			};
 		};
+		000000000000000510000000 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 2.10.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -780,6 +818,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 000000000000000500000000 /* XCRemoteSwiftPackageReference "DynamicNotchKit" */;
 			productName = DynamicNotchKit;
+		};
+		000000000000000510000001 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 000000000000000510000000 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

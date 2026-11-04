@@ -28,6 +28,8 @@ final class NotchComposer {
     @ObservationIgnored var onRefresh: (() -> Void)?
     @ObservationIgnored var onRecapDismiss: (() -> Void)?
     @ObservationIgnored var onRecapDetails: (() -> Void)?
+    /// A click on the update alert: open Release Notes on that version (in-app updates spec §2.3).
+    @ObservationIgnored var onOpenReleaseNotes: ((String) -> Void)?
     /// A recap card waits for Got it: the notch stays up whatever the mode.
     @ObservationIgnored var recapKeepsVisible = false
 
@@ -105,6 +107,9 @@ final class NotchComposer {
         }
         presenter.setChatsAction { [weak self] account in
             self?.sources.forEach { $0.openChats(account: account) }
+        }
+        presenter.setReleaseNotesAction { [weak self] version in
+            self?.onOpenReleaseNotes?(version)
         }
         presenter.setRecapDismissAction { [weak self] in
             self?.onRecapDismiss?()

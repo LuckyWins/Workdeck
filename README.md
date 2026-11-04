@@ -43,9 +43,9 @@ Open Settings from the gear in the popover and click **Try Demo** under General.
 
 ## Install
 
-Workdeck is built from source; there is no signed download yet.
+**From a release:** download `Workdeck-x.y.z.zip` from [Releases](https://github.com/LuckyWins/Workdeck/releases/latest), unzip it and move Workdeck to Applications. It is signed with the author's development certificate, not notarized, so the first launch is blocked once: open System Settings → Privacy & Security and click **Open Anyway** next to Workdeck. Later versions install themselves (see Updates below).
 
-**Requirements:** macOS 26 or later, Xcode 27.
+**From source** (requires macOS 26 or later and Xcode 27):
 
 ```bash
 git clone https://github.com/LuckyWins/Workdeck.git
@@ -53,7 +53,9 @@ cd Workdeck
 make install   # build, quit the installed Workdeck, copy it to /Applications, and launch it
 ```
 
-Both the `Workdeck` and `WorkdeckHelper` targets are signed with team `J55BY69CVU`; with a different team, also update `teamIdentifier` in `Shared/HelperConstants.swift`. The build is signed with your Apple Development certificate and runs on your own Mac; it is not sandboxed, not notarized and not on the Mac App Store.
+Releases are cut as described in [Releasing](docs/releasing.md). Both the `Workdeck` and `WorkdeckHelper` targets are signed with team `J55BY69CVU`; with a different team, also update `teamIdentifier` in `Shared/HelperConstants.swift`. The build is signed with your Apple Development certificate and runs on your own Mac; it is not sandboxed, not notarized and not on the Mac App Store.
+
+**Updates.** With automatic checks on (Workdeck asks once, on its second launch), it looks for a new version on GitHub once a day: the notch says so once, the popover shows a row above Quit, and **Install** opens the standard update window, which installs it in place and relaunches. Settings → About → **Release notes** lists every version and what changed (from `CHANGELOG.md`).
 
 The first time you turn on Closed-Lid Mode, macOS asks you to approve Workdeck's helper: click **Open System Settings…** in the popover and allow Workdeck in **General → Login Items & Extensions**. See [Closed-Lid Mode](docs/closed-lid-mode.md#first-run).
 

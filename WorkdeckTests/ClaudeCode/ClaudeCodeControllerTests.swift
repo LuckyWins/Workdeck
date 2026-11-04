@@ -96,6 +96,11 @@ final class FakePresenter: LimitsPresenting {
         chatsAction = action
     }
 
+    private(set) var releaseNotesAction: ((String) -> Void)?
+    func setReleaseNotesAction(_ action: @escaping (String) -> Void) {
+        releaseNotesAction = action
+    }
+
     private(set) var expansions: [Duration] = []
     func expand(for duration: Duration) {
         expansions.append(duration)

@@ -113,6 +113,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         vscode: SystemVSCodeLauncher.standard(),
     )
 
+    /// In-app updates through Sparkle (in-app updates spec §7); an inert updater while tests run.
+    private(set) lazy var updates: UpdateController = {
+        let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        let info = Bundle.main.infoDictionary ?? [:]
+        let demo = self.demo
+        let notch = self.notch
+        return UpdateController(
+            updater: isTesting ? InertUpdater() : SparkleUpdater(),
+            defaults: .standard,
+            installedVersion: info["CFBundleShortVersionString"] as? String ?? "",
+            installedBuild: Int(info["CFBundleVersion"] as? String ?? "") ?? 0,
+            isDemoActive: { demo.isActive },
+            showAlert: { version in notch.refresh(alerts: [.updateAvailable(version: version)]) }
+        )
+    }()
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Unit tests are hosted in this app; keep them away from the real privileged helper.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
@@ -143,6 +159,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         recap.start()
         demo.register(claudeCode)
         demo.register(recap)
+        demo.register(UpdatesDemoParticipant(updates: updates))
+        notch.onOpenReleaseNotes = { [unowned self] version in
+            updates.showReleaseNotes(version: version)
+            WindowOpener.shared.open(ReleaseNotesWindow.id)
+        }
+        updates.start()
     }
 
     /// Keeps the SIGTERM handler alive (closed-lid persistence spec §3.4).

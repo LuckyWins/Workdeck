@@ -91,6 +91,8 @@ nonisolated enum LimitsText {
             return "\(project) finished"
         case let .sessionNeedsYou(project, _):
             return "\(project) needs you"
+        case let .updateAvailable(version):
+            return "Workdeck \(version) available"
         }
     }
 
@@ -105,6 +107,8 @@ nonisolated enum LimitsText {
             return "worked \(SessionsText.duration(from: now.addingTimeInterval(-worked), to: now))"
         case .sessionNeedsYou:
             return "permission prompt"
+        case .updateAvailable:
+            return nil
         }
     }
 
@@ -127,21 +131,21 @@ nonisolated enum LimitsText {
             "\(project)  worked \(SessionsText.duration(from: now.addingTimeInterval(-worked), to: now))"
         case let .sessionNeedsYou(project, _):
             "\(project)  needs you"
-        case .threshold, .reset:
+        case .threshold, .reset, .updateAvailable:
             alertTitle(alert, showsAccount: showsAccount)
         }
     }
 
     /// Only a Claude limit alert opens the Chats window; a Codex one opens nothing (Codex spec §3.2).
     static func opensChats(_ alert: LimitsAlert) -> Bool {
-        alertProject(alert) == nil && alert.agent == .claudeCode
+        alertProject(alert) == nil && !alert.isUpdate && alert.agent == .claudeCode
     }
 
     /// The account a limit alert is about; clicking it opens the Chats window (spec §4.4).
     static func alertAccount(_ alert: LimitsAlert) -> String? {
         switch alert {
         case let .threshold(_, _, account, _), let .reset(_, account, _): account ?? ClaudeInstance.mainName
-        case .sessionFinished, .sessionNeedsYou: nil
+        case .sessionFinished, .sessionNeedsYou, .updateAvailable: nil
         }
     }
 
@@ -149,15 +153,16 @@ nonisolated enum LimitsText {
     static func alertProject(_ alert: LimitsAlert) -> String? {
         switch alert {
         case let .sessionFinished(project, _, _), let .sessionNeedsYou(project, _): project
-        case .threshold, .reset: nil
+        case .threshold, .reset, .updateAvailable: nil
         }
     }
 
-    /// "!" for something to act on, "✓" for good news.
+    /// "!" for something to act on, "✓" for good news, "↑" for a new Workdeck.
     static func alertSymbol(_ alert: LimitsAlert) -> String {
         switch alert {
         case .threshold, .sessionNeedsYou: "!"
         case .reset, .sessionFinished: "✓"
+        case .updateAvailable: "↑"
         }
     }
 

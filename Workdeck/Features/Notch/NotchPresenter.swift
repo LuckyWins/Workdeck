@@ -19,6 +19,7 @@ protocol LimitsPresenting: AnyObject {
     func setProjectAction(_ action: @escaping (String, AgentKind) -> Void)
     /// What clicking a limit alert does, by account label: open the Chats window (spec §4.4).
     func setChatsAction(_ action: @escaping (String) -> Void)
+    func setReleaseNotesAction(_ action: @escaping (String) -> Void)
     /// What the control that hides or shows the other accounts' limits does.
     func setToggleAccountsAction(_ action: @escaping () -> Void)
     /// Shows last week's recap expanded for `duration` (`nil`: the usual minute), then as `◆`; `nil` removes it
@@ -443,6 +444,10 @@ final class NotchPresenter: LimitsPresenting {
 
     func setChatsAction(_ action: @escaping (String) -> Void) {
         model.onOpenChats = action
+    }
+
+    func setReleaseNotesAction(_ action: @escaping (String) -> Void) {
+        model.onOpenReleaseNotes = action
     }
 
     func setToggleAccountsAction(_ action: @escaping () -> Void) {
