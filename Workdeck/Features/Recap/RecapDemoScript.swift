@@ -1,6 +1,6 @@
 import Foundation
 
-/// The demo's recap: twelve weeks of made-up days for both agents, and the card for the last ten seconds (demo mode
+/// The demo's recap: 26 weeks of made-up days for both agents, and the card for the last ten seconds (demo mode
 /// spec §2.3, Codex recap spec §3.4). Pure.
 nonisolated enum RecapDemoScript {
     /// The length of every demo script.
@@ -13,18 +13,18 @@ nonisolated enum RecapDemoScript {
         return at > (previous ?? -1) && at <= elapsed
     }
 
-    /// Twelve weeks of made-up days up to today, the same on every call (statistics spec, demo mode spec §2.3).
+    /// This week and the kept weeks before it, made up, the same on every call (statistics spec, demo mode spec §2.3).
     static func days(now: Date, calendar: Calendar) -> [RecapDay] {
         let today = calendar.startOfDay(for: now)
         let thisWeek = RecapCalendar.weekStart(of: now, calendar: calendar)
         var result: [RecapDay] = []
-        for week in 0..<RecapStore.keptWeeks {
+        for week in 0...RecapStore.keptWeeks {
             guard let start = calendar.date(byAdding: .weekOfYear, value: -week, to: thisWeek) else { continue }
             let factor = weekFactors[week % weekFactors.count]
             for weekday in 0..<7 {
                 guard let date = calendar.date(byAdding: .day, value: weekday, to: start), date <= today else { continue }
                 let minutes = dayMinutes[weekday] * factor
-                guard minutes > 0 else { continue }
+                guard minutes > 0, !isDayOff(week: week, weekday: weekday) else { continue }
                 result.append(day(date: date, minutes: minutes, weekday: weekday, calendar: calendar))
             }
         }
@@ -46,7 +46,14 @@ nonisolated enum RecapDemoScript {
     private static let projectShares: [(name: String, share: Double)] = [("orbit-app", 0.5), ("api-server", 0.3), ("design-system", 0.15), ("docs", 0.05)]
     /// Monday to Sunday.
     private static let dayMinutes: [Double] = [95, 140, 120, 160, 80, 25, 0]
-    private static let weekFactors: [Double] = [1.0, 0.85, 1.15, 0.7]
+    /// The fifth week of six is a crunch, so the activity grid shows days of 6 hours and more (activity grid spec §4).
+    private static let weekFactors: [Double] = [1.0, 0.85, 1.15, 0.7, 2.0, 0.9]
+
+    /// Every third week from the third on, one weekday off, so the activity grid has empty weekdays; this week and
+    /// last week (the recap's) stay whole.
+    private static func isDayOff(week: Int, weekday: Int) -> Bool {
+        week % 3 == 2 && weekday == week % 5
+    }
     private static let projectFiles = [
         "orbit-app": ["OrbitView.swift", "PlanetModel.swift", "OrbitViewTests.swift", "Package.swift"],
         "api-server": ["routes.ts", "auth.ts", "db.ts"],

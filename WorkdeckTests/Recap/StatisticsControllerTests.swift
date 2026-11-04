@@ -55,12 +55,12 @@ struct StatisticsControllerTests {
         #expect(!controller.canGoForward)
     }
 
-    @Test func neverGoesBackMoreThanTwelveWeeks() {
-        let controller = makeController(days: [work("2026-05-04")])
-        for _ in 0..<20 {
+    @Test func neverGoesBackMoreThanTwentySixWeeks() {
+        let controller = makeController(days: [work("2026-01-05")])
+        for _ in 0..<40 {
             controller.goBack()
         }
-        #expect(key(controller.weekStart) == "2026-07-20")
+        #expect(key(controller.weekStart) == "2026-04-13")
         #expect(!controller.canGoBack)
     }
 
@@ -194,5 +194,48 @@ struct StatisticsControllerTests {
         #expect(controller.agent == nil)
         #expect(controller.summary.seconds == 1800)
         #expect(controller.isHooksConnected)
+    }
+
+    // MARK: Activity grid (activity grid spec §2, §7)
+
+    @Test func theGridFollowsUpdatesAndTheFilter() {
+        let controller = makeController(days: [work("2026-10-13")])
+        #expect(controller.activity.streak == 1)
+        controller.update(days: [work("2026-10-12"), work("2026-10-13")], connectedAgents: [.claudeCode], thresholds: [80, 95])
+        #expect(controller.activity.streak == 2)
+        var codexDay = RecapDay(date: "2026-10-11")
+        codexDay.updateAgent(.codex) { $0.projects["B"] = RecapProjectDay(seconds: 600) }
+        codexDay.projectSeconds["B"] = 600
+        controller.update(days: [codexDay, work("2026-10-12"), work("2026-10-13")], connectedAgents: [.claudeCode, .codex], thresholds: [80, 95])
+        controller.setAgent(.codex)
+        #expect(controller.activity.streak == 0)
+        #expect(controller.activity.activeDays == 1)
+    }
+
+    @Test func theGridMovesWithTheDate() {
+        let controller = makeController(days: [work("2026-10-13")])
+        now.value = date("2026-10-19").addingTimeInterval(10 * 3600)
+        controller.update(days: [work("2026-10-13")], connectedAgents: [.claudeCode], thresholds: [80, 95])
+        #expect(key(controller.activity.weeks.last!.start) == "2026-10-19")
+        #expect(key(controller.activity.weeks.first!.start) == "2026-04-20")
+    }
+
+    @Test func aClickOnTheCurrentWeeksColumnFollowsIt() {
+        let controller = makeController(days: [work("2026-09-01")])
+        controller.show(week: controller.activity.weeks[20].start)
+        #expect(key(controller.weekStart) == "2026-08-31")
+        #expect(!controller.isCurrentWeek)
+        controller.show(week: controller.activity.weeks.last!.days[5].date)
+        #expect(controller.isCurrentWeek)
+    }
+
+    @Test func theOldestWeekShownMovesOnWhenItLeavesTheGrid() {
+        let controller = makeController(days: [work("2026-04-14"), work("2026-10-13")])
+        controller.show(week: date("2026-04-13"))
+        now.value = date("2026-10-19").addingTimeInterval(10 * 3600)
+        controller.update(days: [work("2026-04-14"), work("2026-10-13")], connectedAgents: [.claudeCode], thresholds: [80, 95])
+        #expect(key(controller.weekStart) == "2026-04-20")
+        #expect(controller.weekStart == controller.activity.weeks.first?.start)
+        #expect(!controller.canGoBack)
     }
 }

@@ -2,6 +2,11 @@
 
 Ideas and deferred work. **Planned** lists what is agreed and in what order; each item gets its own spec and plan.
 
+## To Discuss First
+
+- **Compare Claude Code instances.** Show what differs between instances (`~/.claude` and each `~/.claude-<name>`): `CLAUDE.md`, rules, skills, MCP servers (and possibly agents, commands, settings), and offer to apply or move an item from one instance to another. Added 2026-11-04 to brainstorm next. Overlaps "Copy shared setup into an instance" under Claude Code Instances (copy versus link, conflicts, plugins with absolute paths); the settings diff review (`SettingsReview/`) could show the changes before they are written.
+- **Updating an installed Workdeck, and CI.** Added 2026-11-04 to discuss after the activity grid. How an installed copy learns of and installs a new version: a light check of GitHub `releases/latest` with an "Update available" line (as [Poirot](https://github.com/a7t-ai/poirot)'s `UpdateChecker.swift` does, no dependency) versus Sparkle (see Distribution below) versus a Homebrew cask (`brew upgrade`). What must survive an update: the privileged helper registered with `SMAppService` (a new build may need re-approval), the status line and hook paths written into each instance's `settings.json` and Codex's `hooks.json` (they point into the app bundle), and `recap.json`. And whether CI can build, sign, notarize and publish on a tag: Poirot's `.github/workflows/release.yml` archives, makes a DMG, notarizes with `notarytool` and an App Store Connect API key, staples with retries, writes release notes from the commits and updates a Homebrew tap. Signing and notarization need the Apple Developer Program ($99 a year); GitHub Actions macOS runners are free for public repositories and billed per minute for private ones.
+
 ## Planned
 
 Agreed on 2026-10-13, partly inspired by [Coucou](https://github.com/Louis-CFM/coucou).
@@ -19,7 +24,9 @@ Agreed on 2026-10-16, from a survey of other agent companions (see the links in 
 8. ~~**Codex sessions as full as Claude's.**~~ Done. Spec: `specs/2026-10-16-codex-sessions-full-design.md`.
 9. ~~**Clearer agent marks in the notch.**~~ Done. Spec: `specs/2026-10-16-agent-marks-design.md`.
    - ~~**Agent icons outside the notch.**~~ Done. Spec: `specs/2026-10-17-agent-icons-outside-notch-design.md`.
-10. **Activity in Statistics.** Two views from other companions: a 24-hour strip per day with the projects of an hour on hover ([Notch-Pilot](https://github.com/devmegablaster/Notch-Pilot)), and a GitHub-style grid of days with streaks and active-day counts ([limitter](https://github.com/admnov38/limitter), 21 weeks). Both can come from `recap.json`, which keeps twelve weeks of days but no hours today: the strip needs coding time per hour.
+10. **Activity in Statistics.** Two views from other companions: a 24-hour strip per day with the projects of an hour on hover ([Notch-Pilot](https://github.com/devmegablaster/Notch-Pilot)), and a GitHub-style grid of days with streaks and active-day counts ([limitter](https://github.com/admnov38/limitter), 21 weeks).
+    - ~~**Activity grid.**~~ Done. 26 kept weeks plus this one above the week in Statistics, a tooltip per day, streak and active days, a click opens the week; `recap.json` now keeps 26 weeks. Spec: `specs/2026-11-04-activity-grid-design.md`.
+    - **24-hour strip.** Still open: `recap.json` keeps no hours, so the strip needs coding time per hour recorded first.
 11. **Resource measurements.** A `make resources` script that samples the running app's CPU, memory, footprint and leaks and times `workdeck-hook` and `workdeck-statusline`; run it in a few states and add a Resource use section to the README, as [hyderay/notch](https://github.com/hyderay/notch) does.
 
 ## Distribution

@@ -94,6 +94,43 @@ nonisolated enum RecapText {
         return parts.joined(separator: " · ")
     }
 
+    // MARK: Activity grid (activity grid spec §2)
+
+    static let noCoding = "No coding"
+    static let activityLegendHelp = "Under 1h · 1–3h · 3–6h · 6h or more"
+
+    /// "Oct": a month label above the grid.
+    static func monthName(_ date: Date, calendar: Calendar) -> String {
+        format("MMM", date, calendar: calendar)
+    }
+
+    /// "9 day streak", "1 day streak".
+    static func streak(_ days: Int) -> String {
+        "\(number(days)) day streak"
+    }
+
+    /// "67 active days", "1 active day".
+    static func activeDays(_ count: Int) -> String {
+        "\(number(count)) active \(count == 1 ? "day" : "days")"
+    }
+
+    /// "Thursday, October 29, 3 hours 12 minutes": a square read by VoiceOver; "…, upcoming" after today.
+    static func accessibleDay(_ date: Date, seconds: Double, isFuture: Bool = false, calendar: Calendar) -> String {
+        let day = format("EEEE, MMMM d", date, calendar: calendar)
+        guard !isFuture else { return "\(day), upcoming" }
+        guard seconds > 0 else { return "\(day), no coding" }
+        let minutes = Int(seconds / 60)
+        guard minutes >= 1 else { return "\(day), less than a minute" }
+        var parts: [String] = []
+        if minutes >= 60 {
+            parts.append("\(minutes / 60) \(minutes / 60 == 1 ? "hour" : "hours")")
+        }
+        if minutes % 60 > 0 {
+            parts.append("\(minutes % 60) \(minutes % 60 == 1 ? "minute" : "minutes")")
+        }
+        return "\(day), \(parts.joined(separator: " "))"
+    }
+
     private static func format(_ pattern: String, _ date: Date, calendar: Calendar) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")

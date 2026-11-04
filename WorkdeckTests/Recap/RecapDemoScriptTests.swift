@@ -16,7 +16,7 @@ struct RecapDemoScriptTests {
     @Test func daysCoverTheKeptWeeksAndLastWeekIsWorthARecap() {
         let days = RecapDemoScript.days(now: fixedNow, calendar: calendar)
         let weeks = Set(days.compactMap { RecapCalendar.date(ofKey: $0.date, calendar: calendar) }.map { RecapCalendar.weekStart(of: $0, calendar: calendar) })
-        #expect(weeks.count == RecapStore.keptWeeks)
+        #expect(weeks.count == RecapStore.keptWeeks + 1)
         #expect(days.allSatisfy { $0.date <= RecapCalendar.dayKey(fixedNow, calendar: calendar) })
         let recap = RecapDemoScript.recap(now: fixedNow, calendar: calendar)
         #expect(recap.isWorthShowing)
@@ -33,5 +33,16 @@ struct RecapDemoScriptTests {
         #expect(recap.accounts.last?.hasFiveHour == false)
         // Codex worked alongside Claude: the total is less than the two agents' own time.
         #expect(recap.seconds < (recap.agentSeconds[.claudeCode] ?? 0) + (recap.agentSeconds[.codex] ?? 0))
+    }
+
+    @Test func demoDaysReachEveryLevelWithSomeEmptyWeekdays() {
+        let grid = ActivityGrid.make(days: RecapDemoScript.days(now: fixedNow, calendar: calendar), agent: nil, now: fixedNow, calendar: calendar)
+        let past = grid.weeks.flatMap(\.days).filter { !$0.isFuture }
+        #expect(Set(past.map(\.level)) == [0, 1, 2, 3, 4])
+        let emptyWeekdays = past.filter { day in
+            let weekday = calendar.component(.weekday, from: day.date)
+            return day.level == 0 && weekday != 1 && weekday != 7
+        }
+        #expect(emptyWeekdays.count >= 3)
     }
 }

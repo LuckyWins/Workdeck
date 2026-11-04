@@ -23,6 +23,8 @@ final class StatisticsController {
     private(set) var weekStart: Date
     private(set) var summary: WeeklyRecapSummary
     private(set) var pace = RecapPace(elapsedDays: 1, average: 0, change: nil)
+    /// The kept weeks as a grid of days for the agent filter (activity grid spec §2).
+    private(set) var activity: ActivityGrid
     /// Midnight of today: changes once a day, not on every update, so the window does not re-render for the clock.
     private(set) var today: Date
     private(set) var isCurrentWeek = true
@@ -43,6 +45,7 @@ final class StatisticsController {
         let weekStart = RecapCalendar.weekStart(of: now, calendar: calendar)
         self.weekStart = weekStart
         summary = WeeklyRecapSummary(weekStart: weekStart)
+        activity = ActivityGrid.make(days: [], agent: nil, now: now, calendar: calendar)
         rebuild()
     }
 
@@ -100,6 +103,9 @@ final class StatisticsController {
         let current = RecapCalendar.weekStart(of: now, calendar: calendar)
         if followsCurrentWeek {
             set(\.weekStart, current)
+        } else if let first = calendar.date(byAdding: .weekOfYear, value: -RecapStore.keptWeeks, to: current), weekStart < first {
+            // A new week pushed the shown one out of the grid and the store: show the oldest week still kept.
+            set(\.weekStart, first)
         }
         set(\.today, calendar.startOfDay(for: now))
         set(\.isCurrentWeek, weekStart == current)
@@ -112,6 +118,7 @@ final class StatisticsController {
         }
         set(\.summary, WeeklyRecap.summary(days: days, weekStart: weekStart, calendar: calendar, agent: agent))
         set(\.pace, WeeklyRecap.pace(days: days, weekStart: weekStart, now: now, calendar: calendar, agent: agent))
+        set(\.activity, ActivityGrid.make(days: days, agent: agent, now: now, calendar: calendar))
     }
 
     /// The oldest week with a day, but never more than the store keeps (spec §3.1).

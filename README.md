@@ -31,7 +31,7 @@ A Claude Code plan limit runs out in the middle of a task, a session sits waitin
 - 🤖 **Live sessions and agents** — every session working, waiting for you or idle, its agents as a tree, the focused session's last steps as a ticker, and each edit's `+12 −3`. [More](docs/claude-code.md#sessions)
 - 🔔 **Alerts that come to you** — a limit at 80 % and 95 %, a limit that reset, a session that needs you, a long session that finished. The notch opens with the alert, glows in its color, then flashes once.
 - 🎯 **Back to the right window** — click a session to bring forward its VS Code, Cursor or Windsurf window, or its own Terminal or iTerm2 tab.
-- 📅 **Weekly recap and Statistics** — last week's coding time by project, sessions, files, lines, commands, agents and limit hits on the first unlock of a week, for Claude Code and Codex with each agent's own time; any of the last twelve weeks in a window, filtered by agent. Counts and names only, stored locally. [More](docs/claude-code.md#weekly-recap-and-statistics)
+- 📅 **Weekly recap and Statistics** — last week's coding time by project, sessions, files, lines, commands, agents and limit hits on the first unlock of a week, for Claude Code and Codex with each agent's own time; any of the last 26 weeks in a window with a GitHub-style activity grid and your streak, filtered by agent. Counts and names only, stored locally. [More](docs/claude-code.md#weekly-recap-and-statistics)
 - 👥 **Two accounts side by side** — run a second Claude Code instance with its own login, see both accounts' limits, and continue a chat on the other account when a limit runs out. [More](docs/claude-code.md#instances-and-chats)
 - 🖥️ **Any display** — on an external monitor with the lid closed, a virtual notch at the top of the screen, or plain text in the menu bar.
 - 🧪 **Demo mode** — a one-minute scripted tour in the notch, no Claude Code needed.
@@ -39,7 +39,7 @@ A Claude Code plan limit runs out in the middle of a task, a session sits waitin
 
 ## Try It Without Claude Code
 
-Open Settings from the gear in the popover and click **Try Demo** under General. For one minute the notch plays a scripted session: two accounts' limits, a session with a step ticker and an agent, a second session that needs you, a limit alert, a finished session, a Codex session working in parallel and a weekly recap whose **Details…** open the Statistics window with twelve made-up weeks. Nothing is written to disk, and your real sessions are still tracked while it plays.
+Open Settings from the gear in the popover and click **Try Demo** under General. For one minute the notch plays a scripted session: two accounts' limits, a session with a step ticker and an agent, a second session that needs you, a limit alert, a finished session, a Codex session working in parallel and a weekly recap whose **Details…** open the Statistics window with 26 made-up weeks. Nothing is written to disk, and your real sessions are still tracked while it plays.
 
 ## Install
 

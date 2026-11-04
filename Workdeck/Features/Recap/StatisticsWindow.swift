@@ -77,6 +77,13 @@ struct StatisticsContent: View {
                 .labelsHidden()
                 .padding(.bottom, 12)
             }
+            ActivityGridView(grid: controller.activity, shownWeek: controller.weekStart, calendar: controller.calendar) { date in
+                controller.show(week: date)
+            }
+            // Above the week's header, so its tooltip draws over the content below it.
+            .zIndex(1)
+            Divider()
+                .padding(.vertical, 12)
             header
             chart
                 .padding(.top, 14)

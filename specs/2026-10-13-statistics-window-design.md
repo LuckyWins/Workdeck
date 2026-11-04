@@ -62,7 +62,7 @@ Chosen in the browser: a single-column window in the style of Screen Time (one b
 
 ### 3.1 Toolbar
 
-- `‹` shows the week before, down to the oldest week that has a day in the store, and never more than 12 weeks before the current one; it is disabled there.
+- `‹` shows the week before, down to the oldest week that has a day in the store, and never more than 12 weeks before the current one (26 since `specs/2026-11-04-activity-grid-design.md` §5); it is disabled there.
 - `›` shows the week after; it is disabled on the current week.
 - "This week" shows the current week; it is disabled there.
 

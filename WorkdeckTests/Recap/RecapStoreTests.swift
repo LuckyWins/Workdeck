@@ -18,10 +18,10 @@ struct RecapStoreTests {
         #expect(store.load(now: now, calendar: calendar).isEmpty)
     }
 
-    @Test func daysOlderThanTwelveWeeksAreDropped() {
-        // The week of 2026-10-13 starts 2026-10-12; twelve weeks back starts 2026-07-20.
-        let days = ["2026-07-19", "2026-07-20", "2026-10-13"].map { RecapDay(date: $0) }
-        #expect(RecapStore.pruned(days, now: now, calendar: calendar).map(\.date) == ["2026-07-20", "2026-10-13"])
+    @Test func daysOlderThanTwentySixWeeksAreDropped() {
+        // The week of 2026-10-13 starts 2026-10-12; 26 weeks back starts 2026-04-13.
+        let days = ["2026-04-12", "2026-04-13", "2026-07-19", "2026-10-13"].map { RecapDay(date: $0) }
+        #expect(RecapStore.pruned(days, now: now, calendar: calendar).map(\.date) == ["2026-04-13", "2026-07-19", "2026-10-13"])
     }
 
     @Test func aCorruptFileIsSetAsideAndStartsEmpty() throws {

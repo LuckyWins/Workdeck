@@ -71,4 +71,26 @@ struct RecapTextTests {
         #expect(RecapText.noWork(.claudeCode) == "No Claude Code work this week.")
         #expect(RecapText.noWork(.codex) == "No Codex work this week.")
     }
+
+    @Test func activityCopy() {
+        #expect(RecapText.streak(9) == "9 day streak")
+        #expect(RecapText.streak(1) == "1 day streak")
+        #expect(RecapText.activeDays(67) == "67 active days")
+        #expect(RecapText.activeDays(1) == "1 active day")
+        #expect(RecapText.noCoding == "No coding")
+        #expect(RecapText.activityLegendHelp == "Under 1h · 1–3h · 3–6h · 6h or more")
+        let thursday = RecapCalendar.date(ofKey: "2026-10-29", calendar: calendar)!
+        #expect(RecapText.monthName(thursday, calendar: calendar) == "Oct")
+        #expect(RecapText.accessibleDay(thursday, seconds: 11520, calendar: calendar) == "Thursday, October 29, 3 hours 12 minutes")
+        #expect(RecapText.accessibleDay(thursday, seconds: 3660, calendar: calendar) == "Thursday, October 29, 1 hour 1 minute")
+        #expect(RecapText.accessibleDay(thursday, seconds: 7200, calendar: calendar) == "Thursday, October 29, 2 hours")
+        #expect(RecapText.accessibleDay(thursday, seconds: 300, calendar: calendar) == "Thursday, October 29, 5 minutes")
+        #expect(RecapText.accessibleDay(thursday, seconds: 30, calendar: calendar) == "Thursday, October 29, less than a minute")
+        #expect(RecapText.accessibleDay(thursday, seconds: 0, calendar: calendar) == "Thursday, October 29, no coding")
+    }
+
+    @Test func anUpcomingDayIsReadAsUpcoming() {
+        let friday = RecapCalendar.date(ofKey: "2026-10-30", calendar: calendar)!
+        #expect(RecapText.accessibleDay(friday, seconds: 0, isFuture: true, calendar: calendar) == "Friday, October 30, upcoming")
+    }
 }

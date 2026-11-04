@@ -1,8 +1,8 @@
 import Foundation
 
-/// `recap.json`: the daily totals of the last twelve weeks (weekly recap spec §4).
+/// `recap.json`: the daily totals of the last 26 weeks (weekly recap spec §4, activity grid spec §5).
 nonisolated struct RecapStore: Sendable {
-    static let keptWeeks = 12
+    static let keptWeeks = 26
 
     let url: URL
 
@@ -33,7 +33,7 @@ nonisolated struct RecapStore: Sendable {
         try encoder.encode(File(days: Self.pruned(days, now: now, calendar: calendar))).write(to: url, options: .atomic)
     }
 
-    /// This week and the twelve full weeks before it.
+    /// This week and the 26 full weeks before it.
     static func pruned(_ days: [RecapDay], now: Date, calendar: Calendar) -> [RecapDay] {
         let thisWeek = RecapCalendar.weekStart(of: now, calendar: calendar)
         guard let first = calendar.date(byAdding: .weekOfYear, value: -keptWeeks, to: thisWeek) else { return days }
