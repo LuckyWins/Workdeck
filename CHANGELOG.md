@@ -4,6 +4,8 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 
 ## Unreleased
 
+## 1.1.0 — 2026-11-04
+
 ### New
 - Workdeck updates itself: it tells you when a new version is out, shows what changed, and installs it in place.
 - Release notes: Settings → About → Release notes lists every version and what it brought.
