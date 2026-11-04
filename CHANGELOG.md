@@ -4,6 +4,9 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 
 ## Unreleased
 
+### Fixed
+- Closed-Lid Mode stays on when Workdeck is updated. Before, it could switch itself off after an update until you turned it off and on again.
+
 ## 1.1.1 — 2026-11-04
 
 ### Improved

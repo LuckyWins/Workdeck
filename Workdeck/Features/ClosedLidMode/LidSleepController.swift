@@ -31,6 +31,9 @@ final class LidSleepController {
     @ObservationIgnored private let appVersion: String
     @ObservationIgnored private var helperVersionChecked = false
     @ObservationIgnored private let takeoverRetryDelay: Duration
+    @ObservationIgnored private let registerRetryDelay: Duration
+    /// Register attempts after an unregister: macOS refuses them until it has removed the old job.
+    static let registerAttempts = 12
     /// This Workdeck turned sleep off itself, so the helper counts it as the holder.
     @ObservationIgnored private var holdsHelper = false
     /// Set when a safeguard check arrived while another helper call was in flight.
@@ -43,9 +46,11 @@ final class LidSleepController {
         thermalMonitor: any ThermalMonitoring,
         settings: AppSettings,
         appVersion: String,
-        takeoverRetryDelay: Duration = .seconds(1)
+        takeoverRetryDelay: Duration = .seconds(1),
+        registerRetryDelay: Duration = .milliseconds(250)
     ) {
         self.takeoverRetryDelay = takeoverRetryDelay
+        self.registerRetryDelay = registerRetryDelay
         self.helper = helper
         self.installer = installer
         self.powerMonitor = powerMonitor
@@ -257,20 +262,22 @@ final class LidSleepController {
                     lastError = error.localizedDescription
                 }
             }
+            // A connection made before this registration points nowhere.
+            helper.resetConnection()
             helperStatus = installer.status
         }
         guard helperStatus == .enabled else { return false }
         guard !helperVersionChecked else { return true }
 
         do {
-            let helperVersion = try await helper.version()
+            let helperVersion = try await currentHelperVersion()
             helperVersionChecked = true
             if helperVersion != appVersion {
                 await reinstallHelper()
             }
         } catch HelperClientError.connectionFailed {
             // A running helper whose binary was replaced (app update or rebuild) fails the
-            // code-signing check; reinstalling makes launchd start the current binary.
+            // code-signing check, also on a fresh connection; reinstalling makes launchd start the current binary.
             helperVersionChecked = true
             await reinstallHelper()
         } catch {
@@ -280,10 +287,37 @@ final class LidSleepController {
         return helperStatus == .enabled
     }
 
+    /// The helper's version; a failed connection is tried once more on a fresh one, since a connection made before
+    /// the helper was (re)registered fails without saying anything about the helper.
+    private func currentHelperVersion() async throws -> String {
+        do {
+            return try await helper.version()
+        } catch HelperClientError.connectionFailed {
+            helper.resetConnection()
+            return try await helper.version()
+        }
+    }
+
+    /// Replaces the running helper with this build's. macOS refuses a register while it still removes the old job
+    /// ("Job is not allowed to bootstrap"), so registering is retried for a few seconds; a helper still missing after
+    /// that is reported instead of leaving the mode silently off.
     private func reinstallHelper() async {
         try? await installer.unregister()
-        try? installer.register()
+        helper.resetConnection()
+        for attempt in 0..<Self.registerAttempts {
+            if attempt > 0 {
+                try? await Task.sleep(for: registerRetryDelay)
+            }
+            try? installer.register()
+            if installer.status == .enabled || installer.status == .requiresApproval {
+                break
+            }
+        }
+        helper.resetConnection()
         helperStatus = installer.status
+        if helperStatus == .notRegistered {
+            lastError = "Workdeck could not restart its helper. Turn Closed-Lid Mode off and on again."
+        }
     }
 
     private func handleHelperInterruption() {

@@ -23,7 +23,8 @@ struct LidSleepControllerTests {
             thermalMonitor: thermal,
             settings: settings,
             appVersion: appVersion,
-            takeoverRetryDelay: .zero
+            takeoverRetryDelay: .zero,
+            registerRetryDelay: .zero
         )
     }
 
@@ -385,13 +386,61 @@ struct LidSleepControllerTests {
     }
 
     @Test func unreachableHelperIsReinstalled() async {
-        // A helper whose binary was replaced under it (app update) fails the code-signing check.
-        helper.versionErrors = [HelperClientError.connectionFailed("Couldn’t communicate with a helper application.")]
+        // A helper whose binary was replaced under it (app update) fails the code-signing check, also on a fresh
+        // connection.
+        helper.versionErrors = Array(repeating: HelperClientError.connectionFailed("Couldn’t communicate with a helper application."), count: 2)
         let controller = makeController()
         await controller.enable()
         #expect(installer.unregisterCount == 1)
         #expect(installer.registerCount == 1)
         #expect(controller.isActive)
         #expect(controller.lastError == nil)
+    }
+
+    // MARK: Reinstalling after a version change (in-app updates: the mode must survive an update)
+
+    @Test func reinstallKeepsRegisteringUntilMacOSAccepts() async {
+        // macOS refuses a register right after the unregister while it still removes the old job.
+        helper.versionString = "0.9 (1)"
+        installer.registerRefusalsAfterUnregister = 3
+        let controller = makeController(appVersion: "1.0 (1)")
+        await controller.enable()
+        #expect(installer.unregisterCount == 1)
+        #expect(installer.registerCount == 4)
+        #expect(installer.status == .enabled)
+        #expect(controller.isActive)
+        #expect(controller.lastError == nil)
+    }
+
+    @Test func aReinstallThatNeverRegistersSaysSo() async {
+        helper.versionString = "0.9 (1)"
+        installer.registerRefusalsAfterUnregister = 1_000
+        let controller = makeController(appVersion: "1.0 (1)")
+        await controller.enable()
+        #expect(!controller.isActive)
+        #expect(controller.lastError != nil)
+        #expect(installer.registerCount == LidSleepController.registerAttempts)
+    }
+
+    @Test func aFreshRegistrationUsesANewConnection() async {
+        // The connection made before the helper was unregistered points nowhere; it must not look like a broken
+        // helper and start another reinstall.
+        let installer = FakeHelperInstaller(status: .notRegistered)
+        helper.isConnectionStale = true
+        let controller = LidSleepController(
+            helper: helper, installer: installer, powerMonitor: power, thermalMonitor: thermal,
+            settings: settings, appVersion: "1.0 (1)", takeoverRetryDelay: .zero, registerRetryDelay: .zero
+        )
+        await controller.enable()
+        #expect(installer.unregisterCount == 0)
+        #expect(helper.resetCount >= 1)
+        #expect(controller.isActive)
+    }
+
+    @Test func aReinstallDropsTheOldConnection() async {
+        helper.versionString = "0.9 (1)"
+        let controller = makeController(appVersion: "1.0 (1)")
+        await controller.enable()
+        #expect(helper.resetCount >= 1)
     }
 }

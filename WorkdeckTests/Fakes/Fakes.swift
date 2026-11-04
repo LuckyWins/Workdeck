@@ -56,7 +56,17 @@ final class FakeHelperClient: HelperClientProtocol {
         return sleepDisabled
     }
 
+    /// An XPC connection made before the helper was unregistered: calls fail until `resetConnection()`.
+    var isConnectionStale = false
+    private(set) var resetCount = 0
+
+    func resetConnection() {
+        resetCount += 1
+        isConnectionStale = false
+    }
+
     func version() async throws -> String {
+        if isConnectionStale { throw HelperClientError.connectionFailed("invalid destination port") }
         if !versionErrors.isEmpty { throw versionErrors.removeFirst() }
         return versionString
     }
@@ -86,8 +96,18 @@ final class FakeHelperInstaller: HelperInstallerProtocol {
         self.status = status
     }
 
+    /// Register calls refused right after an unregister, while macOS still removes the old job
+    /// ("Job is not allowed to bootstrap").
+    var registerRefusalsAfterUnregister = 0
+    private var pendingRefusals = 0
+
     func register() throws {
         registerCount += 1
+        if pendingRefusals > 0 {
+            pendingRefusals -= 1
+            status = .notRegistered
+            throw NSError(domain: "SMAppServiceErrorDomain", code: 1)
+        }
         status = statusAfterRegister
         if status == .requiresApproval {
             throw NSError(domain: "SMAppServiceErrorDomain", code: 1)
@@ -97,6 +117,7 @@ final class FakeHelperInstaller: HelperInstallerProtocol {
     func unregister() async throws {
         unregisterCount += 1
         status = .notRegistered
+        pendingRefusals = registerRefusalsAfterUnregister
     }
 
     func openApprovalSettings() {

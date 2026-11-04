@@ -22,6 +22,9 @@ protocol HelperClientProtocol: AnyObject {
     func setSleepDisabled(_ disabled: Bool) async throws
     func isSleepDisabled() async throws -> Bool
     func version() async throws -> String
+    /// Drops the XPC connection, so the next call connects to the helper launchd runs now (after a register or an
+    /// unregister the old connection points nowhere).
+    func resetConnection()
     /// Blocking variant for `applicationWillTerminate`, where awaiting is not possible.
     func restoreSleepSynchronously()
     /// Blocking, from the SIGTERM handler: tells the helper Workdeck will be back (closed-lid persistence spec §3.4).
@@ -66,6 +69,15 @@ final class HelperClient: HelperClientProtocol {
                 done(error.map { .failure(HelperClientError.helperFailed($0.localizedDescription)) } ?? .success(disabled))
             }
         }
+    }
+
+    func resetConnection() {
+        guard let old = connection else { return }
+        connection = nil
+        // Its handlers must not clear or interrupt the connection that replaces it.
+        old.interruptionHandler = nil
+        old.invalidationHandler = nil
+        old.invalidate()
     }
 
     func version() async throws -> String {
@@ -130,8 +142,14 @@ final class HelperClient: HelperClientProtocol {
         connection.interruptionHandler = { @Sendable [weak self] in
             Task { @MainActor in self?.onInterruption?() }
         }
+        let identity = ObjectIdentifier(connection)
         connection.invalidationHandler = { @Sendable [weak self] in
-            Task { @MainActor in self?.connection = nil }
+            // Only the current connection: an old one invalidated late must not drop its replacement.
+            Task { @MainActor in
+                if let self, let current = self.connection, ObjectIdentifier(current) == identity {
+                    self.connection = nil
+                }
+            }
         }
         connection.resume()
         self.connection = connection
