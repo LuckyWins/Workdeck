@@ -206,6 +206,13 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | U5 | Skip and Remind Me Later | In Sparkle's window choose Skip This Version; on another version choose Remind Me Later; relaunch. | Skip removes the row; Remind Me Later keeps it, also after the relaunch, without a second alert. |
 | U6 | Survives an update | After U4: Closed-Lid Mode, a Claude Code session in every instance, Codex, Statistics. | The helper works without re-approval, sessions and limits update, recap days are there, no Gatekeeper prompt on relaunch. |
 
+## Landing Page Checklist
+
+| # | Case | Steps | Expected |
+|---|------|-------|----------|
+| P1 | Install command | With Workdeck installed and Closed-Lid Mode on, paste the command from the page into Terminal. | The `==>` steps print with the version; Workdeck quits and reopens on its own; no Gatekeeper or Automation prompt; Closed-Lid Mode stays on through the switch; the last lines say the version and what next. |
+| P2 | The page | Open luckywins.github.io/Workdeck in light and dark mode, click Copy, follow every link, paste the link in a chat. | The icon and texts show in both modes; Copy puts the exact command on the clipboard and says Copied; Read the script, Release notes and GitHub open the right pages; the chat shows a card with the icon. |
+
 ## Results
 
 Mark each run with the date, build commit, and macOS version. Record only scenarios that were actually executed.

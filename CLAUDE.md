@@ -8,7 +8,7 @@ Workdeck is a macOS menu bar toolbox for developers. Each tool is one row in the
 
 ## Build and Test
 
-- Shortcuts: `make build` (Release into `./build`), `make test`, `make install` (copies to `/Applications`), `make clean`, `make release-prep VERSION=x.y.z` (moves `CHANGELOG.md`'s Unreleased under the version, bumps `MARKETING_VERSION` and the build number, commits; see `docs/releasing.md`). Release scripts: `scripts/release/`, tests `python3 -I scripts/release/test_release.py`.
+- Shortcuts: `make build` (Release into `./build`), `make test`, `make install` (copies to `/Applications`), `make clean`, `make release-prep VERSION=x.y.z` (moves `CHANGELOG.md`'s Unreleased under the version, bumps `MARKETING_VERSION` and the build number, commits; see `docs/releasing.md`). Release scripts: `scripts/release/`, tests `python3 -I scripts/release/test_release.py` and `python3 -I scripts/release/test_install.py` (the install script).
 - Build: `xcodebuild -scheme Workdeck -destination 'platform=macOS' build`
 - Test: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"` (`-quiet` hides Swift Testing output)
 - Single suite: add `-only-testing:WorkdeckTests/<SuiteName>` after `test`.
@@ -22,6 +22,7 @@ Workdeck is a macOS menu bar toolbox for developers. Each tool is one row in the
 - `WorkdeckHelper/` — privileged launchd daemon running as root (no default actor isolation). Registered with `SMAppService.daemon`, reached over XPC.
 - `Shared/` — compiled into both targets: the XPC protocol and constants. Types here must be explicitly `nonisolated`.
 - `LaunchDaemons/` — launchd job copied into `Workdeck.app/Contents/Library/LaunchDaemons`.
+- `site/` — the landing page (`index.html`, static, nothing from third parties) and `install.sh` (the one install path: reads the Sparkle appcast, checks the team signature, quits a running Workdeck with SIGTERM like `make install`, swaps the app in; no `sudo`), published to `luckywins.github.io/Workdeck` by `.github/workflows/pages.yml` on an Ubuntu runner with `docs/media/icon.png` copied in.
 - `WorkdeckStatusLine/` — `workdeck-statusline`, the Claude Code status line command embedded in `Contents/Helpers`. Only `main.swift`; its logic is `StatusLineRunner` in `ClaudeUsage/`. It must always exit 0 and stay fast (it runs on every Claude Code message).
 - `WorkdeckHook/` — `workdeck-hook`, the Claude Code hook command embedded in `Contents/Helpers`. Only `main.swift`; its logic is `HookRunner` in `ClaudeHooks/`. It must always exit 0, print nothing, stay fast (it runs on every tool call), and never store prompts or answers: `HookPayloadFilter` is an allowlist, and from tool input it keeps only `action(toolName:input:)`'s 30-character summary and an edit's file name, from an edit's tool response only `lineCounts(toolName:response:)`, plus the tool call ID. With `--agent codex` it is Codex's hook: events go to `sessions-codex/`, Codex's `PermissionRequest` and `Interrupt` are understood, and only the `codex` PID, the agent's `model` on `SubagentStart`, a spawn's `task_name`, and an applied `apply_patch`'s counts and file names (`CodexPatchText`) are added.
 - `ClaudeHooks/` — compiled into the app and `WorkdeckHook` (not the privileged helper): hook event model, payload filter, per-session event files. Everything here is `nonisolated`.
@@ -57,6 +58,7 @@ Workdeck is a macOS menu bar toolbox for developers. Each tool is one row in the
 ## Documentation Layout
 
 - `specs/` design specs, `plans/` implementation plans, `docs/` other documentation (`docs/releasing.md`: cutting a release, CI secrets), `README.md`, `CLAUDE.md`, `CHANGELOG.md` (release notes for colleagues) and `TODO.md` (ideas and deferred work) in the root.
+- A change to the README's tagline or Features updates the matching text in `site/index.html` by hand; the install command is the same string in both (a test checks it).
 - `README.md` is the short overview (features, install, setup, privacy); feature details live in `docs/claude-code.md` and `docs/closed-lid-mode.md`, images in `docs/media/`. A user-visible change updates the matching docs page, and the README when it changes the overview.
 
 ## Git

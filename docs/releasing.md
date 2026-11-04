@@ -9,7 +9,7 @@ Workdeck updates itself through [Sparkle](https://sparkle-project.org): the app 
 3. `git push origin main`, then `git tag v1.3.0 && git push origin v1.3.0`.
 4. Watch the Release workflow in the repository's Actions tab. It checks the tag against the project and the changelog, builds and signs the app, zips it, signs the zip for Sparkle, writes `appcast.xml`, and creates the release `v1.3.0` with the zip, the appcast and the version's notes.
 
-Installed copies find the version at their next daily check, or at once with Settings → About → Check for Updates.
+Installed copies find the version at their next daily check, or at once with Settings → About → Check for Updates. New installs get it too: `curl -fsSL https://luckywins.github.io/Workdeck/install.sh | bash` (`site/install.sh`) reads the same `appcast.xml`, so nothing else changes per release.
 
 If a run fails before publishing because of the setup (a secret, the runner, the Xcode image), fix that and rerun the job from the Actions tab: it builds the same tagged commit. If the code needs a fix, the `v*` ruleset keeps the tag where it is: commit the fix, add a changelog line, and release the next patch version (`make release-prep VERSION=1.3.1`). A failed run publishes nothing, so the unused tag only needs cleaning up if you want to: deleting a `v*` tag (or a published release's tag) takes the owner's bypass in the ruleset. Never reuse a version number that was published: installed copies may already have it.
 
@@ -34,6 +34,8 @@ In the repository: **Settings → Environments → New environment** `release`.
 Two-factor authentication is on; a passkey or a security key is the strongest second factor.
 
 ## Renewing the Certificate
+
+Releases are signed without a secure timestamp, so once the certificate expires, macOS no longer accepts the signatures already published: `install.sh` then refuses the latest release as "not signed by Workdeck's team". After renewing, cut a release right away (a patch version is enough) so the newest download carries a valid signature.
 
 An Apple Development certificate lasts a year. After renewing it in Xcode (Settings → Accounts → Manage Certificates), export the new one as above and replace `CERTIFICATE_P12_BASE64` and `CERTIFICATE_PASSWORD`. The team stays `J55BY69CVU`, so installed copies and the privileged helper accept builds signed with the new certificate.
 

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workdeck</title>
+<meta name="description" content="Your Claude Code limits and sessions in the MacBook notch — and a Mac that stays awake with the lid closed.">
+<link rel="icon" type="image/png" href="icon.png">
+<meta property="og:title" content="Workdeck">
+<meta property="og:description" content="Your Claude Code limits and sessions in the MacBook notch — and a Mac that stays awake with the lid closed.">
+<meta property="og:image" content="https://luckywins.github.io/Workdeck/icon.png">
+<meta property="og:url" content="https://luckywins.github.io/Workdeck/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="color-scheme" content="light dark">
+<style>
+  :root { --bg: #fff; --fg: #1d1d1f; --dim: #6e6e73; --line: #e5e5ea; --code: #f5f5f7; --accent: #b4532f; }
+  /* The terracotta reads well on dark; on white a darker shade keeps links above 4.5:1. */
+  @media (prefers-color-scheme: dark) { :root { --bg: #111113; --fg: #f5f5f7; --dim: #98989d; --line: #2c2c2e; --code: #1c1c1e; --accent: #d97757; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 -apple-system, system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 20px 64px; }
+  header { text-align: center; }
+  .logo { display: block; width: 104px; height: 104px; margin: 0 auto 12px; }
+  h1 { font-size: 46px; margin: 0; letter-spacing: -0.5px; }
+  .tagline { font-size: 20px; color: var(--dim); margin: 8px auto 0; max-width: 600px; }
+  .install { margin: 34px 0 6px; }
+  .install h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .6px; color: var(--dim); text-align: center; margin: 0 0 10px; }
+  .cmd { display: flex; align-items: center; gap: 10px; background: var(--code); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font: 15px ui-monospace, Menlo, monospace; }
+  /* The command scrolls on a narrow screen; the Copy button stays in view. */
+  .cmd code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; }
+  .copy { flex: none; }
+  .copy { border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 8px; padding: 5px 10px; font: 13px -apple-system, system-ui, sans-serif; cursor: pointer; }
+  .small { color: var(--dim); font-size: 14px; text-align: center; margin: 8px 0 0; }
+  .small a, a { color: var(--accent); text-decoration: none; }
+  section { border-top: 1px solid var(--line); padding: 26px 0 4px; margin-top: 30px; }
+  section h2 { font-size: 22px; margin: 0 0 10px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px 22px; }
+  .grid h3 { font-size: 16px; margin: 0 0 3px; }
+  .grid p { margin: 0; color: var(--dim); font-size: 14px; }
+  ol { padding-left: 20px; } ol li { margin: 6px 0; }
+  footer { border-top: 1px solid var(--line); margin-top: 36px; padding-top: 16px; color: var(--dim); font-size: 13px; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img class="logo" src="icon.png" width="104" height="104" alt="Workdeck icon">
+    <h1>Workdeck</h1>
+    <p class="tagline">Your Claude Code limits and sessions in the MacBook notch — and a Mac that stays awake with the lid closed.</p>
+  </header>
+
+  <div class="install">
+    <h2>Install</h2>
+    <div class="cmd"><code>curl -fsSL https://luckywins.github.io/Workdeck/install.sh | bash</code><button type="button" class="copy" aria-live="polite">Copy</button></div>
+    <p class="small">Paste in Terminal. Downloads the latest version into Applications and opens it — no "could not verify" prompt. macOS 26 or later. <a href="https://github.com/LuckyWins/Workdeck/blob/main/site/install.sh">Read the script</a></p>
+  </div>
+
+  <section>
+    <h2>What does Workdeck do?</h2>
+    <div class="grid">
+      <div><h3>💻 Closed-Lid Mode</h3><p>Keeps the Mac awake with the lid closed; turns itself off on low battery or heat.</p></div>
+      <div><h3>📊 Limits in the notch</h3><p>Claude Code and Codex plan limits at a glance, with reset times and a forecast.</p></div>
+      <div><h3>🤖 Live sessions</h3><p>Every session working, waiting for you or idle, with its agents and last steps.</p></div>
+      <div><h3>🔔 Alerts</h3><p>A limit near its end, a session that needs you, a long session that finished.</p></div>
+      <div><h3>📅 Weekly recap</h3><p>Coding time by project, a Statistics window and a half-year activity grid.</p></div>
+      <div><h3>🔒 Private</h3><p>No account, no telemetry; prompts and answers are never stored.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>After installing</h2>
+    <ol>
+      <li>Click the Workdeck icon in the menu bar → gear → Settings, and <b>Connect</b> the Claude Code status line and session hooks (you see the exact change first).</li>
+      <li>Try <b>Settings → General → Try Demo</b> for a one-minute tour.</li>
+      <li>Updates install themselves: Workdeck tells you when a new version is out. <a href="https://github.com/LuckyWins/Workdeck/blob/main/CHANGELOG.md">Release notes</a></li>
+    </ol>
+  </section>
+
+  <footer>Open source on <a href="https://github.com/LuckyWins/Workdeck">GitHub</a> · MIT</footer>
+</main>
+<script>
+  // Copy the command next to the button; say so for a moment, or ask for ⌘C when the browser refuses.
+  document.querySelectorAll('.copy').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var text = button.previousElementSibling.textContent;
+      var reset = function () { button.textContent = 'Copy'; };
+      navigator.clipboard.writeText(text).then(function () {
+        button.textContent = 'Copied';
+        setTimeout(reset, 1500);
+      }, function () {
+        button.textContent = 'Press ⌘C';
+        setTimeout(reset, 2500);
+      });
+    });
+  });
+</script>
+</body>
+</html>

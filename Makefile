@@ -21,7 +21,7 @@ test:
 
 ## install: build, quit the installed Workdeck, copy it to /Applications, and launch it
 install: build
-	@for pid in $$(pgrep -x Workdeck); do \
+	@for pid in $$(pgrep -U $$(id -u) -x Workdeck); do \
 		path=$$(ps -o comm= -p $$pid); \
 		if [ "$$path" != "$(INSTALLED_BIN)" ]; then \
 			echo "error: Workdeck is running from $$path (pid $$pid), probably under the Xcode debugger."; \
@@ -29,11 +29,11 @@ install: build
 			exit 1; \
 		fi; \
 	done
-	@if pgrep -x Workdeck > /dev/null; then \
+	@if pgrep -U $$(id -u) -x Workdeck > /dev/null; then \
 		echo "Quitting installed Workdeck"; \
-		pkill -x Workdeck; \
-		for i in $$(seq 50); do pgrep -x Workdeck > /dev/null || break; sleep 0.2; done; \
-		if pgrep -x Workdeck > /dev/null; then echo "error: Workdeck did not quit within 10 seconds"; exit 1; fi; \
+		pkill -U $$(id -u) -x Workdeck; \
+		for i in $$(seq 50); do pgrep -U $$(id -u) -x Workdeck > /dev/null || break; sleep 0.2; done; \
+		if pgrep -U $$(id -u) -x Workdeck > /dev/null; then echo "error: Workdeck did not quit within 10 seconds"; exit 1; fi; \
 	fi
 	rm -rf "$(INSTALL_DIR)/Workdeck.app"
 	ditto "$(APP)" "$(INSTALL_DIR)/Workdeck.app"

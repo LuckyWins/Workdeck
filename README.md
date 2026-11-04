@@ -43,16 +43,13 @@ Open Settings from the gear in the popover and click **Try Demo** under General.
 
 ## Install
 
-**From a release:** download `Workdeck-x.y.z.zip` from [Releases](https://github.com/LuckyWins/Workdeck/releases/latest), unzip it and move Workdeck to Applications. It is signed with the author's development certificate, not notarized, so on the first launch macOS says "Apple could not verify “Workdeck” is free of malware…". Click **Done** (not Move to Trash), then let it open in one of two ways:
+Paste in Terminal:
 
-- **In System Settings:** open Privacy & Security, scroll to Security, click **Open Anyway** next to "“Workdeck” was blocked to protect your Mac" and confirm with your password or Touch ID; launch Workdeck again and click **Open Anyway** once more.
-- **In Terminal:** remove the quarantine flag the browser added, then launch Workdeck as usual:
+```bash
+curl -fsSL https://luckywins.github.io/Workdeck/install.sh | bash
+```
 
-  ```bash
-  xattr -dr com.apple.quarantine /Applications/Workdeck.app
-  ```
-
-This is needed once. Later versions install themselves (see Updates below) without asking again.
+It downloads the latest version into Applications, checks it is signed by Workdeck's team and opens it, with no "could not verify" prompt. macOS 26 or later. Later versions install themselves (see Updates below). More on [the Workdeck page](https://luckywins.github.io/Workdeck/).
 
 **From source** (requires macOS 26 or later and Xcode 27):
 
