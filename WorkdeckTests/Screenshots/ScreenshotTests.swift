@@ -139,6 +139,22 @@ struct ScreenshotTests {
         }
     }
 
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func instances() async throws {
+        let controller = try await fixtures.instancesCompare()
+        for dark in [false, true] {
+            // The window's default size (`WorkdeckApp`). It reads the instances again when it appears; waiting lets that finish.
+            let url = try await fixtures.showingInstancesHome {
+                try await ScreenshotRenderer.writeWindowYielding(
+                    InstancesWindow(controller: controller), title: "Instances", size: CGSize(width: 900, height: 600),
+                    name: "instances-\(dark ? "dark" : "light")", dark: dark
+                )
+            }
+            try expectWritten(url, points: 900 + 2 * ScreenshotRenderer.windowMargin)
+            #expect(!controller.isLoading)
+        }
+    }
+
     // MARK: Animations (notch animations spec)
 
     private func pixels(_ image: CGImage) -> [UInt8] {
@@ -204,7 +220,7 @@ struct ScreenshotTests {
         // The suite is serialized and runs in declaration order, so this comes last: every image of spec §2 must have
         // been written in this run, not merely be on disk from an earlier one.
         let expected: Set = ["notch-compact", "notch-expanded", "notch-alert", "notch-recap", "popover-light", "popover-dark",
-                             "statistics-light", "statistics-dark", "chats-light", "chats-dark",
+                             "statistics-light", "statistics-dark", "chats-light", "chats-dark", "instances-light", "instances-dark",
                              "notch-hover-animated", "notch-alert-animated"]
         #expect(expected.isSubset(of: ScreenshotRenderer.writtenThisRun), "missing: \(expected.subtracting(ScreenshotRenderer.writtenThisRun).sorted())")
     }

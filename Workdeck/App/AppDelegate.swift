@@ -113,6 +113,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         vscode: SystemVSCodeLauncher.standard(),
     )
 
+    /// The Instances window: compares and copies skills, MCP servers, plugins and instructions (Instances spec §2).
+    private(set) lazy var instancesCompare = InstancesCompareController(
+        instances: { [unowned self] in self.instances.instances },
+        launcher: TerminalAppLauncher.standard(),
+        copier: SetupCopier(
+            replacedRoot: WorkdeckPaths.standard().supportDirectory.appending(path: "Replaced"),
+            now: { Date() }
+        )
+    )
+
     /// In-app updates through Sparkle (in-app updates spec §7); an inert updater while tests run.
     private(set) lazy var updates: UpdateController = {
         let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil

@@ -33,6 +33,7 @@ A Claude Code plan limit runs out in the middle of a task, a session sits waitin
 - 🎯 **Back to the right window** — click a session to bring forward its VS Code, Cursor or Windsurf window, or its own Terminal or iTerm2 tab.
 - 📅 **Weekly recap and Statistics** — last week's coding time by project, sessions, files, lines, commands, agents and limit hits on the first unlock of a week, for Claude Code and Codex with each agent's own time; any of the last 26 weeks in a window with a GitHub-style activity grid and your streak, filtered by agent. Counts and names only, stored locally. [More](docs/claude-code.md#weekly-recap-and-statistics)
 - 👥 **Two accounts side by side** — run a second Claude Code instance with its own login, see both accounts' limits, and continue a chat on the other account when a limit runs out. [More](docs/claude-code.md#instances-and-chats)
+- 🔀 **Compare your accounts' setups** — one window lists the skills, MCP servers, plugins and `CLAUDE.md` of every instance, marks what is missing, off or different, shows a skill's contents, and copies or installs an item into another instance after showing what will change. [More](docs/claude-code.md#instances-window)
 - 🖥️ **Any display** — on an external monitor with the lid closed, a virtual notch at the top of the screen, or plain text in the menu bar.
 - 🧪 **Demo mode** — a one-minute scripted tour in the notch, no Claude Code needed.
 - 🔒 **Private by design** — prompts, answers and file contents are never stored; every change to a `settings.json` is shown as a diff first and backed up.

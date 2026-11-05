@@ -24,6 +24,13 @@ struct ClaudeCodeRow: View {
                         openWindow(id: ChatsWindow.id)
                         NSApp.activate()
                     }
+                    // Comparing needs a second instance.
+                    if !controller.limits.extras.isEmpty {
+                        Button("Instances…") {
+                            openWindow(id: InstancesWindow.id)
+                            NSApp.activate()
+                        }
+                    }
                 }
                 .buttonStyle(.link)
                 .font(.caption)

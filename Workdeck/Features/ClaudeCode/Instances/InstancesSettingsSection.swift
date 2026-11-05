@@ -17,6 +17,11 @@ struct InstancesSettingsSection: View {
             HStack {
                 Button("Add Instance…") { isAdding = true }
                 Spacer()
+                Button("Compare…") {
+                    openWindow(id: InstancesWindow.id)
+                    NSApp.activate()
+                }
+                .help("Compare skills, MCP servers, plugins and instructions across instances")
                 Button("Open Chats…") {
                     openWindow(id: ChatsWindow.id)
                     NSApp.activate()

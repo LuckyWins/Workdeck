@@ -83,6 +83,61 @@ enum ScreenshotRenderer {
     /// `.navigationSubtitle`, bridged to the window), clipped to the window's corners, with a shadow on a clear margin.
     @discardableResult
     static func writeWindow<V: View>(_ view: V, title: String, size: CGSize, name: String, dark: Bool) throws -> URL {
+        let shown = openWindow(view, title: title, size: size, dark: dark)
+        defer { shown.window.orderOut(nil) }
+        // The toolbar arrives a moment after the content; let both settle before drawing.
+        spin(0.5)
+        removeGlass(of: shown)
+        spin(0.4)
+        return try capture(shown, size: size, name: name, dark: dark)
+    }
+
+    /// `writeWindow` for a view whose own tasks leave the main actor and come back (a window that scans files when it
+    /// appears): waiting yields the main actor, so those tasks finish before the window is drawn; spinning the run
+    /// loop alone does not resume them.
+    @discardableResult
+    static func writeWindowYielding<V: View>(_ view: V, title: String, size: CGSize, name: String, dark: Bool) async throws -> URL {
+        let shown = openWindow(view, title: title, size: size, dark: dark)
+        defer { shown.window.orderOut(nil) }
+        spin(0.4)
+        try await pause(until: Date().addingTimeInterval(0.25))
+        shown.window.makeKey()
+        spin(0.1)
+        removeGlass(of: shown)
+        spin(0.4)
+        return try capture(shown, size: size, name: name, dark: dark)
+    }
+
+    /// An inspector sits on a glass panel whose content adapts to what is behind it: drawn offscreen there is nothing
+    /// behind it, and its text comes out black also in a dark window. The content moves out of the glass, and the list
+    /// next to it, which lies under the whole window, is clipped to where it shows: its header line would cross the inspector.
+    private static func removeGlass(of shown: (window: NSWindow, host: NSView, appearance: NSAppearance)) {
+        func visit(_ view: NSView) {
+            view.subviews.forEach(visit)
+            guard let glass = view as? NSGlassEffectView, let content = glass.contentView, let parent = glass.superview else { return }
+            let frame = glass.frame
+            content.removeFromSuperview()
+            content.translatesAutoresizingMaskIntoConstraints = true
+            content.frame = frame
+            content.autoresizingMask = [.width, .height]
+            parent.replaceSubview(glass, with: content)
+            for sibling in parent.superview?.subviews ?? [] where sibling !== parent && sibling.frame.maxX > parent.frame.minX {
+                let clip = CALayer()
+                clip.frame = CGRect(x: 0, y: 0, width: parent.frame.minX, height: sibling.bounds.height)
+                clip.backgroundColor = NSColor.black.cgColor
+                sibling.wantsLayer = true
+                sibling.layer?.mask = clip
+            }
+        }
+        visit(shown.host)
+    }
+
+    /// Lets AppKit and SwiftUI lay out and draw for a while; tasks that leave the main actor do not come back.
+    private static func spin(_ seconds: TimeInterval) {
+        RunLoop.main.run(until: Date().addingTimeInterval(seconds))
+    }
+
+    private static func openWindow<V: View>(_ view: V, title: String, size: CGSize, dark: Bool) -> (window: NSWindow, host: NSView, appearance: NSAppearance) {
         ActiveAppearance.install()
         let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)!
         let host = NSHostingView(rootView: view
@@ -103,16 +158,19 @@ enum ScreenshotRenderer {
         window.contentView = host
         window.orderFrontRegardless()
         window.makeKey()
-        defer { window.orderOut(nil) }
-        // The toolbar arrives a moment after the content; let both settle before drawing.
-        RunLoop.main.run(until: Date().addingTimeInterval(0.8))
-        host.layoutSubtreeIfNeeded()
+        return (window, host, appearance)
+    }
 
+    private static func capture(
+        _ shown: (window: NSWindow, host: NSView, appearance: NSAppearance), size: CGSize, name: String, dark: Bool
+    ) throws -> URL {
+        let host = shown.host
+        host.layoutSubtreeIfNeeded()
         // The frame view draws the title bar and toolbar around the content; it has square corners and no shadow.
         guard let frameView = host.superview,
               let rep = frameView.bitmapImageRepForCachingDisplay(in: frameView.bounds) else { throw Failure.noBitmap(name) }
         frameView.cacheDisplay(in: frameView.bounds, to: rep)
-        drawSelectedSegmentLabels(of: frameView, outside: host, into: rep, appearance: appearance)
+        drawSelectedSegmentLabels(of: frameView, outside: host, into: rep, appearance: shown.appearance)
         guard rep.pixelsWide == Int((size.width * 2).rounded()) else {
             throw Failure.notRetina(name, rep.pixelsWide, size.width)
         }
@@ -282,14 +340,16 @@ enum ScreenshotRenderer {
     }
 }
 
-/// While the screenshots render, the app reports itself active and the accent color is macOS's default blue. AppKit
-/// draws an inactive app's title bar, traffic lights, toolbar and switches in gray, also in a key window, and an
-/// offscreen test host is never active; the accent would follow the settings of the Mac that runs `make screenshots`.
-/// The getters are exchanged once, only in the process that renders (`ScreenshotRenderer.isEnabled`).
+/// While the screenshots render, the app reports itself active, and the accent color, also of a selected table row, is
+/// macOS's default blue. AppKit draws an inactive app's title bar, traffic lights, toolbar and switches in gray, also in
+/// a key window, and an offscreen test host is never active; the accent would follow the settings of the Mac that runs
+/// `make screenshots`. The getters and `drawSelection(in:)` are exchanged once, only in the process that renders
+/// (`ScreenshotRenderer.isEnabled`).
 enum ActiveAppearance {
     private static let installed: Void = {
         exchange(NSApplication.self, #selector(getter: NSApplication.isActive), #selector(getter: NSApplication.screenshotIsActive), classMethod: false)
         exchange(NSColor.self, #selector(getter: NSColor.controlAccentColor), #selector(getter: NSColor.screenshotAccentColor), classMethod: true)
+        exchange(NSTableRowView.self, #selector(NSTableRowView.drawSelection(in:)), #selector(NSTableRowView.screenshotDrawSelection(in:)), classMethod: false)
     }()
 
     /// The accent the screenshots show, for SwiftUI's tint too (it follows the system setting on its own).
@@ -315,6 +375,21 @@ private extension NSApplication {
 private extension NSColor {
     @objc class var screenshotAccentColor: NSColor {
         .systemBlue
+    }
+}
+
+private extension NSTableRowView {
+    /// A selected row of a table in a key window, as macOS draws it with the blue accent: AppKit takes this color from the
+    /// system's accent, which neither the tint nor the swapped `controlAccentColor` reaches. This is `drawSelection(in:)`
+    /// once the two are exchanged; an unemphasized selection is left to AppKit's own drawing.
+    @objc func screenshotDrawSelection(in dirtyRect: NSRect) {
+        guard isEmphasized else {
+            screenshotDrawSelection(in: dirtyRect)
+            return
+        }
+        let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        (isDark ? NSColor(srgbRed: 0, green: 0.349, blue: 0.820, alpha: 1) : NSColor(srgbRed: 0, green: 0.392, blue: 0.882, alpha: 1)).setFill()
+        NSBezierPath(roundedRect: bounds.insetBy(dx: 10, dy: 0), xRadius: 8, yRadius: 8).fill()
     }
 }
 

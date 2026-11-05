@@ -23,6 +23,13 @@ struct WorkdeckApp: App {
         .defaultLaunchBehavior(.suppressed)
         .restorationBehavior(.disabled)
 
+        Window("Instances", id: InstancesWindow.id) {
+            InstancesWindow(controller: appDelegate.instancesCompare)
+        }
+        .defaultSize(width: 900, height: 600)
+        .defaultLaunchBehavior(.suppressed)
+        .restorationBehavior(.disabled)
+
         Window("Statistics", id: StatisticsWindow.id) {
             StatisticsWindow(controller: appDelegate.recap.statistics)
         }

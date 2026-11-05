@@ -200,6 +200,121 @@ final class ScreenshotFixtures {
         try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-minutesAgo * 60)], ofItemAtPath: file.path)
     }
 
+    // MARK: Instances (made-up skills in three instances' folders)
+
+    /// The home of the Instances fixture; `showingInstancesHome` makes it `~` while a view is drawn.
+    private(set) var instancesHome: URL?
+
+    private func writeSkill(
+        _ name: String, description: String, body: String, files: [String: String] = [:],
+        in instance: ClaudeInstance, hoursAgo: Double
+    ) throws {
+        let folder = instance.directory.appending(path: "skills/\(name)")
+        var contents = files
+        contents["SKILL.md"] = "---\nname: \(name)\ndescription: \(description)\n---\n\n\(body)"
+        let changed = Date().addingTimeInterval(-hoursAgo * 3600)
+        for (path, text) in contents {
+            let file = folder.appending(path: path)
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(text.utf8).write(to: file)
+            try FileManager.default.setAttributes([.modificationDate: changed], ofItemAtPath: file.path)
+        }
+    }
+
+    /// The Instances window over main, personal and work, read for real from made-up folders: three skills every
+    /// instance has (folded under "Everywhere"), and four that differ by a missing copy, a turned-off one or a second
+    /// version. The `swiftui-previews` row is selected.
+    func instancesCompare() async throws -> InstancesCompareController {
+        let home = url("instances-home")
+        instancesHome = home
+        let main = ClaudeInstance.main(home: home)
+        let personal = ClaudeInstance.extra(named: "personal", home: home)
+        let work = ClaudeInstance.extra(named: "work", home: home)
+        for instance in [main, personal, work] {
+            try FileManager.default.createDirectory(at: instance.directory, withIntermediateDirectories: true)
+            try Data(#"{"mcpServers": {}}"#.utf8).write(to: instance.accountFile)
+        }
+        try Data(#"{"skillOverrides": {"sql-migration": "off"}}"#.utf8).write(to: personal.directory.appending(path: "settings.json"))
+
+        let everywhere = [
+            ("code-review", "Reviews a diff for bugs, missing tests and unclear names before a pull request.", "# Code review\n\nRead the diff, then the files it touches.\n"),
+            ("commit-style", "Writes commit messages as type(scope): description.", "# Commit style\n\nImperative, lowercase, at most 72 characters.\n"),
+            ("deploy-checklist", "Walks through the checks before a release goes out.", "# Deploy checklist\n\n1. Tests pass.\n2. The changelog is current.\n"),
+        ]
+        for instance in [main, personal, work] {
+            for (name, description, body) in everywhere {
+                try writeSkill(name, description: description, body: body, in: instance, hoursAgo: 200)
+            }
+        }
+
+        let releaseNotes = ("release-notes", "Turns merged pull requests into release notes for colleagues.",
+                            "# Release notes\n\nGroup the changes under New, Improved and Fixed. One short line each, no internals.\n")
+        try writeSkill(releaseNotes.0, description: releaseNotes.1, body: releaseNotes.2, in: main, hoursAgo: 30)
+        try writeSkill(releaseNotes.0, description: releaseNotes.1, body: releaseNotes.2, in: work, hoursAgo: 30)
+
+        let previewsDescription = "Adds #Preview blocks with realistic sample data to SwiftUI views, in light and dark."
+        let previewsFiles = [
+            "examples.md": "# Examples\n\nA list row, a settings form and an empty state.\n",
+            "templates/sample-data.swift": "enum SampleData {\n    static let projects = [\"Orbit\", \"Atlas\"]\n}\n",
+            "templates/preview-matrix.swift": "#Preview(\"Dark\") { Content().preferredColorScheme(.dark) }\n",
+        ]
+        let previews = """
+        # SwiftUI previews
+
+        Use this skill when a SwiftUI view has no preview, or its preview shows empty data.
+
+        ## Steps
+
+        1. Read the view and the types it takes.
+        2. Add a `#Preview` below the view with values from `templates/sample-data.swift`.
+        3. Add a second preview for the dark appearance.
+        4. Build the preview target and fix the errors before you stop.
+
+        ## Rules
+
+        - Never fetch from the network in a preview.
+        - Name each preview after the state it shows: Empty, Loading, Error.
+
+        """
+        for instance in [main, work] {
+            try writeSkill("swiftui-previews", description: previewsDescription, body: previews, files: previewsFiles, in: instance, hoursAgo: 3)
+        }
+        try writeSkill(
+            "swiftui-previews", description: previewsDescription,
+            body: previews.replacingOccurrences(of: "4. Build", with: "4. Check each control's accessibility label.\n5. Build"),
+            files: previewsFiles, in: personal, hoursAgo: 5
+        )
+
+        try writeSkill("sql-migration", description: "Writes a reversible SQL migration and its rollback.", body: "# SQL migration\n\nEvery change has a down step.\n", in: personal, hoursAgo: 96)
+        try writeSkill("write-docs", description: "Drafts documentation pages from the code and its tests.", body: "# Write docs\n\nStart from the reader's question.\n", in: personal, hoursAgo: 52)
+
+        let controller = InstancesCompareController(
+            instances: { [main, personal, work] },
+            launcher: FakeTerminalLauncher(),
+            copier: SetupCopier(replacedRoot: url("instances-replaced"), now: { Date() })
+        )
+        await controller.reload()
+        controller.selection = "skill:swiftui-previews"
+        return controller
+    }
+
+    /// Runs `body` with `~` standing for the Instances fixture's home, so the inspector's path reads
+    /// `~/.claude/skills/...` and not a temporary folder. Foundation reads `CFFIXED_USER_HOME` on every call.
+    func showingInstancesHome<T>(_ body: () async throws -> T) async rethrows -> T {
+        guard let home = instancesHome else { return try await body() }
+        let key = "CFFIXED_USER_HOME"
+        let previous = getenv(key).map { String(cString: $0) }
+        setenv(key, home.path, 1)
+        defer {
+            if let previous {
+                setenv(key, previous, 1)
+            } else {
+                unsetenv(key)
+            }
+        }
+        return try await body()
+    }
+
     func chats() async throws -> ChatsController {
         let home = url("chats-home")
         try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
