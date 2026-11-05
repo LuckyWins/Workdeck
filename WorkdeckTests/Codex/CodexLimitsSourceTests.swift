@@ -26,7 +26,7 @@ final class FakeFetcher: CodexLimitsFetching, @unchecked Sendable {
 @MainActor
 struct CodexLimitsSourceTests {
     let root = makeTemporaryDirectory().appending(path: "sessions")
-    let defaults = UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!
+    let defaults = makeTestDefaults()
     let watcher = FakeSessionsWatcher()
     let now = Box<Date>(fixedNow)
 

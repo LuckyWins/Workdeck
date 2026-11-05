@@ -5,7 +5,7 @@ import Testing
 @MainActor
 struct ClaudeInstancesControllerTests {
     let home = makeTemporaryDirectory()
-    let defaults = UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!
+    let defaults = makeTestDefaults()
 
     private func makeController(launcher: FakeTerminalLauncher) -> ClaudeInstancesController {
         ClaudeInstancesController(

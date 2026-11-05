@@ -5,7 +5,7 @@ import Testing
 @MainActor
 struct ClaudeCodeSettingsTests {
     private func makeDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!
+        makeTestDefaults()
     }
 
     @Test func defaults() {

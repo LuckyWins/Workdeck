@@ -9,7 +9,7 @@ struct CodexSessionsControllerTests {
     let activator = FakeActivator()
     let sleepPreventer = FakeSleepPreventer()
     let liveness = FakeLiveness()
-    let notch = NotchSettings(defaults: UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!)
+    let notch = NotchSettings(defaults: makeTestDefaults())
 
     private func makeController() -> CodexSessionsController {
         let store = ClaudeSessionStore(directory: directory, liveness: liveness, agent: .codex, oneSessionPerProcess: false) { fixedNow.addingTimeInterval(30) }

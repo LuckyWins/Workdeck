@@ -11,8 +11,7 @@ struct LidSleepControllerTests {
     let settings: AppSettings
 
     init() {
-        let suite = "WorkdeckTests.\(UUID().uuidString)"
-        settings = AppSettings(defaults: UserDefaults(suiteName: suite)!)
+        settings = AppSettings(defaults: makeTestDefaults())
     }
 
     func makeController(appVersion: String = "1.0 (1)") -> LidSleepController {

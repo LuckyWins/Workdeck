@@ -33,7 +33,7 @@ final class HeldSources {
 @MainActor
 struct NotchComposerTests {
     let presenter = FakePresenter()
-    let settings = NotchSettings(defaults: UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!)
+    let settings = NotchSettings(defaults: makeTestDefaults())
 
     /// The composer holds sources weakly; the tests keep theirs alive here.
     let held = HeldSources()
@@ -212,7 +212,7 @@ struct NotchComposerTests {
     }
 
     @Test func claudeCodeIsASource() {
-        let settings = ClaudeCodeSettings(defaults: UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!)
+        let settings = ClaudeCodeSettings(defaults: makeTestDefaults())
         let directory = makeTemporaryDirectory()
         let limits = ClaudeLimitsController(
             settings: settings,

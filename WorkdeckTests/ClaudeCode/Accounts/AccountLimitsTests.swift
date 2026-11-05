@@ -5,7 +5,7 @@ import Testing
 @MainActor
 struct AccountLimitsTests {
     let root = makeTemporaryDirectory()
-    let defaults = UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!
+    let defaults = makeTestDefaults()
     let mainConnector = FakeConnector()
     let mainPoller = FakePoller()
     let extraConnector = FakeConnector()

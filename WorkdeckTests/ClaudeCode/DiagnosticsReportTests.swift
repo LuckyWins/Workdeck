@@ -5,7 +5,7 @@ import Testing
 @MainActor
 struct DiagnosticsReportTests {
     @Test func reportNeverIncludesContent() {
-        let settings = ClaudeCodeSettings(defaults: UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!)
+        let settings = ClaudeCodeSettings(defaults: makeTestDefaults())
         var agent = RunningAgent(id: "a1", type: "Explore", description: "SECRET-DESCRIPTION", startedAt: fixedNow, action: "Read SECRET")
         agent.modelID = "claude-opus-5-5"
         agent.isBackground = true
@@ -40,7 +40,7 @@ struct DiagnosticsLogReadingTests {
         let text = DiagnosticsReport.text(
             appVersion: "1.0",
             now: fixedNow,
-            settings: ClaudeCodeSettings(defaults: UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!),
+            settings: ClaudeCodeSettings(defaults: makeTestDefaults()),
             statusLineConnected: true,
             hooksConnected: true,
             sessions: [],

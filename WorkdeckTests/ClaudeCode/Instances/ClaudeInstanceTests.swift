@@ -36,7 +36,7 @@ struct ClaudeInstanceTests {
 
 @MainActor
 struct ClaudeInstanceStoreTests {
-    let defaults = UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!
+    let defaults = makeTestDefaults()
     let home = URL(filePath: "/Users/test")
 
     @Test func mainIsAlwaysFirst() {

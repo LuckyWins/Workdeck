@@ -41,7 +41,7 @@ struct ChatsTextTests {
 struct ChatsControllerTests {
     let vscode = FakeVSCode()
     let home = makeTemporaryDirectory()
-    let defaults = UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!
+    let defaults = makeTestDefaults()
     var project: URL { home.appending(path: "project") }
 
     private func makeChat(_ id: String = "c1", title: String = "Fix login", modified: Date = fixedNow, in projectName: String = "project", configFolder: String = ".claude") throws {

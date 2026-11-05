@@ -6,7 +6,7 @@ import Testing
 struct AccountsCompositionTests {
     let root = makeTemporaryDirectory()
     let sessionsDirectory = makeTemporaryDirectory().appending(path: "sessions")
-    let defaults = UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!
+    let defaults = makeTestDefaults()
     let liveness = FakeLiveness()
     let presenter = FakePresenter()
     let mainConnector = FakeConnector()

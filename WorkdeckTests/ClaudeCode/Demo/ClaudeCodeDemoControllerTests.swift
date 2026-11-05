@@ -11,7 +11,7 @@ struct ClaudeCodeDemoControllerTests {
     let activity = FakeActivity()
     let hooksConnector = FakeHooksConnector()
     let liveness = FakeLiveness()
-    let settings = ClaudeCodeSettings(defaults: UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!)
+    let settings = ClaudeCodeSettings(defaults: makeTestDefaults())
     /// A Monday morning; last week ran 2026-10-05 to 2026-10-11.
     var monday: Date { RecapCalendar.date(ofKey: "2026-10-12", calendar: calendar)!.addingTimeInterval(9 * 3600) }
     var usageURL: URL { directory.appending(path: "claude-usage.json") }

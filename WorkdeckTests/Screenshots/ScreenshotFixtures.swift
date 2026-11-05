@@ -35,19 +35,9 @@ final class ScreenshotFixtures {
         return url
     }
 
-    private var suiteNames: [String] = []
-
-    /// A throwaway defaults suite, removed again when the fixtures go away (no plist left in ~/Library/Preferences).
+    /// A throwaway defaults suite in a temporary folder (no plist left in ~/Library/Preferences).
     func defaults() -> UserDefaults {
-        let name = "WorkdeckScreenshots.\(UUID().uuidString)"
-        suiteNames.append(name)
-        return UserDefaults(suiteName: name)!
-    }
-
-    isolated deinit {
-        for name in suiteNames {
-            UserDefaults.standard.removePersistentDomain(forName: name)
-        }
+        makeTestDefaults()
     }
 
     /// The notch the demo shows `elapsed` seconds in, built by the real pipeline (as `ClaudeCodeDemoControllerTests`).

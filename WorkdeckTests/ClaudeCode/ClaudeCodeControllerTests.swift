@@ -241,7 +241,7 @@ struct ClaudeCodeControllerTests {
     let hooksConnector = FakeHooksConnector()
     let activator = FakeActivator()
     let sleepPreventer = FakeSleepPreventer()
-    let settings = ClaudeCodeSettings(defaults: UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!)
+    let settings = ClaudeCodeSettings(defaults: makeTestDefaults())
 
     private func makeController(notch: Bool = true, clock: @escaping () -> Date = { fixedNow }, linger: TimeInterval = 60) -> (ClaudeCodeController, ClaudeUsageStore) {
         let store = ClaudeUsageStore(fileURL: fileURL) { fixedNow }

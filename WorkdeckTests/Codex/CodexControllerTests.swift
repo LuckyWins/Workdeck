@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 struct CodexControllerTests {
-    let defaults = UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!
+    let defaults = makeTestDefaults()
     let presenter = FakePresenter()
     let watcher = FakeSessionsWatcher()
     let sessionsDirectory = makeTemporaryDirectory()

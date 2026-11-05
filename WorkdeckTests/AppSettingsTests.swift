@@ -5,10 +5,7 @@ import Testing
 @MainActor
 struct AppSettingsTests {
     private func makeDefaults() -> UserDefaults {
-        let suite = "WorkdeckTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
-        defaults.removePersistentDomain(forName: suite)
-        return defaults
+        makeTestDefaults()
     }
 
     @Test func theChoiceIsStored() {

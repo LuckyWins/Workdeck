@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 struct AlertAccountTests {
-    let defaults = UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!
+    let defaults = makeTestDefaults()
 
     @Test func titlesNameTheAccountOnlyWhenAsked() {
         let alert = LimitsAlert.threshold(window(.sevenDay, 96), threshold: 95).forAccount("personal")

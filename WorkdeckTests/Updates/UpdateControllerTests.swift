@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 struct UpdateControllerTests {
-    let defaults = UserDefaults(suiteName: "WorkdeckTests.updates.\(UUID().uuidString)")!
+    let defaults = makeTestDefaults()
     let updater = FakeUpdater()
     let alerts = Box<[String]>([])
     let demo = Box<Bool>(false)

@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 struct NotchSettingsTests {
-    let defaults = UserDefaults(suiteName: "WorkdeckTests.\(UUID().uuidString)")!
+    let defaults = makeTestDefaults()
 
     @Test func defaultsMatchTheOldClaudeDefaults() {
         let settings = NotchSettings(defaults: defaults)
