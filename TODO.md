@@ -8,6 +8,8 @@ Ideas and deferred work. **Planned** lists what is agreed and in what order; eac
 - **Updating an installed Workdeck, and CI.** Being designed: `specs/2026-11-04-in-app-updates-design.md` (Sparkle, releases from CI on a tag, Release Notes window, `CHANGELOG.md`).
 - **Landing page and Terminal install.** Being built: `specs/2026-11-04-landing-page-design.md` (a brew.sh-style page on GitHub Pages; `install.sh` is the only install path).
 
+- **Closed-Lid Mode after an update (in progress, 2026-11-04).** After a version change Workdeck unregisters and registers its helper; macOS (BTM) refuses the register ("Job is not allowed to bootstrap") for seconds to minutes, so the mode stays off until toggled. Agreed fix C: (A, now) keep re-registering in the background with growing pauses up to ~3 minutes and show "Restarting the helper…"; (B, later, with a spec and a security review) stop unregistering: the helper notices its binary was replaced on disk and exits, and launchd starts the new one on the next connection.
+
 ## Planned
 
 Agreed on 2026-10-13, partly inspired by [Coucou](https://github.com/Louis-CFM/coucou).
@@ -33,8 +35,8 @@ Agreed on 2026-10-16, from a survey of other agent companions (see the links in 
 ## Distribution
 
 - **README media.** Screenshots done: `make screenshots` (spec `specs/2026-11-04-screenshots-design.md`). Still open: a demo GIF or MP4 of the notch in motion for the README header and the page, recorded from the demo on the MacBook notch (`screencapture` needs Screen Recording for the app that runs it; Terminal works without restarting VS Code).
-- **Colored switches in the popover screenshot.** Accepted gray for now (2026-11-04): AppKit draws switches as inactive when rendered offscreen, even in a key window of an active app with `isKeyWindow`/`isMainWindow` overridden; the knob shows "on" but reads as off in light mode. Options for later: a real screen capture of the popover (Screen Recording for the app that runs it), or a drawn stand-in for the switch in the screenshot only.
-- **Window frames on the window screenshots.** Statistics and Chats are rendered without window chrome today (screenshots spec §2: no title bar, no toolbar). Add the real frame where a whole window is shown: title bar with the traffic lights and the title, and the toolbar (Statistics: week arrows and This Week; Chats: search, Last 30 days / All, Refresh), with the window's corner radius and shadow. Rendering the content view offscreen does not draw the frame, so this needs either a titled offscreen window captured whole or a drawn frame around the content; the popover and the notch stay as they are.
+- **Gray header icons in the popover screenshot.** The real popover draws Statistics and Settings in gray; the rendered one tints them with the accent (blue). Drawing the app as inactive grays them only together with the switches.
+- **GIFs of the notch on the landing page.** The first two feature tabs (limits and sessions, alerts) show still notch images; an animated notch (compact → hover → expanded, an alert opening) would show it working. Rendered from the demo like the stills.
 - ~~**Auto-update with Sparkle.**~~ Being built: `specs/2026-11-04-in-app-updates-design.md` (Sparkle with the Apple Development certificate, no notarization; releases from CI on a tag).
 
 ## Claude Code Instances

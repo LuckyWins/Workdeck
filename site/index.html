@@ -70,8 +70,8 @@
   .slide.on { opacity: 1; visibility: visible; }
   .slide picture { display: contents; }
   .slide img { max-width: 100%; max-height: 100%; border-radius: 10px; }
-  /* The notch images carry 24 pt of clear space above the notch (renderer padding at 408 pt wide); pull them up so the notch meets the card's top edge. */
-  .slide.top img { border-radius: 0; width: min(408px, 100%); max-height: none; margin-top: calc(min(408px, 100%) * -24 / 408); }
+  /* The notch images start at the notch's top edge, which meets the card's. */
+  .slide.top img { border-radius: 0; }
 
   .after { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin: 56px 0 0; padding: 26px 0 0; border-top: 1px solid var(--line); list-style: none; counter-reset: step; }
   .after li { counter-increment: step; color: var(--dim); font-size: 15px; }
@@ -111,7 +111,7 @@
     <div class="screen">
       <div class="slide top" role="tabpanel" id="slide-0" aria-labelledby="tab-0"><img src="screenshots/notch-expanded.png" alt="The expanded notch: limits of two Claude Code accounts and Codex, and live sessions with an agent" data-zoom></div>
       <div class="slide top" role="tabpanel" id="slide-1" aria-labelledby="tab-1"><img src="screenshots/notch-alert.png" alt="A limit alert in the notch" loading="lazy" data-zoom></div>
-      <div class="slide" role="tabpanel" id="slide-2" aria-labelledby="tab-2"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/popover-dark.png"><img src="screenshots/popover-light.png" alt="The menu bar popover" loading="lazy" data-zoom></picture></div>
+      <div class="slide top" role="tabpanel" id="slide-2" aria-labelledby="tab-2"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/popover-dark.png"><img src="screenshots/popover-light.png" alt="The menu bar popover" loading="lazy" data-zoom></picture></div>
       <div class="slide" role="tabpanel" id="slide-3" aria-labelledby="tab-3"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/chats-dark.png"><img src="screenshots/chats-light.png" alt="The Chats window with two accounts" loading="lazy" data-zoom></picture></div>
       <div class="slide" role="tabpanel" id="slide-4" aria-labelledby="tab-4"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/statistics-dark.png"><img src="screenshots/statistics-light.png" alt="The Statistics window with the activity grid" loading="lazy" data-zoom></picture></div>
     </div>

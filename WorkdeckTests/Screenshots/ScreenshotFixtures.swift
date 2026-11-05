@@ -20,6 +20,15 @@ final class ScreenshotFixtures {
         RecapCalendar.date(ofKey: "2026-10-08", calendar: calendar)!.addingTimeInterval(15 * 3600)
     }
 
+    /// The menu bar clock at the popover's moment, as macOS shows it ("Mon 9:10").
+    var menuBarClock: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "EEE H:mm"
+        return formatter.string(from: monday.addingTimeInterval(600))
+    }
+
     func url(_ path: String) -> URL {
         let url = temporaryRoot.appending(path: path)
         handedOut.append(url)

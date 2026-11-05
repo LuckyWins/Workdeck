@@ -46,7 +46,8 @@ struct ScreenshotTests {
         .background(Color.black)
         .clipShape(NotchOutline(topCornerRadius: NotchGeometry.compactRadii.top, bottomCornerRadius: NotchGeometry.compactRadii.bottom))
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
+        // The notch hangs from the top edge, as from the screen's.
+        .padding(.bottom, 24)
         // A fixed width: fitting the compact views' own width loops AppKit's layout.
         let url = try ScreenshotRenderer.write(compact, name: "notch-compact", dark: true, width: 400)
         try expectWritten(url, points: 400)
@@ -81,9 +82,12 @@ struct ScreenshotTests {
     func statistics() throws {
         let controller = fixtures.statistics()
         for dark in [false, true] {
-            let view = StatisticsContent(controller: controller).background(Color(nsColor: .windowBackgroundColor))
-            let url = try ScreenshotRenderer.write(view, name: "statistics-\(dark ? "dark" : "light")", dark: dark, width: 460)
-            try expectWritten(url, points: 460)
+            // The window's default size (`WorkdeckApp`).
+            let url = try ScreenshotRenderer.writeWindow(
+                StatisticsWindow(controller: controller), title: "Statistics", size: CGSize(width: 460, height: 680),
+                name: "statistics-\(dark ? "dark" : "light")", dark: dark
+            )
+            try expectWritten(url, points: 460 + 2 * ScreenshotRenderer.windowMargin)
         }
     }
 
@@ -109,9 +113,15 @@ struct ScreenshotTests {
             controller: lid, claudeCode: claudeCode, codex: codex,
             recap: fixtures.recap(composer: composer), demo: DemoMode(), updates: fixtures.updates()
         )
+        let scene = PopoverScene(
+            item: MenuBarLabel(lidSleep: lid, claudeCode: claudeCode),
+            clock: fixtures.menuBarClock,
+            content: popover
+        )
+        let width = PopoverGeometry.width + 2 * PopoverGeometry.margin
         for dark in [false, true] {
-            let url = try ScreenshotRenderer.write(popover.background(Color(nsColor: .windowBackgroundColor)), name: "popover-\(dark ? "dark" : "light")", dark: dark, width: 300)
-            try expectWritten(url, points: 300)
+            let url = try ScreenshotRenderer.write(scene, name: "popover-\(dark ? "dark" : "light")", dark: dark, width: width)
+            try expectWritten(url, points: width)
         }
     }
 
@@ -119,9 +129,12 @@ struct ScreenshotTests {
     func chats() async throws {
         let controller = try await fixtures.chats()
         for dark in [false, true] {
-            let view = ChatsWindow(controller: controller).frame(height: 480).background(Color(nsColor: .windowBackgroundColor))
-            let url = try ScreenshotRenderer.write(view, name: "chats-\(dark ? "dark" : "light")", dark: dark, width: 640)
-            try expectWritten(url, points: 640)
+            // The window's default size (`WorkdeckApp`).
+            let url = try ScreenshotRenderer.writeWindow(
+                ChatsWindow(controller: controller), title: "Claude Code Chats", size: CGSize(width: 640, height: 520),
+                name: "chats-\(dark ? "dark" : "light")", dark: dark
+            )
+            try expectWritten(url, points: 640 + 2 * ScreenshotRenderer.windowMargin)
         }
     }
 

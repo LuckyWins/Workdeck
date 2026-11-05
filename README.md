@@ -41,7 +41,7 @@ A Claude Code plan limit runs out in the middle of a task, a session sits waitin
 
 <table>
   <tr>
-    <td align="center" width="45%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/screenshots/popover-dark.png"><img src="docs/media/screenshots/popover-light.png" width="234" alt="The menu bar popover"></picture></td>
+    <td align="center" width="45%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/screenshots/popover-dark.png"><img src="docs/media/screenshots/popover-light.png" width="238" alt="The menu bar popover"></picture></td>
     <td><b>1. Turn on what you need</b><br>Click the Workdeck icon in the menu bar. Each tool is one row: Closed-Lid Mode keeps the Mac awake with the lid closed, Claude Code and Codex show your limits and sessions. Connect them once in Settings.</td>
   </tr>
   <tr>
@@ -49,7 +49,7 @@ A Claude Code plan limit runs out in the middle of a task, a session sits waitin
     <td><b>2. While you work</b><br>The notch shows the limit closest to running out and how many sessions are working. It stays out of the way until something changes.</td>
   </tr>
   <tr>
-    <td align="center" width="45%"><img src="docs/media/screenshots/notch-expanded.png" width="176" alt="The expanded notch: limits and live sessions"></td>
+    <td align="center" width="45%"><img src="docs/media/screenshots/notch-expanded.png" width="185" alt="The expanded notch: limits and live sessions"></td>
     <td><b>3. Hover to see everything</b><br>Rest the pointer on the notch: every account's 5-hour and weekly limits with reset times and a forecast, and every session with its agents, last steps and changed lines.</td>
   </tr>
   <tr>
@@ -57,15 +57,15 @@ A Claude Code plan limit runs out in the middle of a task, a session sits waitin
     <td><b>4. When something needs you</b><br>A limit at 80 % or 95 %, a session waiting for a permission, a long session that finished: the notch opens with the alert. Click it to jump to the right window.</td>
   </tr>
   <tr>
-    <td align="center" width="45%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/screenshots/chats-dark.png"><img src="docs/media/screenshots/chats-light.png" width="293" alt="The Chats window with two accounts"></picture></td>
+    <td align="center" width="45%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/screenshots/chats-dark.png"><img src="docs/media/screenshots/chats-light.png" width="232" alt="The Chats window with two accounts"></picture></td>
     <td><b>5. Out of limit? Carry on with another account</b><br>Run a second Claude Code account side by side. In Chats, open any chat on the other account and continue where you stopped.</td>
   </tr>
   <tr>
-    <td align="center" width="45%"><img src="docs/media/screenshots/notch-recap.png" width="212" alt="Last week's recap in the notch"></td>
+    <td align="center" width="45%"><img src="docs/media/screenshots/notch-recap.png" width="224" alt="Last week's recap in the notch"></td>
     <td><b>6. Your week, on Monday</b><br>On the first unlock of a week the notch shows last week: coding time by project, sessions, files, lines and limit hits.</td>
   </tr>
   <tr>
-    <td align="center" width="45%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/screenshots/statistics-dark.png"><img src="docs/media/screenshots/statistics-light.png" width="116" alt="The Statistics window with the activity grid"></picture></td>
+    <td align="center" width="45%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/screenshots/statistics-dark.png"><img src="docs/media/screenshots/statistics-light.png" width="141" alt="The Statistics window with the activity grid"></picture></td>
     <td><b>7. And everything before</b><br>Statistics keeps half a year: any week in detail, an activity grid of days and your streak, for Claude Code and Codex.</td>
   </tr>
 </table>
