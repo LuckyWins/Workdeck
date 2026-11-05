@@ -25,7 +25,8 @@ struct LidSleepControllerTests {
             appVersion: appVersion,
             takeoverRetryDelay: .zero,
             registerRetryDelay: .zero,
-            helperRestartDelays: Array(repeating: .zero, count: LidSleepController.helperRestartDelays.count)
+            helperRestartDelays: Array(repeating: .zero, count: LidSleepController.helperRestartDelays.count),
+            reconnectDelays: Array(repeating: .zero, count: LidSleepController.reconnectDelays.count)
         )
     }
 
@@ -265,6 +266,19 @@ struct LidSleepControllerTests {
         #expect(controller.isWanted)
     }
 
+    /// A replaced helper handed the hold over (helper self-replace spec §2.3): the new one keeps sleep off for a minute
+    /// and restores it unless a Workdeck takes the hold. This Workdeck held the mode, so it takes it back at once.
+    @Test func aHandedOverHoldIsTakenBackAfterTheHelperRestarts() async {
+        let controller = makeController()
+        await controller.enable()
+        let calls = helper.setCalls.count
+        helper.simulateRestart(keepingSleepDisabled: true)
+        await controller.interruptionTask?.value
+        #expect(controller.isActive)
+        #expect(helper.setCalls.count == calls + 1)
+        #expect(helper.setCalls.last == true)
+    }
+
     @Test func anInterruptionDuringARefreshIsResumed() async {
         let controller = makeController()
         await controller.enable()
@@ -387,9 +401,12 @@ struct LidSleepControllerTests {
     }
 
     @Test func unreachableHelperIsReinstalled() async {
-        // A helper whose binary was replaced under it (app update) fails the code-signing check, also on a fresh
-        // connection.
-        helper.versionErrors = Array(repeating: HelperClientError.connectionFailed("Couldn’t communicate with a helper application."), count: 2)
+        // A helper from 1.1.3 or older whose binary was replaced under it (app update) fails the code-signing check on
+        // every fresh connection, the reconnects included, until it is reinstalled.
+        helper.versionErrors = Array(
+            repeating: HelperClientError.connectionFailed("Couldn’t communicate with a helper application."),
+            count: 2 + LidSleepController.reconnectDelays.count
+        )
         let controller = makeController()
         await controller.enable()
         #expect(installer.unregisterCount == 1)
@@ -411,6 +428,35 @@ struct LidSleepControllerTests {
         #expect(installer.status == .enabled)
         #expect(controller.isActive)
         #expect(controller.lastError == nil)
+    }
+
+    /// A helper with the self-replace exit refuses the new Workdeck once and leaves; launchd starts the new binary at the
+    /// next connection (helper self-replace spec §3).
+    @Test func aReplacedHelperIsReachedWithoutAnUnregister() async {
+        helper.versionErrors = [HelperClientError.connectionFailed("refused"), HelperClientError.connectionFailed("refused")]
+        let controller = makeController(appVersion: "1.0 (1)")
+        await controller.enable()
+        #expect(installer.unregisterCount == 0)
+        #expect(controller.isActive)
+        #expect(helper.resetCount >= 2)
+    }
+
+    /// A helper from 1.1.3 or older has no such exit: it keeps answering its old version, and part A reinstalls it.
+    @Test func anOldHelperStillGetsReinstalled() async {
+        helper.versionString = "0.9 (1)"
+        let controller = makeController(appVersion: "1.0 (1)")
+        await controller.enable()
+        #expect(installer.unregisterCount == 1)
+        #expect(controller.isActive)
+        // A helper that answers with another version accepted the connection, so it cannot leave on its own: no reconnects.
+        #expect(helper.versionCount == 1)
+    }
+
+    /// launchd starts a job at most every 10 s (`ThrottleInterval`): a helper started just before it left may come back
+    /// only then, and the reconnects must still be trying.
+    @Test func reconnectsOutlastLaunchdsThrottle() {
+        let total = LidSleepController.reconnectDelays.reduce(Duration.zero, +)
+        #expect(total >= .seconds(10))
     }
 
     @Test func aReinstallThatNeverRegistersSaysSo() async {

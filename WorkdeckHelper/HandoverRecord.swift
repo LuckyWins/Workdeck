@@ -92,7 +92,15 @@ enum HelperLifecycle {
 
     /// A SIGTERM hands the hold over only after a restart announcement while sleep is really disabled.
     static func handsOver(tracker: SleepSessionTracker, now: Date, isSleepDisabled: () -> Bool) -> Bool {
-        tracker.shouldHandOver(at: now) && isSleepDisabled()
+        handsOver(tracker: tracker, now: now, includingHolders: false, isSleepDisabled: isSleepDisabled)
+    }
+
+    /// A helper whose executable was replaced also hands over while a client holds sleep without having announced a
+    /// restart (helper self-replace spec §2.3): that Workdeck reconnects within seconds and takes over from the new
+    /// helper, so a closed-lid Mac does not sleep in between. A grace alone (no connected holder) is not handed over
+    /// again, so replacements in a row cannot renew the minute. SIGTERM keeps the narrower rule.
+    static func handsOver(tracker: SleepSessionTracker, now: Date, includingHolders: Bool, isSleepDisabled: () -> Bool) -> Bool {
+        (tracker.shouldHandOver(at: now) || (includingHolders && tracker.hasHolders)) && isSleepDisabled()
     }
 
     /// Without a record the next helper restores sleep at start anyway; restoring now is the safe side.

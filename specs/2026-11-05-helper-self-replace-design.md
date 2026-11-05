@@ -39,7 +39,7 @@ Decided with the user (2026-11-04):
 
 At start the helper records the path of its own executable (`proc_pidpath` of its own process, read once at start: inside the app's `Contents/MacOS`, `Bundle.main` is the app, not the helper) and that file's device and inode numbers (`stat`). The path is fixed at start and never given by a client; later checks `stat` the recorded path, not the process's current path (which follows the old file if it is moved away). If `stat` fails at start, the helper records nothing and never considers itself replaced (Anti-Goals).
 
-**Replaced** means: the same path now resolves to a file with a different device or inode number, or no longer exists. Sparkle installs an update by moving the new bundle into place, so the path's inode changes; a rebuild copied over by `make install` does too.
+**Replaced** means: the same path now resolves to a file with a different device or inode number. Nothing at the path is **not** a replacement (final review, 2026-11-05): every update puts a new file there, while a missing file means a moved app or an install caught between removing the old bundle and placing the new one, and a helper that exits then may not be started again, leaving a handed-over hold with nobody to end it. Sparkle installs an update by moving the new bundle into place, so the path's inode changes; a rebuild copied over by `make install` does too.
 
 ### 2.2 When it checks
 
@@ -49,14 +49,14 @@ On every incoming connection, in `listener(_:shouldAcceptNewConnection:)`, befor
 
 1. Refuses the connection (`return false`), so the client's call fails at once with a connection error.
 2. Logs `Executable replaced on disk; exiting so launchd starts the new one` (`HelperLog.power`, notice).
-3. Leaves like on SIGTERM, with one difference: it hands over when sleep is disabled and **either** Workdeck announced a restart (as on SIGTERM) **or** a client still holds sleep disabled (the user, 2026-11-05: a Workdeck of another user, a dev build or a moved app that holds the mode must not see the Mac sleep under a closed lid; it reconnects within seconds and takes over from the new helper). Otherwise it restores sleep. Then it exits with status 0. One leave function serves the SIGTERM handler and this path, with the holder rule as its parameter, so the two cannot drift apart.
+3. Leaves like on SIGTERM, with one difference: it hands over when sleep is disabled and **either** Workdeck announced a restart (as on SIGTERM) **or** a connected client still holds sleep disabled (a grace alone does not count, so replacements in a row cannot renew the minute) (the user, 2026-11-05: a Workdeck of another user, a dev build or a moved app that holds the mode must not see the Mac sleep under a closed lid; it reconnects within seconds and takes over from the new helper). Otherwise it restores sleep. Then it exits with status 0. One leave function serves the SIGTERM handler and this path, with the holder rule as its parameter, so the two cannot drift apart.
 4. Runs once: later connections that arrive before the process is gone are refused too.
 
 launchd then starts the helper from the bundle's `BundleProgram` (`Contents/MacOS/WorkdeckHelper`) at the next connection to the Mach service, as after a crash. The new helper reads a handover record if there is one (closed-lid persistence spec §3.4).
 
 ## 3. The App
 
-`LidSleepController.prepareHelper` today reinstalls when the helper's version differs or the connection fails the code-signing check. Instead, it first **reconnects**: a fresh connection after a short pause, up to four times (0.25, 0.5, 1 and 2 s apart, about 4 s in all), checking the version each time. A helper that has this spec's exit answers with the app's version on the first or second try; Workdeck carries on without unregistering anything.
+`LidSleepController.prepareHelper` today reinstalls when the helper's version differs or the connection fails the code-signing check. Instead, when the connection fails it first **reconnects**: a fresh connection after a short pause, up to six times (0.25, 0.5, 1, 2, 4 and 4 s apart, about 12 s in all, past launchd's 10 s throttle), checking the version each time. A helper that answers with another version accepted the connection, so it is one without this exit (1.1.3 and older): Workdeck reinstalls it at once. A helper that has this spec's exit answers with the app's version on the first or second try; Workdeck carries on without unregistering anything.
 
 If the helper still answers with another version, or every connection fails, Workdeck falls back to part A unchanged: unregister, quick register attempts, then the background restart with "Restarting the helper…".
 
@@ -80,13 +80,15 @@ Run with the user before merging (CLAUDE.md: the helper runs as root).
 | Update from 1.1.3 or older (old helper without the exit) | Reconnects get the old version or fail; part A's unregister path runs, as in 1.1.3. |
 | launchd will not start the replaced binary without a new registration (the spike showed it does, §6; kept for a future macOS) | Reconnects fail; part A's path runs. The spec's benefit is lost but nothing breaks. |
 | `make install` with the mode on and the lid closed | The new Workdeck connects, the helper sees the replacement, hands over (Workdeck announced the restart), exits; the new helper keeps sleep off from the record. Same result as today's SIGTERM path. |
-| Workdeck moved to another folder while running | The old path no longer exists: replaced. The helper exits at the next connection; launchd runs the job from where BTM registered it. If that fails, part A's path re-registers. |
+| Workdeck moved to another folder while running | The old path no longer exists: not a replacement, the helper keeps running (§2.1). |
 | A connection arrives while the exit runs | Refused (§2.3 step 4). |
+| A Workdeck that held the mode without announcing a restart, after the hand-over | Its connection drops; the new helper keeps sleep off from the record; that Workdeck finds sleep still off and takes the hold again at once, so the new helper's grace ends (final review, 2026-11-05). |
+| The old helper started less than 10 s before it exits | launchd's throttle starts the new one up to 10 s later; Workdeck's reconnects last about 12 s. |
 | `stat` fails at start | No identity: the helper never exits for this reason. |
 
 ## 6. Testing
 
-- **Unit (WorkdeckTests, helper sources compiled in):** the identity check — same inode not replaced, other inode replaced, missing file replaced, no identity at start never replaced (injected `stat`); the shared leave function — hands over when Workdeck announced a restart and sleep is off, restores otherwise; a second replaced connection does not run it twice.
+- **Unit (WorkdeckTests, helper sources compiled in):** the identity check — same inode not replaced, other inode replaced, missing file not replaced, no identity at start never replaced (injected `stat`); the shared leave function — hands over when Workdeck announced a restart and sleep is off, restores otherwise; a second replaced connection does not run it twice.
 - **Unit (app):** `LidSleepController` — a helper whose first connection fails and second answers the app's version: no unregister, the mode turns on; a helper that keeps the old version: unregister and part A as before.
 - **Spike, before any code (the user, 2026-11-05):** does launchd start a replaced helper binary without a new registration? With the current 1.1.3 installed and the mode on: quit Workdeck, swap in a fresh local Release build signed with the same team the way Sparkle does (move the old bundle away, move the new one into `/Applications`), stop the old helper process (`sudo launchctl kill SIGTERM system/com.appcreators.workdeck.helper`), open the new Workdeck. Pass: the helper log shows a new helper start, the app does not show "Restarting the helper…", the mode is on within seconds. Fail: "Restarting the helper…" (the connection failed, part A ran): part B is dropped, since it could not help.
   **Result (2026-11-05, 19:09, macOS 27, 1.1.3 replaced by a local 1.1.3 build, new inode):** passed. After the old helper stopped (exit 0), opening the new Workdeck made launchd start the helper from the new binary at once (pid 76108, "Restored sleep (helper start)"); BTM checked the item's disposition and let it run without a new registration; 60 ms later Workdeck set sleep disabled again (`SleepDisabled 1`). No unregister, no "Restarting the helper…".

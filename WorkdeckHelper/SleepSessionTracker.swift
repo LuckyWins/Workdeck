@@ -95,6 +95,11 @@ final class SleepSessionTracker: Sendable {
         }
     }
 
+    /// A connected client holds sleep disabled (a grace for one that went away does not count).
+    var hasHolders: Bool {
+        state.withLock { !$0.holders.isEmpty }
+    }
+
     private static func startGrace(_ state: inout State) -> UInt64 {
         let token = state.nextToken
         state.nextToken += 1

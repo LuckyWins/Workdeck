@@ -37,11 +37,16 @@ final class LidSleepController {
     @ObservationIgnored private let takeoverRetryDelay: Duration
     @ObservationIgnored private let registerRetryDelay: Duration
     @ObservationIgnored private let helperRestartDelays: [Duration]
+    @ObservationIgnored private let reconnectDelays: [Duration]
     /// Register attempts after an unregister: macOS refuses them until it has removed the old job.
     static let registerAttempts = 12
     /// The pauses before each background register attempt once the quick ones failed: about three minutes in all.
     /// After an update macOS kept refusing the new helper for minutes (accepted 3.5 and 6 minutes after the unregister).
     static let helperRestartDelays: [Duration] = [1, 2, 4, 8, 16, 30, 30, 30, 30, 30].map { .seconds($0) }
+    /// The pauses before each fresh connection to a helper that runs an older build: one that notices its executable
+    /// was replaced refuses once and exits, and launchd starts the new one (helper self-replace spec §3).
+    /// About 12 s in all, past launchd's 10 s `ThrottleInterval` for a helper started just before it left.
+    static let reconnectDelays: [Duration] = [.milliseconds(250), .milliseconds(500), .seconds(1), .seconds(2), .seconds(4), .seconds(4)]
     /// This Workdeck turned sleep off itself, so the helper counts it as the holder.
     @ObservationIgnored private var holdsHelper = false
     /// Set when a safeguard check arrived while another helper call was in flight.
@@ -56,8 +61,10 @@ final class LidSleepController {
         appVersion: String,
         takeoverRetryDelay: Duration = .seconds(1),
         registerRetryDelay: Duration = .milliseconds(250),
-        helperRestartDelays: [Duration] = LidSleepController.helperRestartDelays
+        helperRestartDelays: [Duration] = LidSleepController.helperRestartDelays,
+        reconnectDelays: [Duration] = LidSleepController.reconnectDelays
     ) {
+        self.reconnectDelays = reconnectDelays
         self.takeoverRetryDelay = takeoverRetryDelay
         self.registerRetryDelay = registerRetryDelay
         self.helperRestartDelays = helperRestartDelays
@@ -178,16 +185,7 @@ final class LidSleepController {
                 return
             }
             settings.closedLidModeWanted = true
-            // Become the holder in the helper once, so its grace period ends and a later crash starts a new one. A
-            // helper that was just replaced may not answer at once: retry before its grace runs out.
-            for attempt in 0..<3 where !holdsHelper {
-                if attempt > 0 {
-                    try? await Task.sleep(for: takeoverRetryDelay)
-                }
-                if (try? await helper.setSleepDisabled(true)) != nil {
-                    holdsHelper = true
-                }
-            }
+            await takeOverHold()
         } else if isWanted {
             // A helper the new build just replaced may need a moment to start: try a few times, 1, 2, 4, 8 s apart.
             for attempt in 0..<5 where isWanted && !isActive {
@@ -197,6 +195,19 @@ final class LidSleepController {
                     helperVersionChecked = false
                 }
                 await enable()
+            }
+        }
+    }
+
+    /// Become the holder in the helper once, so its grace period ends and a later crash starts a new one. A helper that
+    /// was just replaced may not answer at once: retry before its grace runs out.
+    private func takeOverHold() async {
+        for attempt in 0..<3 where !holdsHelper {
+            if attempt > 0 {
+                try? await Task.sleep(for: takeoverRetryDelay)
+            }
+            if (try? await helper.setSleepDisabled(true)) != nil {
+                holdsHelper = true
             }
         }
     }
@@ -283,13 +294,18 @@ final class LidSleepController {
             let helperVersion = try await currentHelperVersion()
             helperVersionChecked = true
             if helperVersion != appVersion {
+                // It answered, so it accepted the connection: a helper that can leave on its own would have refused.
+                // An older one (1.1.3 and before) stays until it is reinstalled.
                 await reinstallHelper()
             }
         } catch HelperClientError.connectionFailed {
-            // A running helper whose binary was replaced (app update or rebuild) fails the
-            // code-signing check, also on a fresh connection; reinstalling makes launchd start the current binary.
+            // A running helper whose binary was replaced (app update or rebuild) refuses the connection and exits, or
+            // (1.1.3 and older) fails the code-signing check; a fresh connection reaches the new binary, otherwise
+            // reinstalling makes launchd start it.
             helperVersionChecked = true
-            await reinstallHelper()
+            if await !reconnectToReplacedHelper() {
+                await reinstallHelper()
+            }
         } catch {
             lastError = error.localizedDescription
             return false
@@ -306,6 +322,18 @@ final class LidSleepController {
             helper.resetConnection()
             return try await helper.version()
         }
+    }
+
+    /// Fresh connections, a little apart, until one answers this build's version: no unregister needed.
+    private func reconnectToReplacedHelper() async -> Bool {
+        for delay in reconnectDelays {
+            try? await Task.sleep(for: delay)
+            helper.resetConnection()
+            if (try? await helper.version()) == appVersion {
+                return true
+            }
+        }
+        return false
     }
 
     /// Replaces the running helper with this build's. macOS refuses a register while it still removes the old job
@@ -371,8 +399,16 @@ final class LidSleepController {
         // The relaunched helper resets sleep on startup; resync to confirm.
         interruptionTask = Task {
             await syncState()
+            guard wasActive else { return }
+            if isActive {
+                // A replaced helper handed the hold over: the new one keeps sleep off only until its grace ends, unless
+                // this Workdeck takes the hold (helper self-replace spec §2.3).
+                if isWanted {
+                    await takeOverHold()
+                }
+                return
+            }
             // The remembered choice survives the helper's restart: turn the mode on again once it answers.
-            guard wasActive, !isActive else { return }
             if isWanted {
                 // Not when the user turned the helper off (Login Items): that would register it again.
                 if helperStatus == .enabled {

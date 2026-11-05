@@ -118,4 +118,15 @@ struct SleepSessionTrackerTests {
         #expect(throws: (any Error).self) { try tracker.set(second, sleepDisabled: true) { _ in throw CocoaError(.fileWriteUnknown) } }
         #expect(tracker.clientDidDisconnect(second) == nil)
     }
+
+    @Test func hasHoldersOnlyWhileAClientHolds() throws {
+        let tracker = SleepSessionTracker()
+        let client = ObjectIdentifier(NSObject())
+        #expect(!tracker.hasHolders)
+        tracker.clientDidSet(client, sleepDisabled: true)
+        #expect(tracker.hasHolders)
+        // A grace for a client that went away is not a holder.
+        _ = try #require(tracker.clientDidDisconnect(client))
+        #expect(!tracker.hasHolders)
+    }
 }

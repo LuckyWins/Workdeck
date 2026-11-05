@@ -149,4 +149,34 @@ struct HelperLifecycleTests {
         HelperLifecycle.handOver(write: {}, restore: { restored += 1 })
         #expect(restored == 1)
     }
+
+    @Test func aReplacedHelperHandsOverWhileAClientHoldsSleep() {
+        // No restart announced: a Workdeck of another user, a dev build or a moved app holds the mode.
+        let tracker = SleepSessionTracker()
+        tracker.clientDidSet(ObjectIdentifier(holder), sleepDisabled: true)
+        #expect(HelperLifecycle.handsOver(tracker: tracker, now: now, includingHolders: true, isSleepDisabled: { true }))
+    }
+
+    @Test func sigtermStillNeedsAnAnnouncement() {
+        let tracker = SleepSessionTracker()
+        tracker.clientDidSet(ObjectIdentifier(holder), sleepDisabled: true)
+        #expect(!HelperLifecycle.handsOver(tracker: tracker, now: now, includingHolders: false, isSleepDisabled: { true }))
+    }
+
+    @Test func nothingHeldRestores() {
+        let tracker = SleepSessionTracker()
+        #expect(!HelperLifecycle.handsOver(tracker: tracker, now: now, includingHolders: true, isSleepDisabled: { true }))
+        tracker.clientDidSet(ObjectIdentifier(holder), sleepDisabled: true)
+        #expect(!HelperLifecycle.handsOver(tracker: tracker, now: now, includingHolders: true, isSleepDisabled: { false }))
+    }
+
+    /// A helper started from a record (a grace, no holder yet) whose executable is replaced again within that minute does
+    /// not write a fresh record: no Workdeck holds the mode, so nothing would end the renewed minute early.
+    @Test func aGraceAloneIsNotHandedOverAgain() throws {
+        let tracker = SleepSessionTracker()
+        let client = ObjectIdentifier(holder)
+        tracker.clientDidSet(client, sleepDisabled: true)
+        _ = try #require(tracker.clientDidDisconnect(client))
+        #expect(!HelperLifecycle.handsOver(tracker: tracker, now: now, includingHolders: true, isSleepDisabled: { true }))
+    }
 }

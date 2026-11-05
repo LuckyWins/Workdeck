@@ -4,13 +4,20 @@ import os
 final class HelperListenerDelegate: NSObject, NSXPCListenerDelegate {
     private let power: PowerSettings
     private let tracker: SleepSessionTracker
+    private let replacement: ReplacementWatch
 
-    init(power: PowerSettings, tracker: SleepSessionTracker) {
+    init(power: PowerSettings, tracker: SleepSessionTracker, replacement: ReplacementWatch) {
         self.power = power
         self.tracker = tracker
+        self.replacement = replacement
     }
 
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
+        // A new Workdeck after an update: this helper runs code that is no longer on disk. Refuse, and leave so launchd
+        // starts the new binary at the client's next connection (helper self-replace spec §2.3).
+        if replacement.checkConnection() {
+            return false
+        }
         let clientID = ObjectIdentifier(connection)
         let clientPID = connection.processIdentifier
         connection.exportedInterface = NSXPCInterface(with: HelperProtocol.self)

@@ -55,4 +55,12 @@ struct TerminationHandlerTests {
         #expect(handOvers.withLock { $0 } == 1)
         #expect(exitCode.withLock { $0 } == 0)
     }
+
+    @Test func leaveHandsOverOrRestoresThenExits() {
+        var handOvers = 0, restores = 0, exits: [Int32] = []
+        TerminationHandler.leave(handsOver: true, handOver: { handOvers += 1 }, restore: { restores += 1 }, exit: { exits.append($0) })
+        #expect(handOvers == 1 && restores == 0 && exits == [0])
+        TerminationHandler.leave(handsOver: false, handOver: { handOvers += 1 }, restore: { restores += 1 }, exit: { exits.append($0) })
+        #expect(handOvers == 1 && restores == 1 && exits == [0, 0])
+    }
 }

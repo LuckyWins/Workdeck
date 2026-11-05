@@ -8,7 +8,6 @@ Ideas and deferred work. **Planned** lists what is agreed and in what order; eac
 - **Updating an installed Workdeck, and CI.** Being designed: `specs/2026-11-04-in-app-updates-design.md` (Sparkle, releases from CI on a tag, Release Notes window, `CHANGELOG.md`).
 - **Landing page and Terminal install.** Being built: `specs/2026-11-04-landing-page-design.md` (a brew.sh-style page on GitHub Pages; `install.sh` is the only install path).
 
-- **Closed-Lid Mode after an update: stop unregistering the helper (fix C, part B).** Part A is done (2026-11-05): after a version change Workdeck still unregisters and registers its helper, and when macOS (BTM) refuses the register ("Job is not allowed to bootstrap") it keeps retrying in the background for about three minutes ("Restarting the helper…"). Part B, with a spec and a security review: no unregister at all — the helper notices its binary was replaced on disk and exits cleanly, and launchd starts the new one on the next connection; no new XPC methods. Works only from the update after the one that ships it.
 
 ## Planned
 

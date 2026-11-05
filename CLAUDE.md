@@ -56,6 +56,7 @@ Workdeck is a macOS menu bar toolbox for developers. Each tool is one row in the
 - Never execute arbitrary commands or accept paths or arguments from the client.
 - Every code path that disables sleep must have a matching restore path: normal quit, client crash or disconnect, helper restart, and reboot.
 - The code-signing requirements and team ID live in `Shared/HelperConstants.swift`.
+- The helper records its executable's path and inode at start (`ReplacementWatch`); a connection that finds another file there makes it refuse and leave as on SIGTERM (hand over or restore, then exit), so launchd starts the new build after an update. It never decides that from anything a client sends.
 
 ## Documentation Layout
 

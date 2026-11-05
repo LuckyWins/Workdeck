@@ -15,14 +15,20 @@ enum TerminationHandler {
         signal(SIGTERM, SIG_IGN)
         let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: queue)
         source.setEventHandler {
-            if shouldHandOver() {
-                handOver()
-            } else {
-                power.restoreSleep(reason: "SIGTERM")
-            }
-            exit(0)
+            leave(handsOver: shouldHandOver(), handOver: handOver, restore: { power.restoreSleep(reason: "SIGTERM") }, exit: exit)
         }
         source.resume()
         return source
+    }
+
+    /// Hands the hold over or restores sleep, then exits 0: the one way the helper leaves on its own, on SIGTERM and when
+    /// its executable was replaced (helper self-replace spec §2.3).
+    static func leave(handsOver: Bool, handOver: () -> Void, restore: () -> Void, exit: (Int32) -> Void) {
+        if handsOver {
+            handOver()
+        } else {
+            restore()
+        }
+        exit(0)
     }
 }

@@ -65,7 +65,10 @@ final class FakeHelperClient: HelperClientProtocol {
         isConnectionStale = false
     }
 
+    private(set) var versionCount = 0
+
     func version() async throws -> String {
+        versionCount += 1
         if isConnectionStale { throw HelperClientError.connectionFailed("invalid destination port") }
         if !versionErrors.isEmpty { throw versionErrors.removeFirst() }
         return versionString
@@ -76,9 +79,12 @@ final class FakeHelperClient: HelperClientProtocol {
         sleepDisabled = false
     }
 
-    /// Simulates the helper process crashing and launchd relaunching it.
-    func simulateRestart() {
-        sleepDisabled = false
+    /// Simulates the helper process crashing and launchd relaunching it. A helper started on a handover record keeps
+    /// sleep disabled (`keepingSleepDisabled`) until a Workdeck takes the hold or its grace ends.
+    func simulateRestart(keepingSleepDisabled: Bool = false) {
+        if !keepingSleepDisabled {
+            sleepDisabled = false
+        }
         onInterruption?()
     }
 }
