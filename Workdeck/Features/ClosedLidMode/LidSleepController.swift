@@ -17,11 +17,15 @@ final class LidSleepController {
     private(set) var notice: Notice?
     private(set) var lastError: String?
     private(set) var power: PowerSnapshot
+    /// macOS refused the replaced helper's registration at first; Workdeck keeps trying in the background.
+    private(set) var isRestartingHelper = false
 
     /// Latest safeguard check started by a monitor event; exposed so tests can await it.
     @ObservationIgnored private(set) var safeguardTask: Task<Void, Never>?
     /// Latest resync started by a helper interruption; exposed so tests can await it.
     @ObservationIgnored private(set) var interruptionTask: Task<Void, Never>?
+    /// The background restart of a helper macOS would not register at once; exposed so tests can await it.
+    @ObservationIgnored private(set) var helperRestartTask: Task<Void, Never>?
 
     @ObservationIgnored private let helper: any HelperClientProtocol
     @ObservationIgnored private let installer: any HelperInstallerProtocol
@@ -32,8 +36,12 @@ final class LidSleepController {
     @ObservationIgnored private var helperVersionChecked = false
     @ObservationIgnored private let takeoverRetryDelay: Duration
     @ObservationIgnored private let registerRetryDelay: Duration
+    @ObservationIgnored private let helperRestartDelays: [Duration]
     /// Register attempts after an unregister: macOS refuses them until it has removed the old job.
     static let registerAttempts = 12
+    /// The pauses before each background register attempt once the quick ones failed: about three minutes in all.
+    /// After an update macOS kept refusing the new helper for minutes (accepted 3.5 and 6 minutes after the unregister).
+    static let helperRestartDelays: [Duration] = [1, 2, 4, 8, 16, 30, 30, 30, 30, 30].map { .seconds($0) }
     /// This Workdeck turned sleep off itself, so the helper counts it as the holder.
     @ObservationIgnored private var holdsHelper = false
     /// Set when a safeguard check arrived while another helper call was in flight.
@@ -47,10 +55,12 @@ final class LidSleepController {
         settings: AppSettings,
         appVersion: String,
         takeoverRetryDelay: Duration = .seconds(1),
-        registerRetryDelay: Duration = .milliseconds(250)
+        registerRetryDelay: Duration = .milliseconds(250),
+        helperRestartDelays: [Duration] = LidSleepController.helperRestartDelays
     ) {
         self.takeoverRetryDelay = takeoverRetryDelay
         self.registerRetryDelay = registerRetryDelay
+        self.helperRestartDelays = helperRestartDelays
         self.helper = helper
         self.installer = installer
         self.powerMonitor = powerMonitor
@@ -299,8 +309,8 @@ final class LidSleepController {
     }
 
     /// Replaces the running helper with this build's. macOS refuses a register while it still removes the old job
-    /// ("Job is not allowed to bootstrap"), so registering is retried for a few seconds; a helper still missing after
-    /// that is reported instead of leaving the mode silently off.
+    /// ("Job is not allowed to bootstrap"): registering is retried for a few seconds, then in the background for about
+    /// three minutes (`restartHelperInBackground`).
     private func reinstallHelper() async {
         try? await installer.unregister()
         helper.resetConnection()
@@ -316,8 +326,41 @@ final class LidSleepController {
         helper.resetConnection()
         helperStatus = installer.status
         if helperStatus == .notRegistered {
+            restartHelperInBackground()
+        }
+    }
+
+    /// Keeps registering a helper macOS refused right after its unregister, with growing pauses; once it is registered
+    /// the remembered mode turns on again (`refresh`). A helper still missing after all of them is reported instead of
+    /// leaving the mode silently off.
+    private func restartHelperInBackground() {
+        guard helperRestartTask == nil else { return }
+        isRestartingHelper = true
+        helperRestartTask = Task { [weak self, helperRestartDelays] in
+            for delay in helperRestartDelays {
+                try? await Task.sleep(for: delay)
+                guard let self, !Task.isCancelled else { return }
+                // `enable` may have registered it meanwhile.
+                if installer.status == .notRegistered {
+                    try? installer.register()
+                }
+                guard installer.status == .notRegistered else {
+                    helper.resetConnection()
+                    finishHelperRestart()
+                    await refresh()
+                    return
+                }
+            }
+            guard let self else { return }
+            finishHelperRestart()
+            helperStatus = installer.status
             lastError = "Workdeck could not restart its helper. Turn Closed-Lid Mode off and on again."
         }
+    }
+
+    private func finishHelperRestart() {
+        isRestartingHelper = false
+        helperRestartTask = nil
     }
 
     private func handleHelperInterruption() {

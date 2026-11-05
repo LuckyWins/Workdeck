@@ -24,7 +24,8 @@ struct LidSleepControllerTests {
             settings: settings,
             appVersion: appVersion,
             takeoverRetryDelay: .zero,
-            registerRetryDelay: .zero
+            registerRetryDelay: .zero,
+            helperRestartDelays: Array(repeating: .zero, count: LidSleepController.helperRestartDelays.count)
         )
     }
 
@@ -417,9 +418,43 @@ struct LidSleepControllerTests {
         installer.registerRefusalsAfterUnregister = 1_000
         let controller = makeController(appVersion: "1.0 (1)")
         await controller.enable()
+        await controller.helperRestartTask?.value
         #expect(!controller.isActive)
+        #expect(!controller.isRestartingHelper)
         #expect(controller.lastError != nil)
-        #expect(installer.registerCount == LidSleepController.registerAttempts)
+        #expect(installer.registerCount == LidSleepController.registerAttempts + LidSleepController.helperRestartDelays.count)
+    }
+
+    /// After an update macOS can refuse the new helper for minutes (seen: 3.5 and 6 min): the mode keeps trying in the
+    /// background and comes back on its own once the helper is registered.
+    @Test func aHelperMacOSRefusesForLongerTurnsTheModeOnOnceRegistered() async {
+        helper.versionString = "0.9 (1)"
+        settings.closedLidModeWanted = true
+        installer.registerRefusalsAfterUnregister = LidSleepController.registerAttempts + 2
+        let controller = makeController(appVersion: "1.0 (1)")
+        await controller.refresh()
+        #expect(controller.isRestartingHelper)
+        #expect(controller.lastError == nil)
+        #expect(!controller.isActive)
+        await controller.helperRestartTask?.value
+        #expect(!controller.isRestartingHelper)
+        #expect(controller.helperStatus == .enabled)
+        #expect(controller.isActive)
+        #expect(helper.sleepDisabled)
+        #expect(controller.lastError == nil)
+    }
+
+    @Test func turningTheModeOffWhileTheHelperRestartsKeepsItOff() async {
+        helper.versionString = "0.9 (1)"
+        settings.closedLidModeWanted = true
+        installer.registerRefusalsAfterUnregister = LidSleepController.registerAttempts + 2
+        let controller = makeController(appVersion: "1.0 (1)")
+        await controller.refresh()
+        await controller.disable(reason: nil)
+        await controller.helperRestartTask?.value
+        #expect(controller.helperStatus == .enabled)
+        #expect(!controller.isActive)
+        #expect(!helper.sleepDisabled)
     }
 
     @Test func aFreshRegistrationUsesANewConnection() async {

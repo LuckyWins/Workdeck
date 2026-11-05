@@ -8,6 +8,7 @@ struct ClosedLidModeRow: View {
             helperStatus: controller.helperStatus,
             isActive: controller.isActive,
             isWanted: controller.isWanted,
+            isRestartingHelper: controller.isRestartingHelper,
             power: controller.power,
             threshold: controller.threshold,
             notice: controller.notice,

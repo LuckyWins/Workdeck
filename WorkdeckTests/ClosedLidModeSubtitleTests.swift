@@ -67,4 +67,12 @@ struct ClosedLidModeSubtitleTests {
     @Test func errorWinsOverEverything() {
         #expect(make(active: true, notice: .cutoff(.thermal), error: "x") == .init(text: "Couldn't change the sleep setting", isError: true))
     }
+
+    @Test func restartingTheHelperSaysSo() {
+        let subtitle = ClosedLidModeSubtitle.make(
+            helperStatus: .notRegistered, isActive: false, isWanted: true, isRestartingHelper: true,
+            power: PowerSnapshot(isOnBattery: false, batteryPercent: 80), threshold: 20, notice: nil, lastError: nil
+        )
+        #expect(subtitle == ClosedLidModeSubtitle(text: "Restarting the helper…", isError: false))
+    }
 }

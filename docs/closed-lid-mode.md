@@ -36,9 +36,10 @@ Workdeck remembers that you want the mode and turns it on at every launch, after
 1. **Quit** — Workdeck turns sleep back on before exiting; the next launch turns the mode on again.
 2. **Crash or force quit** — the helper notices the dropped XPC connection and waits up to a minute for a new Workdeck to take the mode over, then turns sleep back on.
 3. **Reinstall** (`make install`, which quits Workdeck with `pkill`) — Workdeck tells the helper it is restarting; when the new Workdeck replaces the helper, the old one leaves a short handover record (a deadline and the boot time, in a root-only folder) and the new one keeps sleep off until the new Workdeck takes over, for at most a minute.
-4. **Restart** — the helper starts at boot and resets the setting (a handover record from before the restart is ignored); after login Workdeck turns the mode on again.
-5. **Helper crash** — the relaunched helper resets the setting and Workdeck turns the mode on again.
-6. **Helper stopped** — when launchd stops the helper without a restart announcement (for example, Workdeck is turned off in Login Items & Extensions), it resets the setting before exiting. The one exception: if Workdeck was killed and did not come back, and within that same minute the helper is stopped for good, sleep stays disabled until the helper runs again or `sudo pmset -a disablesleep 0`. A shutdown in that minute is the same case for the shutdown itself; the helper restores sleep when it starts at the next boot.
+4. **Update** — a new Workdeck replaces the helper with its own. macOS can refuse the new helper for a few minutes after the old one is removed; Workdeck keeps registering it in the background for about three minutes ("Restarting the helper…" under the switch) and turns the mode on again as soon as it is accepted.
+5. **Restart** — the helper starts at boot and resets the setting (a handover record from before the restart is ignored); after login Workdeck turns the mode on again.
+6. **Helper crash** — the relaunched helper resets the setting and Workdeck turns the mode on again.
+7. **Helper stopped** — when launchd stops the helper without a restart announcement (for example, Workdeck is turned off in Login Items & Extensions), it resets the setting before exiting. The one exception: if Workdeck was killed and did not come back, and within that same minute the helper is stopped for good, sleep stays disabled until the helper runs again or `sudo pmset -a disablesleep 0`. A shutdown in that minute is the same case for the shutdown itself; the helper restores sleep when it starts at the next boot.
 
 ## Uninstalling
 

@@ -7,6 +7,9 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 ### New
 - Install Workdeck with one Terminal command from its page, luckywins.github.io/Workdeck: no download to unzip and no "could not verify" prompt.
 
+### Fixed
+- Closed-Lid Mode comes back on its own after an update. macOS can take a few minutes to accept Workdeck's updated helper; meanwhile the menu shows "Restarting the helper…" instead of the mode staying off until you toggle it.
+
 ## 1.1.2 — 2026-11-04
 
 ### Fixed

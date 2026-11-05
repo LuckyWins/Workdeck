@@ -9,6 +9,7 @@ struct ClosedLidModeSubtitle: Equatable {
         helperStatus: HelperStatus,
         isActive: Bool,
         isWanted: Bool = false,
+        isRestartingHelper: Bool = false,
         power: PowerSnapshot,
         threshold: Int,
         notice: LidSleepController.Notice?,
@@ -24,6 +25,10 @@ struct ClosedLidModeSubtitle: Equatable {
             return ClosedLidModeSubtitle(text: message, isError: true)
         case .notRegistered, .enabled:
             break
+        }
+        // macOS has not taken the updated helper yet; Workdeck keeps trying for a few minutes.
+        if isRestartingHelper, !isActive {
+            return ClosedLidModeSubtitle(text: "Restarting the helper…", isError: false)
         }
         if isActive {
             if power.isOnBattery, power.batteryPercent != nil {
