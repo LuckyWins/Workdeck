@@ -218,6 +218,12 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 
 Mark each run with the date, build commit, and macOS version. Record only scenarios that were actually executed.
 
+### 2026-11-05 — commit `9dafb4e`, macOS 27.0.1, MacBook Pro
+
+| # | Result | Notes |
+|---|---|---|
+| 13c | ✅ Pass | Two `make install` runs with the mode on. The first replaced a helper without the self-replace exit: about 12 s of reconnects, then the re-register (accepted after 4 s). The second: "Executable replaced on disk" at 19:30:54.026, "Handed sleep over to the next helper", the new helper "Kept sleep disabled from the previous helper", Workdeck set sleep disabled 0.09 s later; no unregister, no "Restarting the helper…", `SleepDisabled 1` throughout. |
+
 ### 2026-10-05 — commit `99dd67f`, macOS 27.0.1, MacBook Pro
 
 | # | Result | Notes |
