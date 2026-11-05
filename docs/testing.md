@@ -209,6 +209,10 @@ Watch the event files with `ls -la ~/Library/Application\ Support/Workdeck/sessi
 | U4 | Install | Click Install (popover, About or the window banner). | Sparkle's window with the notes; Install Update downloads, Install and Relaunch restarts the new version. |
 | U5 | Skip and Remind Me Later | In Sparkle's window choose Skip This Version; on another version choose Remind Me Later; relaunch. | Skip removes the row; Remind Me Later keeps it, also after the relaunch, without a second alert. |
 | U6 | Survives an update | After U4: Closed-Lid Mode, a Claude Code session in every instance, Codex, Statistics. | The helper works without re-approval, sessions and limits update, recap days are there, no Gatekeeper prompt on relaunch. |
+| U7 | Send Feedback with Mail | With Apple Mail as the default mail app and an account in it: Settings → About → Send Feedback…. | Mail opens a new email to andreu.puzikov.21@gmail.com, "Workdeck feedback", the version lines, `Workdeck-diagnostics.txt` attached; nothing is sent until Send. |
+| U7a | Send Feedback, Mail without an account | Mail is the default but has no account; Send Feedback…. | Mail asks for an account; the line under the button says the address and the diagnostics are on the clipboard, and they are. |
+| U8 | Send Feedback with another mail app | Set Outlook (or a browser) as the default mail app; Send Feedback…. | The email opens there without an attachment; Finder shows `Workdeck-diagnostics.txt`; the clipboard holds the report; the line under the button says so. |
+| U9 | No mail app, GitHub | With no app for mail links, Send Feedback…; then Open on GitHub ↗. | The address and the report are on the clipboard and the line says so; the repository opens in the browser. |
 
 ## Landing Page Checklist
 

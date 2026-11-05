@@ -123,6 +123,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     )
 
+    /// Send Feedback in Settings → About (feedback spec): an email to the developer with the Copy Diagnostics report.
+    private(set) lazy var feedback: FeedbackSender = {
+        let claudeCode = self.claudeCode
+        let codex = self.codex
+        return FeedbackSender(
+            system: SystemFeedbackSystem(),
+            folder: FileManager.default.temporaryDirectory.appending(path: "Workdeck-Feedback"),
+            report: { @MainActor in await DiagnosticsReport.recent(claudeCode: claudeCode, codex: codex) },
+            appVersion: HelperConstants.version(of: .main),
+            macOS: FeedbackMail.macOSVersion(),
+            model: FeedbackMail.modelIdentifier()
+        )
+    }()
+
     /// In-app updates through Sparkle (in-app updates spec §7); an inert updater while tests run.
     private(set) lazy var updates: UpdateController = {
         let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil

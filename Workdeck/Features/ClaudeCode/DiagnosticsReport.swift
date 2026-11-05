@@ -47,3 +47,14 @@ enum DiagnosticsReport {
         return entries.compactMap { $0 as? OSLogEntryLog }.map { "\(formatter.string(from: $0.date)) [\($0.category)] \($0.composedMessage)" }
     }
 }
+
+extension DiagnosticsReport {
+    /// The report Copy Diagnostics copies and Send Feedback attaches: the last hour of log, read off the main thread
+    /// (it takes seconds), with Claude Code's and Codex's state.
+    @MainActor
+    static func recent(claudeCode: ClaudeCodeController, codex: CodexController) async -> String {
+        let since = Date().addingTimeInterval(-3600)
+        let lines = await Task.detached { recentLogLines(since: since) }.value
+        return claudeCode.diagnosticsText(logLines: lines, extraLines: codex.diagnosticsLines)
+    }
+}

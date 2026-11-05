@@ -78,4 +78,4 @@ A cell shows what that instance has:
 
 ## Troubleshooting
 
-- Settings → About → **Copy Diagnostics** copies Workdeck's recent log and current state (no prompts, answers or tool details). Live log: `/usr/bin/log stream --predicate 'subsystem == "com.appcreators.workdeck"'`.
+- Settings → About → **Copy Diagnostics** copies Workdeck's recent log and current state (no prompts, answers or tool details). **Send Feedback…** opens an email to the developer in your mail app with the same report attached (Apple Mail) or shown in Finder and copied (other mail apps); you see it before you send it. Live log: `/usr/bin/log stream --predicate 'subsystem == "com.appcreators.workdeck"'`.

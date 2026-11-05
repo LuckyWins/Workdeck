@@ -143,6 +143,7 @@ Claude Code reports plan usage only for Pro and Max subscriptions. Details: [doc
 - **Helper logs:** `/usr/bin/log stream --predicate 'subsystem == "com.appcreators.workdeck.helper"'`.
 - **"Couldn't change the sleep setting" after rebuilding in Xcode:** launchd may still run an older helper build; turn Workdeck off and on again in Login Items & Extensions.
 - **Claude Code:** Settings → About → **Copy Diagnostics** copies Workdeck's recent log and current state, without prompts, answers or tool details.
+- **Tell the developer:** Settings → About → **Send Feedback…** opens an email in your mail app with the diagnostics attached; nothing is sent until you press Send.
 
 More in [Closed-Lid Mode](docs/closed-lid-mode.md#troubleshooting) and [Claude Code](docs/claude-code.md#troubleshooting).
 

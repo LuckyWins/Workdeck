@@ -9,6 +9,7 @@ struct SettingsView: View {
     let codex: CodexController
     let demo: DemoMode
     let updates: UpdateController
+    let feedback: FeedbackSender
 
     @State private var diagnosticsState = DiagnosticsCopyState.idle
 
@@ -90,10 +91,26 @@ struct SettingsView: View {
                     }
                     .disabled(diagnosticsState == .copying)
                 }
+                LabeledContent("Feedback") {
+                    Button(feedback.isPreparing ? "Preparing…" : "Send Feedback…") {
+                        Task { await feedback.send() }
+                    }
+                    .disabled(feedback.isPreparing)
+                }
+                if let status = feedback.status {
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                LabeledContent("Source code") {
+                    Button("Open on GitHub ↗") {
+                        NSWorkspace.shared.open(FeedbackMail.repository)
+                    }
+                }
             } header: {
                 SettingsHeader("About", symbol: "info.circle.fill", color: .gray)
             } footer: {
-                Text("With automatic checks on, Workdeck looks for updates on GitHub once a day; updates are signed. Copy Diagnostics copies Workdeck's recent log and current state, without prompts, answers or tool details, for troubleshooting.")
+                Text("With automatic checks on, Workdeck looks for updates on GitHub once a day; updates are signed. Copy Diagnostics copies Workdeck's recent log and current state, without prompts, answers or tool details, for troubleshooting. Send Feedback opens an email to the developer in your mail app with the diagnostics, which name your projects and instances but hold no prompts, answers or tool details; you see everything before you send it.")
                     .foregroundStyle(.secondary)
             }
         }
@@ -189,13 +206,10 @@ struct SettingsView: View {
         }
     }
 
-    /// Reading the log store takes seconds, so it runs off the main thread.
     private func copyDiagnostics() {
         diagnosticsState = .copying
         Task {
-            let since = Date().addingTimeInterval(-3600)
-            let lines = await Task.detached { DiagnosticsReport.recentLogLines(since: since) }.value
-            let text = claudeCode.diagnosticsText(logLines: lines, extraLines: codex.diagnosticsLines)
+            let text = await DiagnosticsReport.recent(claudeCode: claudeCode, codex: codex)
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
             diagnosticsState = .copied

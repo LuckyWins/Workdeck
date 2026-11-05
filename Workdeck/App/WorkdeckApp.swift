@@ -13,7 +13,7 @@ struct WorkdeckApp: App {
         .menuBarExtraStyle(.window)
 
         Settings {
-            SettingsView(settings: appDelegate.settings, controller: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode, instances: appDelegate.instances, codex: appDelegate.codex, demo: appDelegate.demo, updates: appDelegate.updates)
+            SettingsView(settings: appDelegate.settings, controller: appDelegate.lidSleep, claudeCode: appDelegate.claudeCode, instances: appDelegate.instances, codex: appDelegate.codex, demo: appDelegate.demo, updates: appDelegate.updates, feedback: appDelegate.feedback)
         }
 
         Window("Claude Code Chats", id: ChatsWindow.id) {
