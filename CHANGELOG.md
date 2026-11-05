@@ -4,6 +4,8 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 
 ## Unreleased
 
+## 1.1.4 — 2026-11-05
+
 ### Improved
 - From the next update on, Closed-Lid Mode is back within seconds instead of minutes: Workdeck's helper now restarts itself with the new version. The update that installs this version still takes the slower way.
 
