@@ -4,6 +4,8 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 
 ## Unreleased
 
+## 1.2.0 — 2026-11-06
+
 ### New
 - Send feedback to the developer from Settings → About, and open Workdeck on GitHub.
 - An Instances window compares the skills, MCP servers, plugins and `CLAUDE.md` of your Claude Code instances and copies or installs what one lacks into another, turns skills and plugins on and off and removes them, always after showing what will change. Open it from the Claude Code row in the popover.
