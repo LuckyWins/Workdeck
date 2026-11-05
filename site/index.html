@@ -14,105 +14,114 @@
 <meta name="twitter:card" content="summary">
 <meta name="color-scheme" content="light dark">
 <style>
-  :root { --bg: #fff; --fg: #1d1d1f; --dim: #6e6e73; --line: #e5e5ea; --code: #f5f5f7; --accent: #b4532f; }
-  /* The terracotta reads well on dark; on white a darker shade keeps links above 4.5:1. */
-  @media (prefers-color-scheme: dark) { :root { --bg: #111113; --fg: #f5f5f7; --dim: #98989d; --line: #2c2c2e; --code: #1c1c1e; --accent: #d97757; } }
+  /* The icon's colors: an indigo field, lavender cards, a near-black card with a navy cast and a warm glow at its foot. */
+  :root {
+    --indigo: #6967f5; --indigo-deep: #4846d4; --navy: #181832;
+    --bg: #fbfbff; --fg: #17172a; --dim: #5b5a78; --line: #dcdbfa; --hover: #f1f0ff; --tab: #fff;
+    --code-bg: #181832; --code-fg: #fff; --link: #4846d4; --track: #e4e3fb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0a0a0d; --fg: #f2f2ff; --dim: #a5a4c8; --line: #2a2a4c; --hover: #15152a; --tab: #121226;
+            --code-bg: #15152a; --code-fg: #fff; --link: #b1b0ff; --track: #2a2a4c; }
+    body { background: radial-gradient(1100px 520px at 50% -160px, rgba(105,103,245,.45), transparent 62%) no-repeat, var(--bg); }
+  }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 -apple-system, system-ui, sans-serif; }
-  main { max-width: 760px; margin: 0 auto; padding: 48px 20px 64px; }
-  header { text-align: center; }
-  .logo { display: block; width: 104px; height: 104px; margin: 0 auto 12px; }
-  h1 { font-size: 46px; margin: 0; letter-spacing: -0.5px; }
-  .tagline { font-size: 20px; color: var(--dim); margin: 8px auto 0; max-width: 600px; }
-  .install { margin: 34px 0 6px; }
-  .install h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .6px; color: var(--dim); text-align: center; margin: 0 0 10px; }
-  .cmd { display: flex; align-items: center; gap: 10px; background: var(--code); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font: 15px ui-monospace, Menlo, monospace; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 -apple-system, system-ui, sans-serif; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  main { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+
+  header { text-align: center; padding: 64px 0 40px; }
+  .logo { display: block; width: 80px; height: 80px; margin: 0 auto; filter: drop-shadow(0 10px 24px rgba(105,103,245,.4)); }
+  .name { margin: 10px 0 0; font-size: 17px; font-weight: 700; color: var(--link); letter-spacing: .2px; }
+  h1 { font-size: clamp(32px, 4.6vw, 48px); line-height: 1.08; letter-spacing: -.8px; margin: 14px auto 12px; max-width: 760px; }
+  .tagline { color: var(--dim); font-size: 18px; margin: 0 auto 26px; max-width: 620px; }
+  .cmd { display: flex; align-items: center; gap: 10px; max-width: 580px; margin: 0 auto; padding: 13px 14px; border-radius: 12px;
+         background: var(--code-bg); color: var(--code-fg); border: 1px solid var(--line); font: 14px ui-monospace, Menlo, monospace; text-align: left; }
   /* The command scrolls on a narrow screen; the Copy button stays in view. */
   .cmd code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; }
-  .copy { flex: none; }
-  .copy { border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 8px; padding: 5px 10px; font: 13px -apple-system, system-ui, sans-serif; cursor: pointer; }
-  .small { color: var(--dim); font-size: 14px; text-align: center; margin: 8px 0 0; }
-  .small a, a { color: var(--accent); text-decoration: none; }
-  section { border-top: 1px solid var(--line); padding: 26px 0 4px; margin-top: 30px; }
-  section h2 { font-size: 22px; margin: 0 0 10px; }
-  ol { padding-left: 20px; } ol li { margin: 6px 0; }
-  .tour { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 34px; }
-  .step { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: center; }
-  .step:nth-child(even) .shot { order: 2; }
-  /* Every picture sits in a frame of the same height, scaled to fit. */
-  .shot { height: 300px; display: flex; align-items: center; justify-content: center; background: var(--code); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
-  .shot img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
-  .shot picture { display: contents; }
-  .num { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 13px; background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
-  .text h3 { font-size: 19px; margin: 0 0 6px; }
-  .text p { margin: 0; color: var(--dim); }
-  @media (max-width: 640px) { .step { grid-template-columns: 1fr; } .step:nth-child(even) .shot { order: 0; } .shot { height: 240px; } }
+  .cmd code::before { content: "$ "; opacity: .5; }
+  .copy { flex: none; border: 0; border-radius: 8px; padding: 6px 13px; background: var(--indigo); color: #fff; font: 13px -apple-system, system-ui, sans-serif; cursor: pointer; }
+  .small { font-size: 13.5px; color: var(--dim); margin: 11px 0 0; }
+
+  /* The tour: five features on the left, one screen on the right; it moves on by itself until the pointer is over it. */
+  .tour { display: grid; grid-template-columns: 340px 1fr; gap: 28px; margin-top: 20px; }
+  .tabs { display: flex; flex-direction: column; gap: 6px; }
+  .tab { text-align: left; border: 1px solid transparent; background: transparent; border-radius: 14px; padding: 14px 16px; cursor: pointer; font: inherit; color: inherit; transition: background .2s, border-color .2s; }
+  .tab b { display: block; font-size: 16.5px; }
+  .tab span { display: block; color: var(--dim); font-size: 14.5px; max-height: 0; overflow: hidden; opacity: 0; transition: max-height .3s, opacity .3s, margin .3s; }
+  .tab:hover { background: var(--hover); }
+  .tab:focus-visible { outline: 3px solid var(--indigo); outline-offset: 2px; }
+  .tab[aria-selected="true"] { background: var(--tab); border-color: var(--line); box-shadow: 0 6px 20px rgba(72,70,212,.10); }
+  .tab[aria-selected="true"] b { color: var(--link); }
+  .tab[aria-selected="true"] span { max-height: 120px; opacity: 1; margin-top: 4px; }
+  .bar { height: 3px; border-radius: 2px; background: var(--track); margin-top: 10px; overflow: hidden; display: none; }
+  .tab[aria-selected="true"] .bar { display: block; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--indigo); }
+  .tab[aria-selected="true"] .bar i { animation: fill 6s linear forwards; }
+  .tour.paused .bar i { animation-play-state: paused !important; }
+  @keyframes fill { to { width: 100%; } }
+  @media (prefers-reduced-motion: reduce) { .bar { display: none !important; } }
+
+  .screen { position: relative; min-height: 540px; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 50px rgba(72,70,212,.25);
+            background: radial-gradient(460px 240px at 50% 112%, rgba(245,158,75,.5), transparent 70%), linear-gradient(160deg, var(--indigo) 0%, var(--indigo-deep) 100%); }
+  .slide { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 28px; opacity: 0; visibility: hidden; transition: opacity .35s, visibility .35s; }
+  .slide.top { align-items: flex-start; padding-top: 0; }
+  .slide.on { opacity: 1; visibility: visible; }
+  .slide picture { display: contents; }
+  .slide img { max-width: 100%; max-height: 100%; border-radius: 10px; }
+  /* The notch images carry 24 pt of clear space above the notch (renderer padding at 408 pt wide); pull them up so the notch meets the card's top edge. */
+  .slide.top img { border-radius: 0; width: min(408px, 100%); max-height: none; margin-top: calc(min(408px, 100%) * -24 / 408); }
+
+  .after { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin: 56px 0 0; padding: 26px 0 0; border-top: 1px solid var(--line); list-style: none; counter-reset: step; }
+  .after li { counter-increment: step; color: var(--dim); font-size: 15px; }
+  .after li::before { content: counter(step); display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 12px; background: var(--indigo); color: #fff; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+  .after b { display: block; color: var(--fg); font-size: 16px; margin-bottom: 2px; }
+  footer { padding: 40px 0 30px; font-size: 13px; color: var(--dim); text-align: center; }
+  @media (max-width: 820px) { main { padding: 0 16px; } .tour { grid-template-columns: 1fr; } .screen { min-height: 440px; } .after { grid-template-columns: 1fr; gap: 18px; } }
+
   /* Click a screenshot to see it full screen; Esc or a click closes it. */
   img[data-zoom] { cursor: zoom-in; }
-  .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.82); display: none; align-items: center; justify-content: center; z-index: 10; cursor: zoom-out; padding: 24px; }
+  img[data-zoom]:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  .lightbox { position: fixed; inset: 0; background: rgba(5,5,15,.88); display: none; align-items: center; justify-content: center; z-index: 10; cursor: zoom-out; padding: 24px; }
   .lightbox.open { display: flex; }
   .lightbox img { max-width: 100%; max-height: 100%; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
-  img[data-zoom]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
   body.zoomed { overflow: hidden; }
-  footer { border-top: 1px solid var(--line); margin-top: 36px; padding-top: 16px; color: var(--dim); font-size: 13px; text-align: center; }
 </style>
 </head>
 <body>
 <main>
   <header>
-    <img class="logo" src="icon.png" width="104" height="104" alt="Workdeck icon">
-    <h1>Workdeck</h1>
-    <p class="tagline">Your Claude Code limits and sessions in the MacBook notch — and a Mac that stays awake with the lid closed.</p>
+    <img class="logo" src="icon.png" width="80" height="80" alt="Workdeck icon">
+    <p class="name">Workdeck</p>
+    <h1>Know your Claude Code limits before they run out.</h1>
+    <p class="tagline">Limits, sessions and alerts in the MacBook notch, for Claude Code and Codex — and a Mac that stays awake with the lid closed.</p>
+    <div class="cmd"><code>curl -fsSL https://luckywins.github.io/Workdeck/install.sh | bash</code><button type="button" class="copy" aria-live="polite">Copy</button></div>
+    <p class="small">Paste in Terminal · macOS 26 or later · Free and open source · <a href="https://github.com/LuckyWins/Workdeck/blob/main/site/install.sh">Read the script</a></p>
   </header>
 
-  <div class="install">
-    <h2>Install</h2>
-    <div class="cmd"><code>curl -fsSL https://luckywins.github.io/Workdeck/install.sh | bash</code><button type="button" class="copy" aria-live="polite">Copy</button></div>
-    <p class="small">Paste in Terminal. Downloads the latest version into Applications and opens it — no "could not verify" prompt. macOS 26 or later. <a href="https://github.com/LuckyWins/Workdeck/blob/main/site/install.sh">Read the script</a></p>
-  </div>
-
-  <section>
-    <h2>How it works</h2>
-    <ol class="tour">
-      <li class="step">
-        <div class="shot"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/popover-dark.png"><img src="screenshots/popover-light.png" alt="The menu bar popover" loading="lazy" data-zoom></picture></div>
-        <div class="text"><span class="num">1</span><h3>Turn on what you need</h3><p>Click the Workdeck icon in the menu bar. Each tool is one row: Closed-Lid Mode keeps the Mac awake with the lid closed, Claude Code and Codex show your limits and sessions. Connect them once in Settings.</p></div>
-      </li>
-      <li class="step">
-        <div class="shot"><img src="screenshots/notch-compact.png" alt="The compact notch: the limit ring and session counters" loading="lazy" data-zoom></div>
-        <div class="text"><span class="num">2</span><h3>While you work</h3><p>The notch shows the limit closest to running out and how many sessions are working. It stays out of the way until something changes.</p></div>
-      </li>
-      <li class="step">
-        <div class="shot"><img src="screenshots/notch-expanded.png" alt="The expanded notch: limits of two Claude Code accounts and Codex, and live sessions with an agent" loading="lazy" data-zoom></div>
-        <div class="text"><span class="num">3</span><h3>Hover to see everything</h3><p>Rest the pointer on the notch: every account's 5-hour and weekly limits with reset times and a forecast, and every session with its agents, last steps and changed lines.</p></div>
-      </li>
-      <li class="step">
-        <div class="shot"><img src="screenshots/notch-alert.png" alt="A limit alert in the notch" loading="lazy" data-zoom></div>
-        <div class="text"><span class="num">4</span><h3>When something needs you</h3><p>A limit at 80 % or 95 %, a session waiting for a permission, a long session that finished: the notch opens with the alert. Click it to jump to the right window.</p></div>
-      </li>
-      <li class="step">
-        <div class="shot"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/chats-dark.png"><img src="screenshots/chats-light.png" alt="The Chats window with two accounts" loading="lazy" data-zoom></picture></div>
-        <div class="text"><span class="num">5</span><h3>Out of limit? Carry on with another account</h3><p>Run a second Claude Code account side by side. In Chats, open any chat on the other account and continue where you stopped.</p></div>
-      </li>
-      <li class="step">
-        <div class="shot"><img src="screenshots/notch-recap.png" alt="Last week's recap in the notch" loading="lazy" data-zoom></div>
-        <div class="text"><span class="num">6</span><h3>Your week, on Monday</h3><p>On the first unlock of a week the notch shows last week: coding time by project, sessions, files, lines and limit hits.</p></div>
-      </li>
-      <li class="step">
-        <div class="shot"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/statistics-dark.png"><img src="screenshots/statistics-light.png" alt="The Statistics window with the activity grid" loading="lazy" data-zoom></picture></div>
-        <div class="text"><span class="num">7</span><h3>And everything before</h3><p>Statistics keeps half a year: any week in detail, an activity grid of days and your streak, for Claude Code and Codex.</p></div>
-      </li>
-    </ol>
+  <section class="tour" aria-label="What Workdeck does">
+    <div class="tabs" role="tablist" aria-orientation="vertical">
+      <button class="tab" role="tab" id="tab-0" aria-controls="slide-0"><b>Limits and sessions in the notch</b><span>Hover the notch: every account's 5-hour and weekly limits with a forecast, and every session with its agents and changed lines.</span><div class="bar"><i></i></div></button>
+      <button class="tab" role="tab" id="tab-1" aria-controls="slide-1"><b>Alerts that come to you</b><span>A limit at 80 % or 95 %, a session waiting for a permission, one that finished. Click to jump to its window.</span><div class="bar"><i></i></div></button>
+      <button class="tab" role="tab" id="tab-2" aria-controls="slide-2"><b>Everything in the menu bar</b><span>One row per tool. Closed-Lid Mode keeps the Mac awake with the lid closed, for long builds and SSH.</span><div class="bar"><i></i></div></button>
+      <button class="tab" role="tab" id="tab-3" aria-controls="slide-3"><b>Out of limit? Switch accounts</b><span>Run a second Claude Code account and carry any chat on to it in Chats.</span><div class="bar"><i></i></div></button>
+      <button class="tab" role="tab" id="tab-4" aria-controls="slide-4"><b>Your week at a glance</b><span>A recap on the first unlock of a week, and half a year of work in Statistics.</span><div class="bar"><i></i></div></button>
+    </div>
+    <div class="screen">
+      <div class="slide top" role="tabpanel" id="slide-0" aria-labelledby="tab-0"><img src="screenshots/notch-expanded.png" alt="The expanded notch: limits of two Claude Code accounts and Codex, and live sessions with an agent" data-zoom></div>
+      <div class="slide top" role="tabpanel" id="slide-1" aria-labelledby="tab-1"><img src="screenshots/notch-alert.png" alt="A limit alert in the notch" loading="lazy" data-zoom></div>
+      <div class="slide" role="tabpanel" id="slide-2" aria-labelledby="tab-2"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/popover-dark.png"><img src="screenshots/popover-light.png" alt="The menu bar popover" loading="lazy" data-zoom></picture></div>
+      <div class="slide" role="tabpanel" id="slide-3" aria-labelledby="tab-3"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/chats-dark.png"><img src="screenshots/chats-light.png" alt="The Chats window with two accounts" loading="lazy" data-zoom></picture></div>
+      <div class="slide" role="tabpanel" id="slide-4" aria-labelledby="tab-4"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/statistics-dark.png"><img src="screenshots/statistics-light.png" alt="The Statistics window with the activity grid" loading="lazy" data-zoom></picture></div>
+    </div>
   </section>
 
-  <section>
-    <h2>After installing</h2>
-    <ol>
-      <li>Click the Workdeck icon in the menu bar → gear → Settings, and <b>Connect</b> the Claude Code status line and session hooks (you see the exact change first).</li>
-      <li>Try <b>Settings → General → Try Demo</b> for a one-minute tour.</li>
-      <li>Updates install themselves: Workdeck tells you when a new version is out. <a href="https://github.com/LuckyWins/Workdeck/blob/main/CHANGELOG.md">Release notes</a></li>
-    </ol>
-  </section>
+  <ol class="after" aria-label="After installing">
+    <li><b>Connect</b>Menu bar icon → gear → Settings → Connect the status line and hooks. You see the exact change first.</li>
+    <li><b>Try the demo</b>Settings → General → Try Demo: a one-minute tour with made-up data.</li>
+    <li><b>Stay up to date</b>Workdeck tells you when a new version is out. <a href="https://github.com/LuckyWins/Workdeck/blob/main/CHANGELOG.md">Release notes</a></li>
+  </ol>
 
   <footer>Open source on <a href="https://github.com/LuckyWins/Workdeck">GitHub</a> · MIT</footer>
 </main>
@@ -131,6 +140,43 @@
       });
     });
   });
+
+  // The tour: a click or the arrow keys pick a feature; otherwise the next one comes when the bar fills.
+  // The bar pauses while the pointer or focus is in the tour; with reduced motion there is no bar and no moving on.
+  (function () {
+    var tour = document.querySelector('.tour');
+    var tabs = [].slice.call(tour.querySelectorAll('.tab'));
+    var slides = [].slice.call(tour.querySelectorAll('.slide'));
+    var current = 0;
+    function show(i, focus) {
+      current = i;
+      tabs.forEach(function (tab, n) {
+        tab.setAttribute('aria-selected', n === i ? 'true' : 'false');
+        tab.tabIndex = n === i ? 0 : -1;
+      });
+      slides.forEach(function (slide, n) { slide.classList.toggle('on', n === i); });
+      var bar = tabs[i].querySelector('.bar i');
+      bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = '';
+      if (focus) tabs[i].focus();
+    }
+    tabs.forEach(function (tab, n) {
+      tab.addEventListener('click', function () { show(n); });
+      tab.querySelector('.bar i').addEventListener('animationend', function () { show((current + 1) % tabs.length); });
+    });
+    tour.querySelector('.tabs').addEventListener('keydown', function (e) {
+      var step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+      if (!step) return;
+      e.preventDefault();
+      show((current + step + tabs.length) % tabs.length, true);
+    });
+    function pause() { tour.classList.add('paused'); }
+    function resume() { if (!tour.matches(':hover') && !tour.contains(document.activeElement)) tour.classList.remove('paused'); }
+    tour.addEventListener('mouseenter', pause);
+    tour.addEventListener('mouseleave', resume);
+    tour.addEventListener('focusin', pause);
+    tour.addEventListener('focusout', function () { setTimeout(resume, 0); });
+    show(0);
+  })();
 </script>
 <div class="lightbox" role="dialog" aria-modal="true" aria-label="Screenshot" tabindex="-1"><img alt=""></div>
 <script>
