@@ -35,7 +35,6 @@ Agreed on 2026-10-16, from a survey of other agent companions (see the links in 
 ## Distribution
 
 - **README media.** Screenshots done: `make screenshots` (spec `specs/2026-11-04-screenshots-design.md`). Still open: a demo GIF or MP4 of the notch in motion for the README header and the page, recorded from the demo on the MacBook notch (`screencapture` needs Screen Recording for the app that runs it; Terminal works without restarting VS Code).
-- **Gray header icons in the popover screenshot.** The real popover draws Statistics and Settings in gray; the rendered one tints them with the accent (blue). Drawing the app as inactive grays them only together with the switches.
 - ~~**Auto-update with Sparkle.**~~ Being built: `specs/2026-11-04-in-app-updates-design.md` (Sparkle with the Apple Development certificate, no notarization; releases from CI on a tag).
 
 ## Claude Code Instances

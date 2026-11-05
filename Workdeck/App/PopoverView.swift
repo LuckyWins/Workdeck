@@ -35,11 +35,14 @@ struct PopoverView: View {
                     Image(systemName: "chart.bar")
                 }
                 .buttonStyle(.borderless)
+                // Gray as the menu bar panel draws them, not the accent color of a key window.
+                .foregroundStyle(.secondary)
                 .help("Statistics")
                 SettingsLink {
                     Image(systemName: "gearshape")
                 }
                 .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
                 .help("Settings")
                 .simultaneousGesture(TapGesture().onEnded {
                     // Menu bar apps are not active by default; bring the Settings window to front.
