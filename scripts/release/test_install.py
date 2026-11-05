@@ -183,6 +183,17 @@ class PageTests(unittest.TestCase):
         self.assertIn(command, (ROOT / "site" / "index.html").read_text())
         self.assertIn(command, (ROOT / "README.md").read_text())
 
+    def test_animations_have_a_still_for_reduced_motion(self):
+        page = (ROOT / "site" / "index.html").read_text()
+        for still, animated in [("notch-expanded", "notch-hover-animated"), ("notch-alert", "notch-alert-animated")]:
+            source = f'<source media="(prefers-reduced-motion: reduce)" srcset="screenshots/{still}.png">'
+            # The still loads with the page; the script swaps in the animation once the page has loaded.
+            image = f'src="screenshots/{still}.png" data-animated="screenshots/{animated}.png"'
+            self.assertIn(source, page)
+            self.assertIn(image, page)
+            self.assertLess(page.index(source), page.index(image))
+        self.assertIn("img[data-animated]", page)
+
     def test_readme_no_longer_sends_people_to_the_zip(self):
         readme = (ROOT / "README.md").read_text()
         self.assertNotIn("com.apple.quarantine", readme)

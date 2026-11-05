@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 import SwiftUI
 import Testing
 @testable import Workdeck
@@ -138,12 +139,73 @@ struct ScreenshotTests {
         }
     }
 
+    // MARK: Animations (notch animations spec)
+
+    private func pixels(_ image: CGImage) -> [UInt8] {
+        var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
+        bytes.withUnsafeMutableBytes { buffer in
+            CGContext(
+                data: buffer.baseAddress, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )?.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        }
+        return bytes
+    }
+
+    private func expectAnimation(_ url: URL, canvas: CGSize) throws {
+        let source = try #require(CGImageSourceCreateWithURL(url as CFURL, nil))
+        #expect(CGImageSourceGetCount(source) > 1)
+        let png = (CGImageSourceCopyProperties(source, nil) as? [CFString: Any])?[kCGImagePropertyPNGDictionary] as? [CFString: Any]
+        #expect(png?[kCGImagePropertyAPNGLoopCount] as? Int == 0)
+        #expect(try ScreenshotRenderer.pixelWidth(of: url) == Int(canvas.width * 2))
+        // The loop's seam: the last frame shows exactly what the first does.
+        let first = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        let last = try #require(CGImageSourceCreateImageAtIndex(source, CGImageSourceGetCount(source) - 1, nil))
+        #expect(pixels(first) == pixels(last), "\(url.lastPathComponent): the loop jumps at its seam")
+        let bytes = try #require(try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int)
+        #expect(bytes < 5_000_000, "\(url.lastPathComponent) is \(bytes) bytes")
+    }
+
+    /// Measures views only, writes nothing: runs in every test run, not only with the screenshot switch.
+    @Test func theCanvasFitsTheOvershoot() {
+        let animation = NotchAnimation(fixtures: fixtures)
+        let overshoot = NotchAnimationTimeline.frames(NotchAnimationTimeline.hover, pointer: true).map(\.progress).max()!
+        #expect(overshoot > 1)
+        #expect(animation.canvas.width >= animation.expandedSize.width * overshoot + 2 * NotchTransitionView.margin)
+        #expect(animation.canvas.height >= animation.expandedSize.height * overshoot + NotchTransitionView.margin)
+        #expect(animation.alertCanvas.width >= animation.alertExpandedSize.width * overshoot + 2 * NotchTransitionView.margin)
+        #expect(animation.alertCanvas.height >= animation.alertExpandedSize.height * overshoot + NotchTransitionView.margin)
+        // The open hover notch fits every demo second it shows, not only the first (its rows grow).
+        let model = LimitsNotchModel()
+        for second in stride(from: NotchAnimation.firstExpandedSecond, through: NotchAnimation.firstExpandedSecond + 5, by: 1) {
+            model.state = fixtures.demoNotch(elapsed: second).state
+            #expect(NSHostingView(rootView: NotchExpandedContent(model: model)).fittingSize.height <= animation.expandedSize.height, "second \(second)")
+        }
+        // The pointer comes in from beyond the canvas's right edge, as a hand reaching for the notch.
+        #expect(animation.pointerStart.x > animation.canvas.width)
+        // The alert's notch is the alert alone, not the whole expanded view.
+        #expect(animation.alertExpandedSize.height < animation.expandedSize.height / 2)
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func notchHoverAnimation() async throws {
+        let animation = NotchAnimation(fixtures: fixtures)
+        try expectAnimation(try await animation.writeHover(), canvas: animation.canvas)
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func notchAlertAnimation() async throws {
+        let animation = NotchAnimation(fixtures: fixtures)
+        try expectAnimation(try await animation.writeAlert(), canvas: animation.alertCanvas)
+    }
+
     @Test(.enabled(if: ScreenshotRenderer.isEnabled))
     func everyImageWasWritten() {
         // The suite is serialized and runs in declaration order, so this comes last: every image of spec §2 must have
         // been written in this run, not merely be on disk from an earlier one.
         let expected: Set = ["notch-compact", "notch-expanded", "notch-alert", "notch-recap", "popover-light", "popover-dark",
-                             "statistics-light", "statistics-dark", "chats-light", "chats-dark"]
+                             "statistics-light", "statistics-dark", "chats-light", "chats-dark",
+                             "notch-hover-animated", "notch-alert-animated"]
         #expect(expected.isSubset(of: ScreenshotRenderer.writtenThisRun), "missing: \(expected.subtracting(ScreenshotRenderer.writtenThisRun).sorted())")
     }
 }

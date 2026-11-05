@@ -49,11 +49,11 @@ A Claude Code plan limit runs out in the middle of a task, a session sits waitin
     <td><b>2. While you work</b><br>The notch shows the limit closest to running out and how many sessions are working. It stays out of the way until something changes.</td>
   </tr>
   <tr>
-    <td align="center" width="45%"><img src="docs/media/screenshots/notch-expanded.png" width="185" alt="The expanded notch: limits and live sessions"></td>
+    <td align="center" width="45%"><img src="docs/media/screenshots/notch-hover-animated.png" width="184" alt="The notch opening under the pointer: limits and live sessions"></td>
     <td><b>3. Hover to see everything</b><br>Rest the pointer on the notch: every account's 5-hour and weekly limits with reset times and a forecast, and every session with its agents, last steps and changed lines.</td>
   </tr>
   <tr>
-    <td align="center" width="45%"><img src="docs/media/screenshots/notch-alert.png" width="360" alt="A limit alert in the notch"></td>
+    <td align="center" width="45%"><img src="docs/media/screenshots/notch-alert-animated.png" width="360" alt="The notch opening by itself with a limit alert"></td>
     <td><b>4. When something needs you</b><br>A limit at 80 % or 95 %, a session waiting for a permission, a long session that finished: the notch opens with the alert. Click it to jump to the right window.</td>
   </tr>
   <tr>

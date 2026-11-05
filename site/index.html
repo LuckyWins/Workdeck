@@ -109,8 +109,8 @@
       <button class="tab" role="tab" id="tab-4" aria-controls="slide-4"><b>Your week at a glance</b><span>A recap on the first unlock of a week, and half a year of work in Statistics.</span><div class="bar"><i></i></div></button>
     </div>
     <div class="screen">
-      <div class="slide top" role="tabpanel" id="slide-0" aria-labelledby="tab-0"><img src="screenshots/notch-expanded.png" alt="The expanded notch: limits of two Claude Code accounts and Codex, and live sessions with an agent" data-zoom></div>
-      <div class="slide top" role="tabpanel" id="slide-1" aria-labelledby="tab-1"><img src="screenshots/notch-alert.png" alt="A limit alert in the notch" loading="lazy" data-zoom></div>
+      <div class="slide top" role="tabpanel" id="slide-0" aria-labelledby="tab-0"><picture><source media="(prefers-reduced-motion: reduce)" srcset="screenshots/notch-expanded.png"><img src="screenshots/notch-expanded.png" data-animated="screenshots/notch-hover-animated.png" alt="The notch opening under the pointer: limits of two Claude Code accounts and Codex, and live sessions with an agent" data-zoom></picture></div>
+      <div class="slide top" role="tabpanel" id="slide-1" aria-labelledby="tab-1"><picture><source media="(prefers-reduced-motion: reduce)" srcset="screenshots/notch-alert.png"><img src="screenshots/notch-alert.png" data-animated="screenshots/notch-alert-animated.png" alt="The notch opening by itself with a limit alert" loading="lazy" data-zoom></picture></div>
       <div class="slide top" role="tabpanel" id="slide-2" aria-labelledby="tab-2"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/popover-dark.png"><img src="screenshots/popover-light.png" alt="The menu bar popover" loading="lazy" data-zoom></picture></div>
       <div class="slide" role="tabpanel" id="slide-3" aria-labelledby="tab-3"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/chats-dark.png"><img src="screenshots/chats-light.png" alt="The Chats window with two accounts" loading="lazy" data-zoom></picture></div>
       <div class="slide" role="tabpanel" id="slide-4" aria-labelledby="tab-4"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/statistics-dark.png"><img src="screenshots/statistics-light.png" alt="The Statistics window with the activity grid" loading="lazy" data-zoom></picture></div>
@@ -177,6 +177,18 @@
     tour.addEventListener('focusout', function () { setTimeout(resume, 0); });
     show(0);
   })();
+</script>
+<script>
+  // The notch animations are a few MB: the stills load with the page, and each animation takes its still's place once
+  // the page has loaded. With reduced motion the still stays and the animation is never fetched.
+  window.addEventListener('load', function () {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    document.querySelectorAll('img[data-animated]').forEach(function (img) {
+      var animation = new Image();
+      animation.onload = function () { img.src = animation.src; };
+      animation.src = img.getAttribute('data-animated');
+    });
+  });
 </script>
 <div class="lightbox" role="dialog" aria-modal="true" aria-label="Screenshot" tabindex="-1"><img alt=""></div>
 <script>

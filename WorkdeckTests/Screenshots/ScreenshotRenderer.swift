@@ -153,6 +153,85 @@ enum ScreenshotRenderer {
         }
     }
 
+    /// Records an animation (notch animations spec §3.3): one offscreen window for all `frames`, `update` setting what a
+    /// frame shows before it is captured. Live frames are captured at their own moment of real time, so the view's own
+    /// motion (spinners, shimmers, SwiftUI animations) keeps its pace; the file gets the timeline's delays, never the time
+    /// a capture took.
+    @discardableResult
+    static func writeAnimation<V: View>(
+        _ view: V, canvas: CGSize, frames: [NotchAnimationFrame], name: String, update: (NotchAnimationFrame) -> Void
+    ) async throws -> URL {
+        ActiveAppearance.install()
+        let appearance = NSAppearance(named: .darkAqua)!
+        let host = NSHostingView(rootView: view
+            .frame(width: canvas.width, height: canvas.height)
+            .environment(\.colorScheme, .dark)
+            .tint(ActiveAppearance.accent))
+        host.appearance = appearance
+        host.sizingOptions = []
+        let window = KeyWindow(
+            contentRect: CGRect(origin: CGPoint(x: -20_000, y: -20_000), size: canvas),
+            styleMask: [.borderless], backing: .buffered, defer: false
+        )
+        window.appearance = appearance
+        window.isReleasedWhenClosed = false
+        window.backgroundColor = .clear
+        window.isOpaque = false
+        window.contentView = host
+        host.frame = CGRect(origin: .zero, size: canvas)
+        window.orderFrontRegardless()
+        window.makeKey()
+        defer { window.orderOut(nil) }
+
+        var images: [(image: CGImage, delay: TimeInterval)] = []
+        // Live frames are captured at the timeline's own moments of real time, so motion inside the notch keeps its pace.
+        var clock = Date()
+        var latest: TimeInterval = 0
+        var dropped = 0
+        for (index, frame) in frames.enumerated() {
+            update(frame)
+            host.layoutSubtreeIfNeeded()
+            // Waiting yields the main actor: a view's own tasks (the flash's timed fade) run only while this does not.
+            if index == 0 {
+                // Layout and `onAppear` settle; the clock starts after.
+                try await pause(until: Date().addingTimeInterval(0.6))
+                clock = Date().addingTimeInterval(-frame.time)
+            } else if frame.isLive {
+                try await pause(until: clock.addingTimeInterval(frame.time))
+                // Drawing can take longer than a frame; a frame whose time has passed is dropped and the one before
+                // shows longer, as a screen recording does, so the motion keeps its real pace.
+                if !images.isEmpty, Date() > clock.addingTimeInterval(frame.time + frame.delay) {
+                    images[images.count - 1].delay += frame.delay
+                    dropped += 1
+                    continue
+                }
+                latest = max(latest, Date().timeIntervalSince(clock) - frame.time)
+            } else {
+                // A drawn change only; the clock moves on with the timeline.
+                try await pause(until: Date().addingTimeInterval(0.005))
+                clock = Date().addingTimeInterval(-frame.time)
+            }
+            host.layoutSubtreeIfNeeded()
+            guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { throw Failure.noBitmap(name) }
+            host.cacheDisplay(in: host.bounds, to: rep)
+            guard rep.pixelsWide == Int((canvas.width * 2).rounded()) else { throw Failure.notRetina(name, rep.pixelsWide, canvas.width) }
+            guard let image = rep.cgImage else { throw Failure.noBitmap(name) }
+            images.append((image, frame.delay))
+        }
+        print("\(name): \(images.count) frames captured, \(dropped) dropped, up to \(Int(latest * 1000)) ms late")
+        try FileManager.default.createDirectory(at: outputFolder, withIntermediateDirectories: true)
+        let url = outputFolder.appending(path: "\(name).png")
+        try APNGWriter.write(images, to: url)
+        writtenThisRun.insert(name)
+        print("Wrote \(url.path)")
+        return url
+    }
+
+    private static func pause(until date: Date) async throws {
+        let left = date.timeIntervalSinceNow
+        try await Task.sleep(for: .seconds(max(0, left)))
+    }
+
     /// `rep` clipped to the window's corners, outlined by a hairline, with a window shadow on a clear margin.
     private static func framed(_ rep: NSBitmapImageRep, dark: Bool, name: String) throws -> NSBitmapImageRep {
         let scale: CGFloat = 2

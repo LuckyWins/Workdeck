@@ -49,10 +49,15 @@ release-prep:
 	python3 -I scripts/release/release.py prepare $(VERSION)
 
 ## screenshots: render the README and landing page images from demo data into docs/media/screenshots
+## (the notch animations are then squeezed losslessly by oxipng: brew install oxipng)
 screenshots:
+	@command -v oxipng >/dev/null || { echo "error: make screenshots needs oxipng to compress the notch animations: brew install oxipng"; exit 1; }
 	@mkdir -p $(BUILD_DIR)
 	@set -o pipefail; TEST_RUNNER_WORKDECK_SCREENSHOTS=1 TEST_RUNNER_TZ=Europe/Berlin xcodebuild -scheme $(SCHEME) \
 		-destination '$(DESTINATION)' test -only-testing:WorkdeckTests/ScreenshotTests 2>&1 \
 		| tee $(BUILD_DIR)/screenshots.log | grep -E "error:|recorded an issue|Test run with|\*\* TEST|^Wrote "
 	@n=$$(grep -c '^Wrote .*docs/media/screenshots/[a-z-]*\.png' $(BUILD_DIR)/screenshots.log); \
-		if [ "$$n" -lt 10 ]; then echo "error: only $$n images written; the switch may not have reached the tests"; exit 1; fi
+		if [ "$$n" -lt 12 ]; then echo "error: only $$n images written; the switch may not have reached the tests"; exit 1; fi
+	@# Lossless, keeps the animation: about a third smaller than ImageIO's deflate.
+	@oxipng -q -o 4 --strip safe docs/media/screenshots/*-animated.png
+	@ls -lh docs/media/screenshots/*-animated.png | awk '{print "Compressed " $$9 " to " $$5}'
