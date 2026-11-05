@@ -525,6 +525,41 @@ struct InstanceSetupScannerTests {
         #expect(instructions[2].url.path.hasSuffix("rules/team/style.md"))
     }
 
+    /// Dotfile managers often link `rules/` (or a folder in it) to a repository.
+    @Test func aLinkedRulesFolderIsRead() throws {
+        let fixture = InstanceFixture()
+        let dotfiles = fixture.root.appending(path: "dotfiles/rules")
+        try FileManager.default.createDirectory(at: dotfiles.appending(path: "team"), withIntermediateDirectories: true)
+        try Data("Be terse".utf8).write(to: dotfiles.appending(path: "style.md"))
+        try Data("Review".utf8).write(to: dotfiles.appending(path: "team/review.md"))
+        try FileManager.default.createDirectory(at: fixture.instance.directory, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: fixture.instance.directory.appending(path: "rules"), withDestinationURL: dotfiles)
+        let instructions = try #require(fixture.scan().instructions.value)
+        #expect(instructions.map(\.path) == ["rules/style.md", "rules/team/review.md"])
+        // The file's place is the instance's own path, so a removal knows which instance it belongs to.
+        #expect(instructions[0].url.path == fixture.instance.directory.appending(path: "rules/style.md").path)
+    }
+
+    @Test func aLinkedFolderInsideRulesIsRead() throws {
+        let fixture = InstanceFixture()
+        let shared = fixture.root.appending(path: "dotfiles/team")
+        try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true)
+        try Data("Review".utf8).write(to: shared.appending(path: "review.md"))
+        fixture.write("Flutter", "rules/flutter.md")
+        try FileManager.default.createSymbolicLink(at: fixture.instance.directory.appending(path: "rules/team"), withDestinationURL: shared)
+        let instructions = try #require(fixture.scan().instructions.value)
+        #expect(instructions.map(\.path) == ["rules/flutter.md", "rules/team/review.md"])
+    }
+
+    @Test func aRulesLinkLoopEnds() throws {
+        let fixture = InstanceFixture()
+        fixture.write("Flutter", "rules/flutter.md")
+        let rules = fixture.instance.directory.appending(path: "rules")
+        try FileManager.default.createSymbolicLink(at: rules.appending(path: "again"), withDestinationURL: rules)
+        let instructions = try #require(fixture.scan().instructions.value)
+        #expect(instructions.map(\.path) == ["rules/flutter.md"])
+    }
+
     @Test func instructionHashFollowsTheBytes() throws {
         let first = InstanceFixture(name: "first")
         let second = InstanceFixture(name: "second")

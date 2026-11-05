@@ -140,7 +140,8 @@ nonisolated enum InstanceSetupScanner {
         }
         let rules = directory.appending(path: "rules")
         if isDirectory(rules) {
-            guard let files = try? ruleFiles(in: rules, prefix: "rules/") else { return .unreadable }
+            var visited = Set<String>()
+            guard let files = try? ruleFiles(in: rules, prefix: "rules/", visited: &visited) else { return .unreadable }
             found += files.sorted { bytewise($0.path, $1.path) }
         }
         var instructions: [InstructionInfo] = []
@@ -152,16 +153,21 @@ nonisolated enum InstanceSetupScanner {
     }
 
     /// Every `.md` file below `directory`; dot-entries and linked folders are skipped, linked files are read.
-    private static func ruleFiles(in directory: URL, prefix: String) throws -> [(path: String, url: URL)] {
+    /// The `.md` files below `directory`, hidden entries left out. Links are followed, to a folder too (dotfile
+    /// managers often link `rules/` or a folder in it), but each real folder is read once, so a link loop ends. A
+    /// file keeps its path inside the instance folder, not the one its link points to.
+    private static func ruleFiles(in directory: URL, prefix: String, visited: inout Set<String>) throws -> [(path: String, url: URL)] {
+        guard visited.insert(directory.resolvingSymlinksInPath().standardizedFileURL.path).inserted else { return [] }
         var files: [(path: String, url: URL)] = []
-        for child in try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isDirectoryKey]) {
-            let name = child.lastPathComponent
+        // By path: listing a linked folder by URL fails with "Not a directory".
+        for name in try FileManager.default.contentsOfDirectory(atPath: directory.path) {
             if name.hasPrefix(".") {
                 continue
             }
-            if try child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true {
-                files += try ruleFiles(in: child, prefix: prefix + name + "/")
-            } else if name.lowercased().hasSuffix(".md"), exists(child), !isDirectory(child) {
+            let child = directory.appending(path: name)
+            if isDirectory(child) {
+                files += try ruleFiles(in: child, prefix: prefix + name + "/", visited: &visited)
+            } else if name.lowercased().hasSuffix(".md"), exists(child) {
                 files.append((prefix + name, child))
             }
         }

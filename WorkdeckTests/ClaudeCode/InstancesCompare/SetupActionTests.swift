@@ -233,4 +233,69 @@ struct SetupActionTests {
         #expect(zshAccepts(action.command))
         #expect(zshAccepts(try #require(terminal(SetupPlanner.installPlugin("it's@odd", marketplaceSource: "a b/c'd", in: fixture.personal))).command))
     }
+
+    @Test func enablingAndDisablingAPlugin() throws {
+        let fixture = PlannerFixture()
+        let id = "swift-lsp@claude-plugins-official"
+        let disable = try #require(terminal(SetupPlanner.setPlugin(id, enabled: false, in: fixture.main)))
+        #expect(disable.command == "claude plugin disable '\(id)' --scope user")
+        #expect(disable.summary == "Disable plugin \(id) in main")
+        let enable = try #require(terminal(SetupPlanner.setPlugin(id, enabled: true, in: fixture.personal)))
+        #expect(enable.command == "\(fixture.prefix(for: fixture.personal))claude plugin enable '\(id)' --scope user")
+        #expect(enable.summary == "Enable plugin \(id) in personal")
+    }
+
+    @Test func uninstallingKeepsData() throws {
+        let fixture = PlannerFixture()
+        let uninstall = try #require(terminal(SetupPlanner.uninstallPlugin("lsp@m", from: fixture.personal)))
+        #expect(uninstall.command == "\(fixture.prefix(for: fixture.personal))claude plugin uninstall 'lsp@m' --scope user --keep-data")
+        #expect(uninstall.summary == "Uninstall plugin lsp@m from personal")
+    }
+
+    @Test func removingAUserServer() throws {
+        let fixture = PlannerFixture()
+        let remove = try #require(terminal(SetupPlanner.removeMCPServer(fixture.server("firebase"), from: fixture.main)))
+        #expect(remove.command == "claude mcp remove 'firebase' --scope user")
+        #expect(remove.summary == "Remove MCP server firebase from main")
+    }
+
+    @Test func removingAProjectServerRunsInItsFolder() throws {
+        let fixture = PlannerFixture()
+        let remove = try #require(terminal(SetupPlanner.removeMCPServer(fixture.server("firebase", project: "/p/zophi"), from: fixture.personal)))
+        #expect(remove.command == "cd '/p/zophi' && \(fixture.prefix(for: fixture.personal))claude mcp remove 'firebase' --scope local")
+        #expect(remove.summary == "Remove MCP server firebase from personal in project zophi")
+    }
+
+    @Test func removeCommandsQuoteOddNames() throws {
+        let fixture = PlannerFixture()
+        #expect(zshAccepts(try #require(terminal(SetupPlanner.removeMCPServer(fixture.server("it's", project: "/p/a b"), from: fixture.personal))).command))
+        #expect(zshAccepts(try #require(terminal(SetupPlanner.uninstallPlugin("it's@odd", from: fixture.personal))).command))
+        #expect(zshAccepts(try #require(terminal(SetupPlanner.setPlugin("it's@odd", enabled: false, in: fixture.personal))).command))
+    }
+
+    @Test func removingASkillOrRuleMovesItsOwnPath() {
+        let fixture = PlannerFixture()
+        let skill = fixture.skill("deploy", in: fixture.main)
+        #expect(SetupPlanner.removeSkill(skill) == .remove(skill.folder))
+        let rule = fixture.instruction("rules/team/style.md", in: fixture.main)
+        #expect(SetupPlanner.removeInstruction(rule) == .remove(rule.url))
+    }
+
+    @Test func aSkillOverridePrintsWithoutTheSettingsText() {
+        let secret = "s3cret-value-9f2c"
+        let url = URL(filePath: "/made-up/.claude/settings.json")
+        let reviewed = SettingsChange(
+            account: "main", url: url, original: nil,
+            before: #"{"env":{"API_TOKEN":"\#(secret)"}}"#,
+            after: #"{"env":{"API_TOKEN":"\#(secret)"},"skillOverrides":{"deploy":"off"}}"#,
+            isReformatted: false
+        )
+        let action = SetupAction.skillOverride(SkillOverrideChange(settings: url, skill: "deploy", off: true, reviewed: reviewed))
+        var dumped = ""
+        dump(action, to: &dumped)
+        for text in [String(describing: action), String(reflecting: action), dumped] {
+            #expect(!text.contains(secret))
+            #expect(text.contains("deploy"))
+        }
+    }
 }

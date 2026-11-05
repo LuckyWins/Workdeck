@@ -39,6 +39,11 @@ nonisolated struct CompareRow: Identifiable, Equatable, Sendable {
     let group: String?
     /// The cell of each instance, by instance name.
     let cells: [String: CellState]
+    /// The fingerprint of each copy that is there (present, off or differs), by instance name; empty for items that
+    /// are never told apart (plugins).
+    var fingerprints: [String: String] = [:]
+    /// The project folder of a project row; `nil` for a whole-instance row.
+    var projectPath: String? = nil
 }
 
 /// Turns the instances' setups into the rows of one tab (Instances spec §2). Pure: it reads no files except to
@@ -93,10 +98,12 @@ nonisolated enum InstanceComparison {
             let shown = reference ?? first
             var folderExists: Bool?
             var cells: [String: CellState] = [:]
+            var fingerprints: [String: String] = [:]
             for (index, column) in columns.enumerated() {
                 if column.items == nil {
                     cells[column.name] = .unreadable
                 } else if let item = byKey[index][key] {
+                    fingerprints[column.name] = item.fingerprint
                     if item.isOff {
                         cells[column.name] = .off
                     } else if let reference, item.fingerprint != reference.fingerprint {
@@ -118,7 +125,9 @@ nonisolated enum InstanceComparison {
                 title: shown.title,
                 subtitle: shown.subtitle,
                 group: shown.projectPath == nil ? nil : projectsGroup,
-                cells: cells
+                cells: cells,
+                fingerprints: fingerprints,
+                projectPath: shown.projectPath
             )
             if matches(row, filter) {
                 rows.append(row)

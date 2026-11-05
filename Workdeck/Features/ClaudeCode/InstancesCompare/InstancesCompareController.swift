@@ -11,8 +11,10 @@ nonisolated struct PendingAction: Equatable, Sendable {
     /// Lines of text: what goes where and from which instance.
     let review: String
     /// For a replacement, the line diff from the target's current `SKILL.md` or file to the source's; `nil` when
-    /// nothing is replaced or a file could not be compared.
+    /// nothing is replaced or a file could not be compared. For a skill turned on or off, the `settings.json` diff.
     let diff: [DiffBlock]?
+    /// A removal or an uninstall: Confirm is shown as destructive.
+    var isDestructive = false
 }
 
 /// What the inspector shows for a skill or an instruction file of one instance.
@@ -86,6 +88,11 @@ final class InstancesCompareController {
     @ObservationIgnored private var knownMarketplaces: [String: Set<String>] = [:]
     /// Where each known marketplace comes from (`claude plugin marketplace add <source>`).
     @ObservationIgnored private var marketplaceSources: [String: String] = [:]
+    /// What the cell menus need besides a row: shared files, linked copies and gone project folders, read with the
+    /// scan so drawing a cell reads no files.
+    @ObservationIgnored private var menuContext = CellMenuContext.empty
+    /// A reload started by a menu item that found nothing to plan; exposed so tests can await it.
+    @ObservationIgnored private(set) var refreshTask: Task<Void, Never>?
     /// Counts reloads, so a slow older one never overwrites a newer one.
     @ObservationIgnored private var generation = 0
 
@@ -115,6 +122,14 @@ final class InstancesCompareController {
         setups = loaded.setups
         knownMarketplaces = loaded.knownMarketplaces
         marketplaceSources = loaded.marketplaceSources
+        let goneProjects = loaded.goneProjects
+        menuContext = CellMenuContext(
+            columns: loaded.setups.map(\.instance.name),
+            sharedSettings: loaded.sharedSettings,
+            sharedSkills: loaded.sharedSkills,
+            fileExists: { !goneProjects.contains($0) },
+            linkedCopies: loaded.linkedCopies
+        )
         notice = current.count < 2 ? Self.singleInstanceNotice : nil
         rebuildRows()
         isLoading = false
@@ -124,6 +139,11 @@ final class InstancesCompareController {
         let setups: [InstanceSetup]
         let knownMarketplaces: [String: Set<String>]
         let marketplaceSources: [String: String]
+        let sharedSettings: [String: [String]]
+        let sharedSkills: [String: [String]]
+        let linkedCopies: [String: [String]]
+        /// The project folders of MCP servers that no longer exist.
+        let goneProjects: Set<String>
     }
 
     /// The blocking part of a reload, on the global pool: one scan per instance (in parallel, kept in order) and the
@@ -151,11 +171,79 @@ final class InstancesCompareController {
         for name in names {
             sources[name] = PluginCatalog.marketplaceSource(name, in: instances)
         }
+        let setups = scanned.sorted { $0.0 < $1.0 }.map(\.1)
         return Loaded(
-            setups: scanned.sorted { $0.0 < $1.0 }.map(\.1),
+            setups: setups,
             knownMarketplaces: known,
-            marketplaceSources: sources
+            marketplaceSources: sources,
+            sharedSettings: sharing(instances) { $0.directory.appending(path: "settings.json") },
+            sharedSkills: sharing(instances) { $0.directory.appending(path: "skills") },
+            linkedCopies: linkedCopies(in: setups),
+            goneProjects: goneProjects(in: setups)
         )
+    }
+
+    private nonisolated static func goneProjects(in setups: [InstanceSetup]) -> Set<String> {
+        var projects = Set<String>()
+        for setup in setups {
+            if case .read(let servers) = setup.mcp {
+                projects.formUnion(servers.compactMap(\.project))
+            }
+        }
+        return projects.filter { !FileManager.default.fileExists(atPath: $0) }
+    }
+
+    /// For each skill or instruction file that is not itself a link: the other instances whose copy of the same row
+    /// resolves to it, so moving it to Replaced would take it from them too.
+    private nonisolated static func linkedCopies(in setups: [InstanceSetup]) -> [String: [String]] {
+        struct Copy {
+            let key: String
+            let instance: String
+            let isLink: Bool
+            let realPath: String
+        }
+        var copies: [Copy] = []
+        for setup in setups {
+            var items: [(key: String, url: URL)] = []
+            if case .read(let skills) = setup.skills {
+                items += skills.map { ("skill:\($0.name)", $0.folder) }
+            }
+            if case .read(let files) = setup.instructions {
+                items += files.map { ("instruction:\($0.path)", $0.url) }
+            }
+            for item in items {
+                let isLink = (try? FileManager.default.destinationOfSymbolicLink(atPath: item.url.path)) != nil
+                let realPath = item.url.resolvingSymlinksInPath().standardizedFileURL.path
+                copies.append(Copy(key: item.key, instance: setup.instance.name, isLink: isLink, realPath: realPath))
+            }
+        }
+        var result: [String: [String]] = [:]
+        for copy in copies where !copy.isLink {
+            let others = copies.filter { $0.key == copy.key && $0.instance != copy.instance && $0.realPath == copy.realPath }.map(\.instance)
+            if !others.isEmpty {
+                result["\(copy.key)|\(copy.instance)"] = others
+            }
+        }
+        return result
+    }
+
+    /// Instance name → the other instances, in column order, whose `item` is the same file or folder behind links
+    /// (as `ClaudeSettingsFile.isSameFile` tells it); only items that exist are compared.
+    private nonisolated static func sharing(_ instances: [ClaudeInstance], item: (ClaudeInstance) -> URL) -> [String: [String]] {
+        let resolved: [(name: String, path: String?)] = instances.map { instance in
+            let url = item(instance)
+            guard FileManager.default.fileExists(atPath: url.path) else { return (instance.name, nil) }
+            return (instance.name, url.resolvingSymlinksInPath().standardizedFileURL.path)
+        }
+        var result: [String: [String]] = [:]
+        for entry in resolved {
+            guard let path = entry.path else { continue }
+            let others = resolved.filter { $0.name != entry.name && $0.path == path }.map(\.name)
+            if !others.isEmpty {
+                result[entry.name] = others
+            }
+        }
+        return result
     }
 
     private func rebuildRows() {
@@ -186,19 +274,22 @@ final class InstancesCompareController {
 
     // MARK: Planning
 
-    /// Plans what a click on `row`'s cell of instance `target` does and opens the review: a skill, rule or `CLAUDE.md`
-    /// is copied (a `differs` cell replaces the target's copy), an MCP server or a plugin goes through Terminal. A
-    /// cell that is present, off, unreadable or whose project folder is gone, a server that differs (`add-json` cannot
-    /// replace one) and a project's plugin plan nothing. The copy comes from the first instance, in column order,
-    /// whose cell is present (or, failing that, off).
-    func plan(row: CompareRow, target: String) {
+    /// Plans copying `row`'s item from instance `source` into instance `target` and opens the review: a skill, rule or
+    /// `CLAUDE.md` is copied (over a different copy, which it replaces), an MCP server or a plugin goes through Terminal.
+    /// A source without the item, a target that has the same copy, is unreadable or whose project folder is gone, a
+    /// server that is there already (`add-json` cannot replace one) and a project's plugin plan nothing.
+    func plan(row: CompareRow, target: String, from source: String) {
         guard !isApplying else { return }
         pending = nil
-        guard let targetSetup = setups.first(where: { $0.instance.name == target }),
-              let sourceSetup = referenceSetup(for: row, excluding: target),
+        guard source != target,
+              let targetSetup = setups.first(where: { $0.instance.name == target }),
+              let sourceSetup = setups.first(where: { $0.instance.name == source }),
+              Self.has(row.cells[source]),
               let cell = row.cells[target] else { return }
         let missing = cell == .missing
-        let differs = cell == .differs
+        let sourceFingerprint = row.fingerprints[sourceSetup.instance.name]
+        let targetFingerprint = row.fingerprints[target]
+        let differs = Self.has(cell) && sourceFingerprint != nil && targetFingerprint != nil && sourceFingerprint != targetFingerprint
         guard missing || differs else { return }
         let planned: PendingAction?
         if row.id.hasPrefix("skill:") {
@@ -215,12 +306,11 @@ final class InstancesCompareController {
         pending = planned
     }
 
-    private func referenceSetup(for row: CompareRow, excluding target: String) -> InstanceSetup? {
-        let others = setups.filter { $0.instance.name != target }
-        if let present = others.first(where: { if case .present? = row.cells[$0.instance.name] { true } else { false } }) {
-            return present
+    private static func has(_ cell: CellState?) -> Bool {
+        switch cell {
+        case .present?, .off?, .differs?: true
+        default: false
         }
-        return others.first { row.cells[$0.instance.name] == .off }
     }
 
     private func planSkill(_ row: CompareRow, from source: InstanceSetup, to target: InstanceSetup) -> PendingAction? {
@@ -238,8 +328,21 @@ final class InstancesCompareController {
                 lines.append("SKILL.md is the same; other files differ.")
             }
         }
+        let name = target.instance.name
+        if Self.isTurnedOff(skill.name, in: target.instance) {
+            lines.append("It stays off in \(name): skillOverrides turns it off there.")
+        }
+        if let others = menuContext.sharedSkills[name] {
+            lines.append("\(name)'s skills folder is shared with \(others.joined(separator: ", ")): the copy shows up there too.")
+        }
         lines.append(startLine(in: target))
-        return PendingAction(action: action, target: target.instance.name, review: lines.joined(separator: "\n"), diff: diff)
+        return PendingAction(action: action, target: name, review: lines.joined(separator: "\n"), diff: diff)
+    }
+
+    /// `skillOverrides[skill]` is `"off"` in the instance's `settings.json`, so a copy arrives turned off.
+    private static func isTurnedOff(_ skill: String, in instance: ClaudeInstance) -> Bool {
+        let settings = try? ClaudeSettingsFile(url: instance.directory.appending(path: "settings.json")).read()
+        return (settings?["skillOverrides"] as? [String: Any])?[skill] as? String == "off"
     }
 
     private func planInstruction(_ row: CompareRow, from source: InstanceSetup, to target: InstanceSetup) -> PendingAction? {
@@ -294,6 +397,119 @@ final class InstancesCompareController {
         guard case .terminal(_, let summary) = action else { return nil }
         let lines = [summary, Self.terminalLine, Self.claudeCommandLine, startLine(in: target)]
         return PendingAction(action: action, target: target.instance.name, review: lines.joined(separator: "\n"), diff: nil)
+    }
+
+    // MARK: Cell menu
+
+    /// The menu of `row`'s cell in `instance` (Instances manage spec §2.1).
+    func menu(for row: CompareRow, instance: String) -> [[CellMenuItem]] {
+        CellMenu.items(row: row, tab: tab, instance: instance, context: menuContext)
+    }
+
+    /// Plans a menu item and opens its review; a disabled item, or any item while an action applies, plans nothing.
+    /// An item that finds nothing to do (the files changed since the window read them) reads the instances again, so
+    /// the cell shows what is there now.
+    func perform(_ item: CellMenuItem, row: CompareRow, instance: String) {
+        guard item.disabledReason == nil, !isApplying else { return }
+        switch item.action {
+        case .copy(let from, let to):
+            plan(row: row, target: to, from: from)
+        case .turnOn, .turnOff:
+            pending = nil
+            guard let setup = setups.first(where: { $0.instance.name == instance }) else { return }
+            pending = planState(row, in: setup, off: item.action == .turnOff)
+            refreshIfNothingPlanned()
+        case .remove:
+            pending = nil
+            guard let setup = setups.first(where: { $0.instance.name == instance }) else { return }
+            pending = planRemoval(row, in: setup)
+            refreshIfNothingPlanned()
+        }
+    }
+
+    private func refreshIfNothingPlanned() {
+        guard pending == nil else { return }
+        refreshTask = Task { await reload() }
+    }
+
+    private func planState(_ row: CompareRow, in setup: InstanceSetup, off: Bool) -> PendingAction? {
+        let name = setup.instance.name
+        switch tab {
+        case .skills:
+            guard case .read(let skills) = setup.skills,
+                  let skill = skills.first(where: { "skill:\($0.name)" == row.id }),
+                  let change = try? SkillOverrides.plan(skill: skill.name, off: off, in: setup.instance) else { return nil }
+            return skillOverrideReview(change, in: setup)
+        case .plugins:
+            guard row.group == nil, let plugin = plugin(of: row, in: setup) else { return nil }
+            let action = SetupPlanner.setPlugin(plugin.id, enabled: !off, in: setup.instance)
+            guard case .terminal(_, let summary) = action else { return nil }
+            let lines = [summary, Self.changeLine, Self.claudeCommandLine, startLine(in: setup)]
+            return PendingAction(action: action, target: name, review: lines.joined(separator: "\n"), diff: nil)
+        case .mcp, .instructions:
+            return nil
+        }
+    }
+
+    /// The review of a skill turned on or off: what changes in which file, the reformatting and the diff.
+    private func skillOverrideReview(_ change: SkillOverrideChange, in setup: InstanceSetup, note: String? = nil) -> PendingAction {
+        var lines = note.map { [$0] } ?? []
+        lines += [
+            "Turn \(change.off ? "off" : "on") skill \(change.skill) in \(setup.instance.name)",
+            "Changes skillOverrides in \(change.reviewed.displayPath); a backup is kept next to it.",
+        ]
+        if change.reviewed.isReformatted {
+            lines.append(SettingsReviewText.reformatted)
+        }
+        if change.reviewed.blocks == nil {
+            lines.append(SettingsReviewText.tooLarge)
+        }
+        lines.append(startLine(in: setup))
+        return PendingAction(
+            action: .skillOverride(change), target: setup.instance.name, review: lines.joined(separator: "\n"), diff: change.reviewed.blocks
+        )
+    }
+
+    private func planRemoval(_ row: CompareRow, in setup: InstanceSetup) -> PendingAction? {
+        let name = setup.instance.name
+        let undoLine = "To undo, move it back from Replaced."
+        let lines: [String]
+        let action: SetupAction
+        switch tab {
+        case .skills:
+            guard case .read(let skills) = setup.skills,
+                  let skill = skills.first(where: { "skill:\($0.name)" == row.id }) else { return nil }
+            action = SetupPlanner.removeSkill(skill)
+            lines = ["Move skill \(skill.name) from \(name) to Workdeck's Replaced folder", undoLine, startLine(in: setup)]
+        case .instructions:
+            guard case .read(let files) = setup.instructions,
+                  let file = files.first(where: { "instruction:\($0.path)" == row.id }) else { return nil }
+            action = SetupPlanner.removeInstruction(file)
+            var text = ["Move \(file.path) from \(name) to Workdeck's Replaced folder"]
+            if file.path == InstanceComparison.globalInstructionPath {
+                text.append("This is \(name)'s instructions for every project.")
+            }
+            lines = text + [undoLine]
+        case .plugins:
+            guard row.group == nil, let plugin = plugin(of: row, in: setup) else { return nil }
+            action = SetupPlanner.uninstallPlugin(plugin.id, from: setup.instance)
+            guard case .terminal(_, let summary) = action else { return nil }
+            lines = [summary, "Its data folder is kept.", Self.changeLine, Self.claudeCommandLine]
+        case .mcp:
+            guard case .read(let servers) = setup.mcp,
+                  let server = servers.first(where: { InstanceComparison.key("mcp", $0.name, project: $0.project) == row.id }) else { return nil }
+            if let project = server.project, !FileManager.default.fileExists(atPath: project) { return nil }
+            action = SetupPlanner.removeMCPServer(server, from: setup.instance)
+            guard case .terminal(_, let summary) = action else { return nil }
+            lines = [summary, Self.changeLine, Self.claudeCommandLine]
+        }
+        return PendingAction(action: action, target: name, review: lines.joined(separator: "\n"), diff: nil, isDestructive: true)
+    }
+
+    /// The whole-instance plugin of `row` in `setup`.
+    private func plugin(of row: CompareRow, in setup: InstanceSetup) -> PluginInfo? {
+        guard case .read(let plugins) = setup.plugins else { return nil }
+        return plugins.first { $0.projectPath == nil && InstanceComparison.key("plugin", $0.id, project: nil) == row.id }
     }
 
     // MARK: Browse Plugins
@@ -389,6 +605,8 @@ final class InstancesCompareController {
     }
 
     private static let terminalLine = "Runs in Terminal: Claude Code installs it"
+    /// For a Terminal action that changes or removes what is installed.
+    static let changeLine = "Runs in Terminal: Claude Code makes the change"
     /// Plugins and MCP servers are installed with the `claude` command (Instances spec §5).
     static let claudeCommandLine = "If Terminal says claude is not found, install Claude Code’s command first."
     /// A file too large or unreadable to compare line by line.
@@ -411,15 +629,37 @@ final class InstancesCompareController {
         isApplying = true
         var outcome = "Done"
         do {
-            try await copier.apply(confirmed.action, instanceName: confirmed.target, launcher: launcher)
+            if case .skillOverride(let change) = confirmed.action {
+                try SkillOverrides.apply(change)
+            } else {
+                try await copier.apply(confirmed.action, instanceName: confirmed.target, launcher: launcher)
+            }
         } catch {
             outcome = error.localizedDescription
+            // As Connect does: a settings.json that changed since the review gets a new review instead of a dead end.
+            if let fresh = freshReview(after: error, for: confirmed) {
+                isApplying = false
+                pending = fresh
+                await reload()
+                return
+            }
         }
         isApplying = false
         if pending == confirmed {
             result = outcome
         }
         await reload()
+    }
+
+    /// The review again, from the file as it is now, when a skill's `settings.json` changed since it was shown; `nil`
+    /// for any other failure, when the review was closed meanwhile or when nothing is left to change.
+    private func freshReview(after error: any Error, for confirmed: PendingAction) -> PendingAction? {
+        guard error as? ClaudeConnectorError == .changedSinceReview,
+              pending == confirmed,
+              case .skillOverride(let change) = confirmed.action,
+              let setup = setups.first(where: { $0.instance.name == confirmed.target }),
+              let fresh = try? SkillOverrides.plan(skill: change.skill, off: change.off, in: setup.instance) else { return nil }
+        return skillOverrideReview(fresh, in: setup, note: SettingsReviewText.fileChangedSinceShown)
     }
 
     /// Closes the review without writing anything.

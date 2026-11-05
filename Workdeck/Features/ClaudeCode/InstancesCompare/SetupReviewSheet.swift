@@ -17,7 +17,7 @@ extension View {
 /// What a click in the Instances window will write, where and from which instance; for a replacement the diff; then
 /// the result (Instances spec §3). Nothing is written before Confirm.
 struct SetupReviewSheet: View {
-    static let terminalResult = "Opened in Terminal. Claude Code installs it there; Workdeck refreshes when you come back. "
+    static let terminalResult = "Opened in Terminal. Claude Code finishes it there; Workdeck refreshes when you come back. "
         + InstancesCompareController.claudeCommandLine
 
     let controller: InstancesCompareController
@@ -32,7 +32,7 @@ struct SetupReviewSheet: View {
                 .textSelection(.enabled)
             if let diff = pending.diff, !diff.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("What changes in \(pending.target)’s copy")
+                    Text(diffCaption)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     SettingsDiffView(blocks: diff)
@@ -51,7 +51,7 @@ struct SetupReviewSheet: View {
                     Button("Cancel") { controller.cancel() }
                         .keyboardShortcut(.cancelAction)
                         .disabled(controller.isApplying)
-                    Button("Confirm") { Task { await controller.confirm() } }
+                    Button("Confirm", role: pending.isDestructive ? .destructive : nil) { Task { await controller.confirm() } }
                         .keyboardShortcut(.defaultAction)
                         .disabled(controller.isApplying)
                 } else {
@@ -70,7 +70,16 @@ struct SetupReviewSheet: View {
         case .copy(_, _, true): "Replace in \(pending.target)?"
         case .copy: "Copy to \(pending.target)?"
         case .terminal: "Run in Terminal?"
+        case .remove: "Remove from \(pending.target)?"
+        case .skillOverride(let change): change.off ? "Turn off in \(pending.target)?" : "Turn on in \(pending.target)?"
         }
+    }
+
+    private var diffCaption: String {
+        if case .skillOverride(let change) = pending.action {
+            return "What changes in \(change.reviewed.displayPath)"
+        }
+        return "What changes in \(pending.target)’s copy"
     }
 
     @ViewBuilder

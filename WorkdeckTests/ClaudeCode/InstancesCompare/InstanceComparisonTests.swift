@@ -256,4 +256,31 @@ struct InstanceComparisonTests {
         #expect(Set(first.map(\.id)).count == first.count)
         #expect(first.map(\.id) == second.map(\.id))
     }
+
+    @Test func fingerprintsAreKeptPerInstance() throws {
+        let setups = [
+            setup("main", skills: .read([skill("deploy", hash: "h1")])),
+            setup("personal", skills: .read([skill("deploy", hash: "h2")])),
+            setup("work", skills: .read([skill("deploy", hash: "h1", isOff: true)])),
+            setup("solo"),
+        ]
+        let deploy = try row(InstanceComparison.rows(.skills, setups: setups, filter: .all), "skill:deploy")
+        #expect(deploy.fingerprints == ["main": "h1", "personal": "h2", "work": "h1"])
+    }
+
+    @Test func aPluginRowHasNoFingerprints() throws {
+        let setups = [setup("main", plugins: .read([plugin("lsp@m")])), setup("personal")]
+        let lsp = try row(InstanceComparison.rows(.plugins, setups: setups, filter: .all), "plugin:lsp@m")
+        #expect(lsp.fingerprints.isEmpty)
+    }
+
+    @Test func aProjectRowKeepsItsFolder() throws {
+        let setups = [
+            setup("main", mcp: .read([server("firebase", project: "/p/zophi"), server("github")])),
+            setup("personal"),
+        ]
+        let rows = InstanceComparison.rows(.mcp, setups: setups, filter: .all, fileExists: { _ in true })
+        #expect(try row(rows, "mcp:firebase@/p/zophi").projectPath == "/p/zophi")
+        #expect(try row(rows, "mcp:github").projectPath == nil)
+    }
 }

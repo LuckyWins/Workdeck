@@ -5,7 +5,7 @@ import SwiftUI
 /// file, with the inspector on the right for skills and instructions (Instances spec §2).
 struct InstancesWindow: View {
     static let id = "claude-instances"
-    static let footer = "A click on a cell shows what will be copied where, then writes it."
+    static let footer = "A click on a cell shows what it can do; every change is shown before it is written."
 
     @Bindable var controller: InstancesCompareController
     @State private var isBrowsing = false
@@ -277,13 +277,32 @@ private struct RowTitle: View {
     }
 }
 
-/// One instance's mark for one row: ● present, off, v2 / differs, + Add / + Install, folder gone, Couldn’t read.
+/// One instance's mark for one row: ● present, off, v2 / differs, + Add / + Install, folder gone, Couldn’t read. A
+/// click opens the cell's menu when it offers anything (Instances manage spec §2.1).
 private struct CompareCell: View {
     let controller: InstancesCompareController
     let row: CompareRow
     let instance: String
 
     var body: some View {
+        let sections = controller.menu(for: row, instance: instance)
+        if sections.isEmpty {
+            mark(hasMenu: false)
+        } else {
+            Menu {
+                CellMenuContent(controller: controller, row: row, instance: instance, sections: sections)
+            } label: {
+                mark(hasMenu: true)
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+        }
+    }
+
+    @ViewBuilder
+    private func mark(hasMenu: Bool) -> some View {
         switch row.cells[instance] ?? .missing {
         case .present(let detail):
             VStack(spacing: 1) {
@@ -298,33 +317,18 @@ private struct CompareCell: View {
                         .lineLimit(1)
                 }
             }
+            .contentShape(Rectangle())
             .help(partialNote ?? "")
         case .off:
             MarkTag(text: "off", tint: .orange)
                 .help(withPartialNote("Installed in \(instance), but turned off"))
         case .differs:
-            let mark = MarkTag(text: controller.tab == .skills ? "v2" : "differs", tint: .purple)
-            if controller.tab == .skills || controller.tab == .instructions, let source = source {
-                Button {
-                    controller.plan(row: row, target: instance)
-                } label: {
-                    mark
-                }
-                .buttonStyle(.plain)
-                .help(withPartialNote("Replace \(instance)’s copy with \(source)’s…"))
-            } else {
-                mark
-                    .help("Same name, other settings than in the first instance that has it")
-            }
+            MarkTag(text: controller.tab == .skills ? "v2" : "differs", tint: .purple)
+                .help(withPartialNote("Other contents than the first instance that has it"))
         case .missing:
-            if canAdd, let source {
-                Button {
-                    controller.plan(row: row, target: instance)
-                } label: {
-                    AddMark(text: controller.tab == .plugins ? "+ Install" : "+ Add")
-                }
-                .buttonStyle(.plain)
-                .help(help(from: source))
+            if hasMenu {
+                AddMark(text: controller.tab == .plugins ? "+ Install" : "+ Add")
+                    .help(controller.tab == .plugins ? "Install \(row.title) in \(instance)…" : "Copy \(row.title) to \(instance)…")
             } else {
                 Text("—")
                     .foregroundStyle(.tertiary)
@@ -351,24 +355,31 @@ private struct CompareCell: View {
     private func withPartialNote(_ help: String) -> String {
         partialNote.map { "\(help)\n\($0)" } ?? help
     }
+}
 
-    /// A project's plugin is never installed from here.
-    private var canAdd: Bool {
-        !(controller.tab == .plugins && row.group != nil)
-    }
+/// A cell menu's items: sections between dividers, a disabled item with its reason as a second line.
+private struct CellMenuContent: View {
+    let controller: InstancesCompareController
+    let row: CompareRow
+    let instance: String
+    let sections: [[CellMenuItem]]
 
-    /// The instance a copy would come from: the first other one, in column order, that has it on, else off.
-    private var source: String? {
-        let others = controller.setups.map(\.instance.name).filter { $0 != instance }
-        return others.first { if case .present? = row.cells[$0] { true } else { false } }
-            ?? others.first { row.cells[$0] == .off }
-    }
-
-    private func help(from source: String) -> String {
-        switch controller.tab {
-        case .plugins: "Install \(row.title) in \(instance)…"
-        case .mcp: "Add \(row.title) from \(source) to \(instance)…"
-        case .skills, .instructions: "Copy \(row.title) from \(source) to \(instance)…"
+    var body: some View {
+        ForEach(Array(sections.enumerated()), id: \.offset) { index, section in
+            if index > 0 {
+                Divider()
+            }
+            ForEach(section) { item in
+                Button(role: item.isDestructive ? .destructive : nil) {
+                    controller.perform(item, row: row, instance: instance)
+                } label: {
+                    Text(item.title)
+                    if let reason = item.disabledReason {
+                        Text(reason)
+                    }
+                }
+                .disabled(item.disabledReason != nil)
+            }
         }
     }
 }
@@ -618,20 +629,36 @@ private struct InstanceInspector: View {
     }
 
     private func actions(_ row: CompareRow) -> some View {
-        let targets = copyTargets(row)
+        let items = shownInstance(row).map { controller.menu(for: row, instance: $0).flatMap { $0 } } ?? []
+        let copies = items.filter { if case .copy = $0.action { true } else { false } }
+        let others = items.filter { if case .copy = $0.action { false } else { true } }
         return VStack(alignment: .leading, spacing: 8) {
-            if targets.count > 2 {
-                Menu("Copy to…") {
-                    ForEach(targets, id: \.self) { target in
-                        Button(target) { controller.plan(row: row, target: target) }
+            if copies.count > 2 {
+                Menu("Copy…") {
+                    ForEach(copies) { item in
+                        Button(item.title) { perform(item, row) }
                     }
                 }
                 .fixedSize()
-            } else if !targets.isEmpty {
+            } else if !copies.isEmpty {
                 HStack {
-                    ForEach(targets, id: \.self) { target in
-                        Button("Copy to \(target)") { controller.plan(row: row, target: target) }
+                    ForEach(copies) { item in
+                        Button(item.title) { perform(item, row) }
                             .buttonStyle(.borderedProminent)
+                    }
+                }
+            }
+            if !others.isEmpty {
+                HStack {
+                    ForEach(others) { item in
+                        let button = Button(item.title, role: item.isDestructive ? .destructive : nil) { perform(item, row) }
+                            .disabled(item.disabledReason != nil)
+                            .help(item.disabledReason ?? "")
+                        if item.isDestructive {
+                            button.tint(.red)
+                        } else {
+                            button
+                        }
                     }
                 }
             }
@@ -698,9 +725,9 @@ private struct InstanceInspector: View {
         }
     }
 
-    /// The instances a copy can go to: those that lack it or have another version.
-    private func copyTargets(_ row: CompareRow) -> [String] {
-        controller.setups.map(\.instance.name).filter { row.cells[$0] == .missing || row.cells[$0] == .differs }
+    private func perform(_ item: CellMenuItem, _ row: CompareRow) {
+        guard let instance = shownInstance(row) else { return }
+        controller.perform(item, row: row, instance: instance)
     }
 
     private func editableFile(_ content: InspectorContent) -> URL {

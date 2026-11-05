@@ -240,4 +240,39 @@ struct SetupCopierTests {
         }
         #expect(launcher.commands.isEmpty)
     }
+
+    @Test func removeMovesASkillToReplaced() async throws {
+        let fixture = CopierFixture()
+        fixture.write("Deploy it", "skills/deploy/SKILL.md", in: fixture.personal)
+        let folder = fixture.personal.directory.appending(path: "skills/deploy")
+        try await fixture.copier().apply(.remove(folder), instanceName: "personal", launcher: FakeTerminalLauncher())
+        #expect(!fixture.exists(folder))
+        let kept = fixture.replaced.appending(path: "personal/\(fixture.stamp)/skills/deploy/SKILL.md")
+        #expect(try String(contentsOf: kept, encoding: .utf8) == "Deploy it")
+    }
+
+    @Test func removeMovesALinkNotWhatItPointsTo() async throws {
+        let fixture = CopierFixture()
+        let linked = fixture.root.appending(path: "dotfiles/deploy")
+        try FileManager.default.createDirectory(at: linked, withIntermediateDirectories: true)
+        try Data("Deploy it".utf8).write(to: linked.appending(path: "SKILL.md"))
+        let skills = fixture.personal.directory.appending(path: "skills")
+        try FileManager.default.createDirectory(at: skills, withIntermediateDirectories: true)
+        let link = skills.appending(path: "deploy")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: linked)
+        try await fixture.copier().apply(.remove(link), instanceName: "personal", launcher: FakeTerminalLauncher())
+        #expect(!FileManager.default.hasItem(at: link))
+        let kept = fixture.replaced.appending(path: "personal/\(fixture.stamp)/skills/deploy")
+        let type = try FileManager.default.attributesOfItem(atPath: kept.path)[.type] as? FileAttributeType
+        #expect(type == .typeSymbolicLink)
+        #expect(try String(contentsOf: linked.appending(path: "SKILL.md"), encoding: .utf8) == "Deploy it")
+    }
+
+    @Test func removingSomethingGoneThrows() async {
+        let fixture = CopierFixture()
+        let folder = fixture.personal.directory.appending(path: "skills/gone")
+        await #expect(throws: SetupError.notThere) {
+            try await fixture.copier().apply(.remove(folder), instanceName: "personal", launcher: FakeTerminalLauncher())
+        }
+    }
 }

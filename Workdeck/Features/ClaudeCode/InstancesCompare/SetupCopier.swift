@@ -2,17 +2,22 @@ import Foundation
 
 nonisolated enum SetupError: Error, Equatable, Sendable, LocalizedError {
     case terminalNotOpened
+    case notThere
+    case notAFileAction
 
     var errorDescription: String? {
         switch self {
         case .terminalNotOpened: "Terminal could not be opened."
+        case .notThere: "It is no longer there."
+        case .notAFileAction: "Workdeck could not apply this change."
         }
     }
 }
 
 /// Applies a `SetupAction` (Instances spec §3). A copy goes to `.<target>.workdeck-<UUID>` next to the target and is
 /// then renamed into place, so a failed copy leaves nothing half-written; a copy it replaces moves first to
-/// `<replacedRoot>/<instance>/<date>/<path inside the instance folder>`, so nothing is lost.
+/// `<replacedRoot>/<instance>/<date>/<path inside the instance folder>`, so nothing is lost. A removed item moves
+/// there too.
 nonisolated struct SetupCopier: Sendable {
     /// `~/Library/Application Support/Workdeck/Replaced`.
     let replacedRoot: URL
@@ -24,7 +29,21 @@ nonisolated struct SetupCopier: Sendable {
             try await copy(from: source, to: destination, instanceName: instanceName)
         case .terminal(let command, _):
             guard await launcher.open(command) else { throw SetupError.terminalNotOpened }
+        case .remove(let url):
+            try await moveAway(url, instanceName: instanceName)
+        case .skillOverride:
+            throw SetupError.notAFileAction
         }
+    }
+
+    /// Moves `url` to where a replaced copy goes; a link is moved as a link, so what it points to stays untouched.
+    @concurrent
+    private func moveAway(_ url: URL, instanceName: String) async throws {
+        let fileManager = FileManager.default
+        guard fileManager.hasItem(at: url) else { throw SetupError.notThere }
+        let kept = keptLocation(of: url, instanceName: instanceName)
+        try fileManager.createDirectory(at: kept.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fileManager.moveItem(at: url, to: kept)
     }
 
     /// Whatever sits at `destination` when the copy lands is kept, whether or not the plan expected it. `@concurrent`

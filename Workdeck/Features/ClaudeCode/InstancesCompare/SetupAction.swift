@@ -8,6 +8,10 @@ nonisolated enum SetupAction: Equatable, Sendable, CustomStringConvertible, Cust
     /// A `claude` command run in Terminal. `summary` is the one sentence the review shows; `command` can hold
     /// secrets (an MCP server's `env` and headers), so it is never displayed.
     case terminal(command: String, summary: String)
+    /// A skill folder or an instruction file moved to Workdeck's Replaced folder (Instances manage spec §2.3).
+    case remove(URL)
+    /// A skill turned on or off in `settings.json`; applied by the controller on the main actor.
+    case skillOverride(SkillOverrideChange)
 
     var description: String {
         switch self {
@@ -15,6 +19,10 @@ nonisolated enum SetupAction: Equatable, Sendable, CustomStringConvertible, Cust
             "copy(from: \(from), to: \(to), replacing: \(replacing))"
         case .terminal(_, let summary):
             "terminal(summary: \(summary))"
+        case .remove(let url):
+            "remove(\(url))"
+        case .skillOverride(let change):
+            "skillOverride(skill: \(change.skill), off: \(change.off))"
         }
     }
 
@@ -26,6 +34,10 @@ nonisolated enum SetupAction: Equatable, Sendable, CustomStringConvertible, Cust
             Mirror(self, children: ["from": from, "to": to, "replacing": replacing], displayStyle: .enum)
         case .terminal(_, let summary):
             Mirror(self, children: ["summary": summary], displayStyle: .enum)
+        case .remove(let url):
+            Mirror(self, children: ["url": url], displayStyle: .enum)
+        case .skillOverride(let change):
+            Mirror(self, children: ["skill": change.skill, "off": change.off], displayStyle: .enum)
         }
     }
 }
@@ -74,6 +86,44 @@ nonisolated enum SetupPlanner {
             command: "\(environment(for: target))claude plugin marketplace add \(ShellCommand.quoted(source))",
             summary: "Add marketplace \(displayed(source)) to \(target.name)"
         )
+    }
+
+    static func setPlugin(_ id: String, enabled: Bool, in target: ClaudeInstance) -> SetupAction {
+        let verb = enabled ? "enable" : "disable"
+        return .terminal(
+            command: "\(environment(for: target))claude plugin \(verb) \(ShellCommand.quoted(id)) --scope user",
+            summary: "\(enabled ? "Enable" : "Disable") plugin \(id) in \(target.name)"
+        )
+    }
+
+    /// `--keep-data` keeps `plugins/data/<id>/`, so nothing removed is lost and a reinstall finds it again.
+    static func uninstallPlugin(_ id: String, from target: ClaudeInstance) -> SetupAction {
+        .terminal(
+            command: "\(environment(for: target))claude plugin uninstall \(ShellCommand.quoted(id)) --scope user --keep-data",
+            summary: "Uninstall plugin \(id) from \(target.name)"
+        )
+    }
+
+    /// A project's server is removed from within its folder, where Claude Code keeps it (`--scope local`).
+    static func removeMCPServer(_ server: MCPServerInfo, from target: ClaudeInstance) -> SetupAction {
+        let remove = "\(environment(for: target))claude mcp remove \(ShellCommand.quoted(server.name)) "
+            + "--scope \(server.project == nil ? "user" : "local")"
+        let summary = "Remove MCP server \(server.name) from \(target.name)"
+        guard let project = server.project else {
+            return .terminal(command: remove, summary: summary)
+        }
+        return .terminal(
+            command: "cd \(ShellCommand.quoted(project)) && \(remove)",
+            summary: summary + " in project \(URL(filePath: project).lastPathComponent)"
+        )
+    }
+
+    static func removeSkill(_ skill: SkillInfo) -> SetupAction {
+        .remove(skill.folder)
+    }
+
+    static func removeInstruction(_ file: InstructionInfo) -> SetupAction {
+        .remove(file.url)
     }
 
     /// `CLAUDE_CONFIG_DIR=<folder> ` for an extra instance; the main instance needs none.

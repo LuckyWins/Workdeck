@@ -106,6 +106,30 @@ private func row(_ controller: InstancesCompareController, _ id: String) throws 
     try #require(controller.rows.first { $0.id == id }, "no row \(id) in \(controller.rows.map(\.id))")
 }
 
+/// A launcher whose `run` waits until `release()`, so a test can act while a confirm is applying.
+private final class WaitingLauncher: TerminalLaunching {
+    private let gate = DispatchSemaphore(value: 0)
+
+    func run(_ command: String) throws {
+        gate.wait()
+    }
+
+    func release() {
+        gate.signal()
+    }
+}
+
+@MainActor
+private func item(_ controller: InstancesCompareController, _ row: CompareRow, _ instance: String, _ title: String) throws -> CellMenuItem {
+    let items = controller.menu(for: row, instance: instance).flatMap { $0 }
+    return try #require(items.first { $0.title == title }, "no \(title) in \(items.map(\.title))")
+}
+
+/// Every path under `directory`, relative to it.
+private func paths(under directory: URL) -> [String] {
+    (FileManager.default.enumerator(atPath: directory.path)?.allObjects as? [String]) ?? []
+}
+
 @MainActor
 struct InstancesCompareControllerTests {
     @Test func reloadBuildsRows() async throws {
@@ -165,7 +189,7 @@ struct InstancesCompareControllerTests {
         let controller = fixture.controller()
         await controller.reload()
 
-        controller.plan(row: try row(controller, "skill:deploy"), target: "personal")
+        controller.plan(row: try row(controller, "skill:deploy"), target: "personal", from: "main")
 
         let pending = try #require(controller.pending)
         guard case .copy(let source, let destination, let replacing) = pending.action else {
@@ -182,7 +206,7 @@ struct InstancesCompareControllerTests {
         #expect(!fixture.exists("skills", in: fixture.personal))
     }
 
-    @Test func theReferenceIsTheFirstInstanceThatHasItOn() async throws {
+    @Test func theCopyComesFromTheNamedSource() async throws {
         let fixture = CompareFixture()
         fixture.skill("deploy", "# Off here\n", in: fixture.main)
         fixture.write(#"{"skillOverrides": {"deploy": "off"}}"#, "settings.json", in: fixture.main)
@@ -190,7 +214,7 @@ struct InstancesCompareControllerTests {
         let controller = fixture.controller([fixture.main, fixture.personal, fixture.work])
         await controller.reload()
 
-        controller.plan(row: try row(controller, "skill:deploy"), target: "personal")
+        controller.plan(row: try row(controller, "skill:deploy"), target: "personal", from: "work")
 
         let pending = try #require(controller.pending)
         #expect(pending.review.contains("from work to personal"))
@@ -207,7 +231,7 @@ struct InstancesCompareControllerTests {
         fixture.write("echo hi", "skills/deploy/run.sh", in: fixture.main)
         let controller = fixture.controller()
         await controller.reload()
-        controller.plan(row: try row(controller, "skill:deploy"), target: "personal")
+        controller.plan(row: try row(controller, "skill:deploy"), target: "personal", from: "main")
 
         await controller.confirm()
 
@@ -230,7 +254,7 @@ struct InstancesCompareControllerTests {
         let deploy = try row(controller, "skill:deploy")
         #expect(deploy.cells["personal"] == .differs)
 
-        controller.plan(row: deploy, target: "personal")
+        controller.plan(row: deploy, target: "personal", from: "main")
 
         let pending = try #require(controller.pending)
         guard case .copy(_, _, let replacing) = pending.action else {
@@ -265,7 +289,7 @@ struct InstancesCompareControllerTests {
         await controller.reload()
         controller.tab = .instructions
 
-        controller.plan(row: try row(controller, "instruction:rules/style.md"), target: "personal")
+        controller.plan(row: try row(controller, "instruction:rules/style.md"), target: "personal", from: "main")
 
         let pending = try #require(controller.pending)
         #expect(pending.review.contains("Copy rules/style.md from main to personal"))
@@ -282,7 +306,7 @@ struct InstancesCompareControllerTests {
         await controller.reload()
         controller.tab = .plugins
 
-        controller.plan(row: try row(controller, "plugin:swift-lsp@official"), target: "personal")
+        controller.plan(row: try row(controller, "plugin:swift-lsp@official"), target: "personal", from: "main")
 
         let pending = try #require(controller.pending)
         #expect(pending.review.contains("Install plugin swift-lsp@official in personal"))
@@ -309,7 +333,7 @@ struct InstancesCompareControllerTests {
         await controller.reload()
         controller.tab = .plugins
 
-        controller.plan(row: try row(controller, "plugin:swift-lsp@official"), target: "personal")
+        controller.plan(row: try row(controller, "plugin:swift-lsp@official"), target: "personal", from: "main")
         await controller.confirm()
 
         let command = try #require(fixture.launcher.commands.first)
@@ -328,7 +352,7 @@ struct InstancesCompareControllerTests {
         let firebase = try row(controller, "mcp:firebase@\(project.path)")
         #expect(firebase.cells["personal"] == .missing)
 
-        controller.plan(row: firebase, target: "personal")
+        controller.plan(row: firebase, target: "personal", from: "main")
 
         let pending = try #require(controller.pending)
         #expect(pending.review.contains("Add MCP server firebase to personal in project zophi"))
@@ -356,7 +380,7 @@ struct InstancesCompareControllerTests {
         await controller.reload()
         controller.tab = .mcp
 
-        controller.plan(row: try row(controller, "mcp:cloudwatch"), target: "personal")
+        controller.plan(row: try row(controller, "mcp:cloudwatch"), target: "personal", from: "main")
         await controller.confirm()
 
         let command = try #require(fixture.launcher.commands.first)
@@ -393,29 +417,29 @@ struct InstancesCompareControllerTests {
         await controller.reload()
         controller.filter = .all
 
-        controller.plan(row: try row(controller, "skill:lint"), target: "personal")
+        controller.plan(row: try row(controller, "skill:lint"), target: "personal", from: "main")
         #expect(controller.pending == nil)
-        controller.plan(row: try row(controller, "skill:deploy"), target: "personal")
+        controller.plan(row: try row(controller, "skill:deploy"), target: "personal", from: "main")
         #expect(controller.pending == nil)
-        controller.plan(row: try row(controller, "skill:deploy"), target: "main")
+        controller.plan(row: try row(controller, "skill:deploy"), target: "main", from: "personal")
         #expect(controller.pending == nil)
 
         controller.tab = .mcp
         let firebase = try row(controller, "mcp:firebase@\(gone)")
         #expect(firebase.cells["personal"] == .folderGone)
-        controller.plan(row: firebase, target: "personal")
+        controller.plan(row: firebase, target: "personal", from: "main")
         #expect(controller.pending == nil)
         let dart = try row(controller, "mcp:dart")
         #expect(dart.cells["personal"] == .differs)
-        controller.plan(row: dart, target: "personal")
+        controller.plan(row: dart, target: "personal", from: "main")
         #expect(controller.pending == nil, "add-json cannot replace a server that exists")
 
         controller.tab = .plugins
         let plugin = try row(controller, "plugin:swift-lsp@official@/p/zophi")
-        controller.plan(row: plugin, target: "personal")
+        controller.plan(row: plugin, target: "personal", from: "main")
         #expect(controller.pending == nil, "plugins of one project are read-only")
 
-        controller.plan(row: plugin, target: "nobody")
+        controller.plan(row: plugin, target: "nobody", from: "main")
         #expect(controller.pending == nil)
         #expect(fixture.launcher.commands.isEmpty)
     }
@@ -425,7 +449,7 @@ struct InstancesCompareControllerTests {
         fixture.skill("deploy", in: fixture.main)
         let controller = fixture.controller()
         await controller.reload()
-        controller.plan(row: try row(controller, "skill:deploy"), target: "personal")
+        controller.plan(row: try row(controller, "skill:deploy"), target: "personal", from: "main")
         #expect(controller.pending != nil)
 
         controller.cancel()
@@ -446,7 +470,7 @@ struct InstancesCompareControllerTests {
         let controller = fixture.controller()
         await controller.reload()
         controller.tab = .plugins
-        controller.plan(row: try row(controller, "plugin:swift-lsp@official"), target: "personal")
+        controller.plan(row: try row(controller, "plugin:swift-lsp@official"), target: "personal", from: "main")
 
         await controller.confirm()
         await controller.confirm()
@@ -460,7 +484,7 @@ struct InstancesCompareControllerTests {
         let controller = fixture.controller()
         await controller.reload()
         controller.tab = .plugins
-        controller.plan(row: try row(controller, "plugin:swift-lsp@official"), target: "personal")
+        controller.plan(row: try row(controller, "plugin:swift-lsp@official"), target: "personal", from: "main")
 
         await controller.confirm()
 
@@ -470,7 +494,7 @@ struct InstancesCompareControllerTests {
         copyFixture.skill("deploy", in: copyFixture.main)
         let copying = copyFixture.controller()
         await copying.reload()
-        copying.plan(row: try row(copying, "skill:deploy"), target: "personal")
+        copying.plan(row: try row(copying, "skill:deploy"), target: "personal", from: "main")
         try FileManager.default.removeItem(at: copyFixture.main.directory.appending(path: "skills/deploy"))
 
         await copying.confirm()
@@ -714,13 +738,13 @@ struct InstancesCompareWindowStateTests {
         let controller = fixture.controller()
         await controller.reload()
 
-        controller.plan(row: try row(controller, "skill:deploy"), target: "personal")
+        controller.plan(row: try row(controller, "skill:deploy"), target: "personal", from: "main")
         let skill = try #require(controller.pending)
         #expect(skill.diff == nil)
         #expect(skill.review.contains("Can’t show the changes here."))
 
         controller.tab = .instructions
-        controller.plan(row: try row(controller, "instruction:rules/style.md"), target: "personal")
+        controller.plan(row: try row(controller, "instruction:rules/style.md"), target: "personal", from: "main")
         let rule = try #require(controller.pending)
         #expect(rule.diff == nil)
         #expect(rule.review.contains("Can’t show the changes here."))
@@ -733,7 +757,7 @@ struct InstancesCompareWindowStateTests {
         let controller = fixture.controller()
         await controller.reload()
 
-        controller.plan(row: try row(controller, "skill:deploy"), target: "personal")
+        controller.plan(row: try row(controller, "skill:deploy"), target: "personal", from: "main")
 
         #expect(try #require(controller.pending).review.contains("show the changes") == false)
     }
@@ -849,5 +873,299 @@ struct InstancesCompareWindowStateTests {
         let diff = await SkillFolderDiff.skillFileDiff(old: folder, new: fixture.personal.directory.appending(path: "skills/deploy"))
 
         #expect(diff == nil)
+    }
+
+    // MARK: Cell menu
+
+    @Test func turningASkillOffIsReviewedThenWritten() async throws {
+        let fixture = CompareFixture()
+        fixture.skill("deploy", in: fixture.main)
+        fixture.skill("deploy", in: fixture.personal)
+        fixture.write(#"{"model":"opus"}"#, "settings.json", in: fixture.main)
+        let controller = fixture.controller()
+        controller.filter = .all
+        await controller.reload()
+        let deploy = try row(controller, "skill:deploy")
+        controller.perform(try item(controller, deploy, "main", "Turn Off in main"), row: deploy, instance: "main")
+        let pending = try #require(controller.pending)
+        #expect(pending.review.contains("Turn off skill deploy in main"))
+        #expect(pending.diff?.isEmpty == false)
+        #expect(fixture.read("settings.json", in: fixture.main) == #"{"model":"opus"}"#)
+
+        await controller.confirm()
+        #expect(controller.result == "Done")
+        let root = try #require(try JSONSerialization.jsonObject(with: Data(fixture.read("settings.json", in: fixture.main)!.utf8)) as? [String: Any])
+        #expect((root["skillOverrides"] as? [String: String]) == ["deploy": "off"])
+        #expect(fixture.exists("settings.json.workdeck-backup", in: fixture.main))
+        #expect(controller.rows.first?.cells["main"] == .off)
+    }
+
+    @Test func aSettingsFileChangedAfterTheReviewIsRefused() async throws {
+        let fixture = CompareFixture()
+        fixture.skill("deploy", in: fixture.main)
+        fixture.skill("deploy", in: fixture.personal)
+        fixture.write(#"{"model":"opus"}"#, "settings.json", in: fixture.main)
+        let controller = fixture.controller()
+        controller.filter = .all
+        await controller.reload()
+        let deploy = try row(controller, "skill:deploy")
+        controller.perform(try item(controller, deploy, "main", "Turn Off in main"), row: deploy, instance: "main")
+        fixture.write(#"{"model":"sonnet"}"#, "settings.json", in: fixture.main)
+        await controller.confirm()
+        // Like Connect, the review shows the new changes instead of a dead end.
+        let fresh = try #require(controller.pending)
+        #expect(fresh.review.hasPrefix(SettingsReviewText.fileChangedSinceShown))
+        #expect(controller.result == nil)
+        #expect(fixture.read("settings.json", in: fixture.main) == #"{"model":"sonnet"}"#)
+        await controller.confirm()
+        #expect(controller.result == "Done")
+        let root = try #require(try JSONSerialization.jsonObject(with: Data(fixture.read("settings.json", in: fixture.main)!.utf8)) as? [String: Any])
+        #expect(root["model"] as? String == "sonnet")
+        #expect((root["skillOverrides"] as? [String: String]) == ["deploy": "off"])
+    }
+
+    @Test func aSharedSettingsFilePlansNothing() async throws {
+        let fixture = CompareFixture()
+        fixture.skill("deploy", in: fixture.main)
+        fixture.skill("deploy", in: fixture.personal)
+        fixture.write("{}", "settings.json", in: fixture.main)
+        try FileManager.default.createSymbolicLink(
+            at: fixture.personal.directory.appending(path: "settings.json"),
+            withDestinationURL: fixture.main.directory.appending(path: "settings.json")
+        )
+        let controller = fixture.controller()
+        controller.filter = .all
+        await controller.reload()
+        let deploy = try row(controller, "skill:deploy")
+        let turnOff = try item(controller, deploy, "personal", "Turn Off in personal")
+        #expect(turnOff.disabledReason == "Shares settings.json with main")
+        controller.perform(turnOff, row: deploy, instance: "personal")
+        #expect(controller.pending == nil)
+    }
+
+    @Test func removingASkillMovesItToReplaced() async throws {
+        let fixture = CompareFixture()
+        fixture.skill("deploy", in: fixture.main)
+        let controller = fixture.controller()
+        await controller.reload()
+        let deploy = try row(controller, "skill:deploy")
+        controller.perform(try item(controller, deploy, "main", "Remove from main…"), row: deploy, instance: "main")
+        let pending = try #require(controller.pending)
+        #expect(pending.isDestructive)
+        #expect(pending.review.contains("Move skill deploy from main to Workdeck's Replaced folder"))
+        await controller.confirm()
+        #expect(controller.result == "Done")
+        #expect(!fixture.exists("skills/deploy", in: fixture.main))
+        #expect(paths(under: fixture.replaced.appending(path: "main")).contains { $0.hasSuffix("skills/deploy/SKILL.md") })
+    }
+
+    @Test func removingTheGlobalInstructionsSaysEveryProject() async throws {
+        let fixture = CompareFixture()
+        fixture.write("Be terse", "CLAUDE.md", in: fixture.main)
+        let controller = fixture.controller()
+        controller.tab = .instructions
+        await controller.reload()
+        let claude = try row(controller, "instruction:CLAUDE.md")
+        controller.perform(try item(controller, claude, "main", "Remove from main…"), row: claude, instance: "main")
+        let pending = try #require(controller.pending)
+        #expect(pending.review.contains("This is main's instructions for every project."))
+        #expect(pending.isDestructive)
+    }
+
+    @Test func disablingAPluginRunsClaudeInTerminal() async throws {
+        let fixture = CompareFixture()
+        fixture.installedPlugin("lsp@m", in: fixture.personal)
+        let controller = fixture.controller()
+        controller.tab = .plugins
+        await controller.reload()
+        let lsp = try row(controller, "plugin:lsp@m")
+        controller.perform(try item(controller, lsp, "personal", "Disable in personal"), row: lsp, instance: "personal")
+        #expect(controller.pending?.review.contains(InstancesCompareController.changeLine) == true)
+        await controller.confirm()
+        let prefix = "CLAUDE_CONFIG_DIR=" + ShellCommand.quoted(fixture.personal.directory.path) + " "
+        #expect(fixture.launcher.commands.last == prefix + "claude plugin disable 'lsp@m' --scope user")
+    }
+
+    @Test func uninstallingAPluginKeepsItsData() async throws {
+        let fixture = CompareFixture()
+        fixture.installedPlugin("lsp@m", in: fixture.main)
+        let controller = fixture.controller()
+        controller.tab = .plugins
+        await controller.reload()
+        let lsp = try row(controller, "plugin:lsp@m")
+        controller.perform(try item(controller, lsp, "main", "Uninstall from main…"), row: lsp, instance: "main")
+        let pending = try #require(controller.pending)
+        #expect(pending.review.contains("Its data folder is kept."))
+        #expect(pending.isDestructive)
+        await controller.confirm()
+        #expect(fixture.launcher.commands.last?.hasSuffix("--keep-data") == true)
+    }
+
+    @Test func removingAServerRunsClaudeMcpRemove() async throws {
+        let fixture = CompareFixture()
+        fixture.account(["mcpServers": ["cloudwatch": fixture.serverJSON()]], in: fixture.main)
+        let controller = fixture.controller()
+        controller.tab = .mcp
+        await controller.reload()
+        let cloudwatch = try row(controller, "mcp:cloudwatch")
+        controller.perform(try item(controller, cloudwatch, "main", "Remove from main…"), row: cloudwatch, instance: "main")
+        #expect(controller.pending?.review.contains(fixture.secret) == false)
+        await controller.confirm()
+        #expect(fixture.launcher.commands.last == "claude mcp remove 'cloudwatch' --scope user")
+    }
+
+    @Test func copyingFromTheClickedCopy() async throws {
+        let fixture = CompareFixture()
+        fixture.skill("deploy", "v1", in: fixture.main)
+        fixture.skill("deploy", "v2", in: fixture.personal)
+        fixture.skill("deploy", "v1", in: fixture.work)
+        let controller = fixture.controller([fixture.main, fixture.personal, fixture.work])
+        await controller.reload()
+        let deploy = try row(controller, "skill:deploy")
+        controller.perform(try item(controller, deploy, "personal", "Copy to main"), row: deploy, instance: "personal")
+        #expect(controller.pending?.review.contains("Copy skill deploy from personal to main") == true)
+        await controller.confirm()
+        #expect(fixture.read("skills/deploy/SKILL.md", in: fixture.main) == fixture.read("skills/deploy/SKILL.md", in: fixture.personal))
+        #expect(paths(under: fixture.replaced.appending(path: "main")).contains { $0.hasSuffix("skills/deploy/SKILL.md") })
+    }
+
+    @Test func nothingIsPlannedWhileApplying() async throws {
+        let fixture = CompareFixture()
+        fixture.installedPlugin("lsp@m", in: fixture.main)
+        let launcher = WaitingLauncher()
+        let controller = InstancesCompareController(
+            instances: { [fixture] in [fixture.main, fixture.personal] },
+            launcher: launcher,
+            copier: SetupCopier(replacedRoot: fixture.replaced, now: { Date() })
+        )
+        controller.tab = .plugins
+        await controller.reload()
+        let lsp = try row(controller, "plugin:lsp@m")
+        controller.perform(try item(controller, lsp, "main", "Disable in main"), row: lsp, instance: "main")
+        let pending = controller.pending
+        let confirming = Task { await controller.confirm() }
+        while !controller.isApplying {
+            await Task.yield()
+        }
+        controller.perform(try item(controller, lsp, "main", "Uninstall from main…"), row: lsp, instance: "main")
+        #expect(controller.pending == pending)
+        launcher.release()
+        await confirming.value
+    }
+
+    // MARK: Final review fixes
+
+    @Test func aSettingsFileInAnotherFormatSaysItIsReformatted() async throws {
+        let fixture = CompareFixture()
+        fixture.skill("deploy", in: fixture.main)
+        fixture.write(#"{"model":"opus"}"#, "settings.json", in: fixture.main)
+        let controller = fixture.controller()
+        await controller.reload()
+        let deploy = try row(controller, "skill:deploy")
+        controller.perform(try item(controller, deploy, "main", "Turn Off in main"), row: deploy, instance: "main")
+        #expect(controller.pending?.review.contains(SettingsReviewText.reformatted) == true)
+    }
+
+    @Test func aSettingsFileTooLargeToDiffSaysSo() async throws {
+        let fixture = CompareFixture()
+        fixture.skill("deploy", in: fixture.main)
+        let keys = (0..<1_200).map { "\"key\($0)\": \($0)" }.joined(separator: ",\n")
+        fixture.write("{\n\(keys)\n}", "settings.json", in: fixture.main)
+        let controller = fixture.controller()
+        await controller.reload()
+        let deploy = try row(controller, "skill:deploy")
+        controller.perform(try item(controller, deploy, "main", "Turn Off in main"), row: deploy, instance: "main")
+        let pending = try #require(controller.pending)
+        #expect(pending.diff == nil)
+        #expect(pending.review.contains(SettingsReviewText.tooLarge))
+    }
+
+    @Test func aSkillAnotherInstanceLinksToCannotBeRemovedThere() async throws {
+        let fixture = CompareFixture()
+        fixture.skill("deploy", in: fixture.personal)
+        try FileManager.default.createDirectory(at: fixture.main.directory.appending(path: "skills"), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: fixture.main.directory.appending(path: "skills/deploy"),
+            withDestinationURL: fixture.personal.directory.appending(path: "skills/deploy")
+        )
+        let controller = fixture.controller()
+        controller.filter = .all
+        await controller.reload()
+        let deploy = try row(controller, "skill:deploy")
+        #expect(try item(controller, deploy, "personal", "Remove from personal…").disabledReason == "Shared with main through a link")
+        #expect(try item(controller, deploy, "main", "Remove from main…").disabledReason == nil)
+    }
+
+    @Test func instructionsAnotherInstanceLinksToCannotBeRemovedThere() async throws {
+        let fixture = CompareFixture()
+        fixture.write("Be terse", "CLAUDE.md", in: fixture.main)
+        try FileManager.default.createSymbolicLink(
+            at: fixture.personal.directory.appending(path: "CLAUDE.md"),
+            withDestinationURL: fixture.main.directory.appending(path: "CLAUDE.md")
+        )
+        let controller = fixture.controller()
+        controller.tab = .instructions
+        controller.filter = .all
+        await controller.reload()
+        let claude = try row(controller, "instruction:CLAUDE.md")
+        #expect(try item(controller, claude, "main", "Remove from main…").disabledReason == "Shared with personal through a link")
+        #expect(try item(controller, claude, "personal", "Remove from personal…").disabledReason == nil)
+    }
+
+    @Test func aClickThatFindsNothingToChangeRefreshes() async throws {
+        let fixture = CompareFixture()
+        fixture.skill("deploy", in: fixture.main)
+        let controller = fixture.controller()
+        await controller.reload()
+        let deploy = try row(controller, "skill:deploy")
+        let turnOff = try item(controller, deploy, "main", "Turn Off in main")
+        fixture.write(#"{"skillOverrides":{"deploy":"off"}}"#, "settings.json", in: fixture.main)
+        controller.perform(turnOff, row: deploy, instance: "main")
+        #expect(controller.pending == nil)
+        await controller.refreshTask?.value
+        #expect(controller.rows.first?.cells["main"] == .off)
+    }
+
+    @Test func aCopyIntoATurnedOffSkillSaysItStaysOff() async throws {
+        let fixture = CompareFixture()
+        fixture.skill("deploy", in: fixture.main)
+        fixture.write(#"{"skillOverrides":{"deploy":"off"}}"#, "settings.json", in: fixture.personal)
+        let controller = fixture.controller()
+        await controller.reload()
+        let deploy = try row(controller, "skill:deploy")
+        controller.perform(try item(controller, deploy, "personal", "Copy from main"), row: deploy, instance: "personal")
+        #expect(controller.pending?.review.contains("It stays off in personal: skillOverrides turns it off there.") == true)
+    }
+
+    @Test func aCopyIntoASharedSkillsFolderSaysWhoElseGetsIt() async throws {
+        let fixture = CompareFixture()
+        fixture.skill("deploy", in: fixture.main)
+        let shared = fixture.root.appending(path: "dotfiles/skills")
+        try FileManager.default.createDirectory(at: shared, withIntermediateDirectories: true)
+        for instance in [fixture.personal, fixture.work] {
+            try FileManager.default.createSymbolicLink(at: instance.directory.appending(path: "skills"), withDestinationURL: shared)
+        }
+        let controller = fixture.controller([fixture.main, fixture.personal, fixture.work])
+        await controller.reload()
+        let deploy = try row(controller, "skill:deploy")
+        controller.perform(try item(controller, deploy, "personal", "Copy from main"), row: deploy, instance: "personal")
+        #expect(controller.pending?.review.contains("personal's skills folder is shared with work: the copy shows up there too.") == true)
+    }
+
+    @Test func aSharedRulesFolderCannotLoseARule() async throws {
+        let fixture = CompareFixture()
+        let rules = fixture.root.appending(path: "dotfiles/rules")
+        try FileManager.default.createDirectory(at: rules, withIntermediateDirectories: true)
+        try Data("Be terse".utf8).write(to: rules.appending(path: "style.md"))
+        for instance in [fixture.main, fixture.personal] {
+            try FileManager.default.createSymbolicLink(at: instance.directory.appending(path: "rules"), withDestinationURL: rules)
+        }
+        let controller = fixture.controller()
+        controller.tab = .instructions
+        controller.filter = .all
+        await controller.reload()
+        let style = try row(controller, "instruction:rules/style.md")
+        #expect(try item(controller, style, "personal", "Remove from personal…").disabledReason == "Shared with main through a link")
+        #expect(try item(controller, style, "main", "Remove from main…").disabledReason == "Shared with personal through a link")
     }
 }
