@@ -4,6 +4,8 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 
 ## Unreleased
 
+## 1.1.3 — 2026-11-05
+
 ### New
 - Install Workdeck with one Terminal command from its page, luckywins.github.io/Workdeck: no download to unzip and no "could not verify" prompt.
 
