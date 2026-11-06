@@ -33,8 +33,6 @@ Agreed on 2026-10-16, from a survey of other agent companions (see the links in 
 Agreed on 2026-11-06, from [Lumio](https://lumiomac.com/).
 
 12. ~~**Quick notes.**~~ Done (`7c25269`). A tap of the right Option opens a panel from the notch: one line, Return, and it is a reminder in Apple Reminders. `#` picks a project (a Reminders list) with terminal-style Tab completion, a date in the text sets the reminder, ⌘↩ hands the note to Claude Code or Codex in Terminal in the project's folder, completed notes are removed after a week with a copy in an archive. Spec: `specs/2026-11-06-quick-notes-design.md`. Later: resurface notes when an agent finishes in the project, `workdeck-note` for agents, notes in the recap, a note to `TODO.md` or a GitHub issue.
-    - ~~**Taking a tick back and Done.**~~ Done (`1144844`), after the check at the Mac. A ticked note stays crossed out for 4 seconds with a ring counting down before it is written to Reminders; ⌘Z or another click takes it back. **Done** under the open notes folds out what was ticked in the last 30 days and opens one again.
-    - ~~**On the landing page.**~~ Done (`bbf2dc5`). The quick notes tab plays `notes-capture-animated.png` (the right Option tapped, the panel growing out of the notch and saving the demo's note); animated tabs stay as long as they play and start from their first frame.
 
 ## Distribution
 
