@@ -32,7 +32,7 @@ Agreed on 2026-10-16, from a survey of other agent companions (see the links in 
 
 Agreed on 2026-11-06, from [Lumio](https://lumiomac.com/).
 
-12. **Quick notes.** A tap of the right Option opens a panel from the notch: one line, Return, and it is a reminder in Apple Reminders. `#` picks a project (a Reminders list) with terminal-style Tab completion, a date in the text sets the reminder, ⌘↩ hands the note to Claude Code or Codex in Terminal in the project's folder, completed notes are removed after a week with a copy in an archive. Being built: `specs/2026-11-06-quick-notes-design.md` (plan `plans/2026-11-06-quick-notes.md`). Later: resurface notes when an agent finishes in the project, `workdeck-note` for agents, notes in the recap, a note to `TODO.md` or a GitHub issue.
+12. ~~**Quick notes.**~~ Done (`7c25269`). A tap of the right Option opens a panel from the notch: one line, Return, and it is a reminder in Apple Reminders. `#` picks a project (a Reminders list) with terminal-style Tab completion, a date in the text sets the reminder, ⌘↩ hands the note to Claude Code or Codex in Terminal in the project's folder, completed notes are removed after a week with a copy in an archive. Spec: `specs/2026-11-06-quick-notes-design.md`. Later: resurface notes when an agent finishes in the project, `workdeck-note` for agents, notes in the recap, a note to `TODO.md` or a GitHub issue.
 
 ## Distribution
 
