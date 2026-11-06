@@ -337,6 +337,10 @@ final class NoteNSTextView: NSTextView {
         case .paste:
             pasteAsPlainText(nil)
         case .undo:
+            // A tick that can still be taken back goes first; then the typing.
+            if onKey?(.commandZ) == true {
+                return true
+            }
             undoManager?.undo()
         case .redo:
             undoManager?.redo()

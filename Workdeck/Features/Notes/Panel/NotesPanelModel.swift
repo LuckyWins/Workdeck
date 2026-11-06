@@ -4,7 +4,7 @@ import Observation
 
 /// A key the note field hands to the panel instead of handling it itself.
 nonisolated enum PanelKey: Equatable, Sendable {
-    case tab, space, returnKey, commandReturn, commandShiftReturn, up, down, commandD, escape, backspace
+    case tab, space, returnKey, commandReturn, commandShiftReturn, up, down, commandD, commandZ, escape, backspace
 }
 
 /// What the panel shows: the note, the agent picker (spec §3.5), the folder prompt (§3.6) or a confirmation (§3.4).
@@ -84,6 +84,11 @@ final class NotesPanelModel {
     private(set) var folderIsChange = false
     /// A confirmation that waits for the user instead of closing on its own (a command to copy).
     private(set) var confirmationStays = false
+    /// Open items just ticked, oldest first: they stay in the list crossed out for `doneUndoDelay` before the tick
+    /// is written to Reminders, and ⌘Z or another click takes it back meanwhile.
+    private(set) var pendingDone: [ReminderItem] = []
+    /// The Done section under the open items is expanded; kept while Workdeck runs.
+    var isDoneShown = false
 
     /// The matches a chip came from: Tab after a commit moves to the next one.
     @ObservationIgnored private var cycleMatches: [ReminderListInfo] = []
@@ -92,12 +97,17 @@ final class NotesPanelModel {
     @ObservationIgnored private var folderItem: ReminderItem?
     @ObservationIgnored private(set) var confirmationClosesPanel = false
     @ObservationIgnored private var confirmationTask: Task<Void, Never>?
+    @ObservationIgnored private let doneUndoDelay: Duration
+    @ObservationIgnored private var pendingDoneTasks: [String: Task<Void, Never>] = [:]
+    /// When each waiting tick was made, by the wall clock: the row's ring counts its undo time down.
+    @ObservationIgnored private var pendingDoneSince: [String: Date] = [:]
 
     init(
         controller: NotesController,
         now: @escaping () -> Date,
         calendar: Calendar = .autoupdatingCurrent,
         confirmationDuration: Duration = .seconds(2),
+        doneUndoDelay: Duration = .seconds(4),
         openURL: @escaping (URL) -> Void = { _ = NSWorkspace.shared.open($0) },
         copy: @escaping (String) -> Void = { value in
             NSPasteboard.general.clearContents()
@@ -108,12 +118,16 @@ final class NotesPanelModel {
         self.now = now
         self.calendar = calendar
         self.confirmationDuration = confirmationDuration
+        self.doneUndoDelay = doneUndoDelay
         self.openURL = openURL
         self.copy = copy
     }
 
     deinit {
         confirmationTask?.cancel()
+        for task in pendingDoneTasks.values {
+            task.cancel()
+        }
     }
 
     // MARK: Opening and closing
@@ -130,8 +144,16 @@ final class NotesPanelModel {
     }
 
     /// The panel closed (Esc, a click outside, the key): whatever was in progress is dropped, the typed text stays.
+    /// Ticks still waiting for their undo time are written now.
     func closed() {
         resetTransientState()
+        guard !pendingDone.isEmpty else { return }
+        let ids = pendingDone.map(\.id)
+        Task { [weak self] in
+            for id in ids {
+                await self?.commitDone(id)
+            }
+        }
     }
 
     private func resetTransientState() {
@@ -310,7 +332,7 @@ final class NotesPanelModel {
             if isListOpen {
                 move(key, rows: max(matches.count, 1), allowsNone: false)
             } else {
-                move(key, rows: visibleItems.count, allowsNone: true)
+                move(key, rows: rows.count, allowsNone: true)
             }
             return true
         case .escape:
@@ -323,6 +345,11 @@ final class NotesPanelModel {
             return true
         case .commandD:
             return isBusy || selectedItem == nil ? true : nil
+        case .commandZ:
+            // The last tick, while it can still be taken back; otherwise the field undoes its typing.
+            guard let last = pendingDone.last else { return false }
+            cancelPendingDone(last.id)
+            return true
         case .returnKey, .commandReturn:
             return isBusy ? true : nil
         }
@@ -401,6 +428,29 @@ final class NotesPanelModel {
 
     /// The open items, filtered by the typed text and limited to the project (a chip, or `#name` typed exactly).
     var visibleItems: [ReminderItem] {
+        filtered(controller.openItems)
+    }
+
+    /// The Done section's items, filtered as the open items are.
+    var visibleDoneItems: [ReminderItem] {
+        filtered(controller.doneItems)
+    }
+
+    /// What ↑↓ move through: the open items, then the done ones while the Done section is expanded.
+    var rows: [ReminderItem] {
+        isDoneShown ? visibleItems + visibleDoneItems : visibleItems
+    }
+
+    /// Ticked: completed in Reminders, or waiting for its undo time.
+    func isDone(_ item: ReminderItem) -> Bool {
+        item.completed != nil || pendingDone.contains { $0.id == item.id }
+    }
+
+    func isPendingDone(_ item: ReminderItem) -> Bool {
+        pendingDone.contains { $0.id == item.id }
+    }
+
+    private func filtered(_ items: [ReminderItem]) -> [ReminderItem] {
         if let project = draft.project, project.listID == nil {
             return []   // a list that does not exist yet has no items
         }
@@ -423,7 +473,7 @@ final class NotesPanelModel {
         }
         remaining += draft.text[cursor...]
         let filter = remaining.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        return controller.openItems.filter { item in
+        return items.filter { item in
             (listID == nil || item.listID == listID)
                 && (filter.isEmpty || item.title.range(of: filter, options: [.caseInsensitive, .diacriticInsensitive]) != nil)
         }
@@ -431,23 +481,83 @@ final class NotesPanelModel {
 
     /// The open items show under an empty field, and under typed text while some match it.
     var showsOpenItems: Bool {
-        mode == .typing && !isListOpen && (draft.text.isEmpty || !visibleItems.isEmpty)
+        mode == .typing && !isListOpen && (draft.text.isEmpty || !visibleItems.isEmpty || !visibleDoneItems.isEmpty)
     }
 
     var selectedItem: ReminderItem? {
         guard mode == .typing, !isListOpen, let row = selectedRow else { return nil }
-        let items = visibleItems
+        let items = rows
         return items.indices.contains(row) ? items[row] : nil
     }
 
+    /// ⌘D or the circle: an open item is ticked after `doneUndoDelay` (crossed out meanwhile, see `pendingDone`); a
+    /// tick still waiting is taken back; a done item is open again at once.
     func toggleDone(_ item: ReminderItem) async {
-        await perform {
-            await controller.markDone(item)
+        if isPendingDone(item) {
+            cancelPendingDone(item.id)
+            return
         }
-        if let row = selectedRow {
-            let count = visibleItems.count
-            selectedRow = count == 0 ? nil : min(row, count - 1)
+        if item.completed != nil {
+            await controller.markUndone(item)
+            clampSelection()
+            return
         }
+        pendingDone.append(item)
+        pendingDoneSince[item.id] = Date()
+        let delay = doneUndoDelay
+        pendingDoneTasks[item.id] = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            await self?.commitDone(item.id)
+        }
+    }
+
+    /// Shows or hides the Done section; a selection inside it goes with it.
+    func toggleDoneSection() {
+        isDoneShown.toggle()
+        clampSelection()
+    }
+
+    private func cancelPendingDone(_ id: String) {
+        pendingDoneTasks.removeValue(forKey: id)?.cancel()
+        pendingDoneSince[id] = nil
+        pendingDone.removeAll { $0.id == id }
+    }
+
+    /// When a waiting tick was made; nil for any other item.
+    func pendingDoneStart(of item: ReminderItem) -> Date? {
+        isPendingDone(item) ? pendingDoneSince[item.id] : nil
+    }
+
+    /// How much of the undo time is left at `date` for a tick made at `start`: 1 just after the tick, 0 once it is
+    /// written.
+    func undoTimeLeft(since start: Date, at date: Date) -> Double {
+        let total = Double(doneUndoDelay.components.seconds) + Double(doneUndoDelay.components.attoseconds) / 1e18
+        guard total > 0 else { return 0 }
+        return min(1, max(0, 1 - date.timeIntervalSince(start) / total))
+    }
+
+    /// Writes a waiting tick to Reminders; the item moves from the open items to the Done section.
+    private func commitDone(_ id: String) async {
+        guard let index = pendingDone.firstIndex(where: { $0.id == id }) else { return }
+        let item = pendingDone.remove(at: index)
+        pendingDoneTasks.removeValue(forKey: id)?.cancel()
+        pendingDoneSince[id] = nil
+        await controller.markDone(item)
+        clampSelection()
+    }
+
+    private func clampSelection() {
+        guard let row = selectedRow, mode == .typing, !isListOpen else { return }
+        let count = rows.count
+        selectedRow = count == 0 ? nil : min(row, count - 1)
+    }
+
+    /// "Done 2 h ago", "Done now": when a done item was ticked.
+    func doneDetail(of item: ReminderItem) -> String {
+        guard let completed = item.completed else { return "" }
+        let age = NotesDateText.age(since: completed, now: now())
+        return age == "now" ? "Done now" : "Done \(age) ago"
     }
 
     /// "Give to agent" on a row.

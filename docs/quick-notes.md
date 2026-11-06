@@ -49,6 +49,8 @@ With the field empty, the panel lists the open notes of the lists you used here 
 
 - Typing filters the list; `#name` limits it to one project. Return always saves what you typed as a new note.
 - ↑↓ select a note, **⌘↩** gives it to its project's agent, **⌘D** marks it done. With the mouse: the circle marks it done, a row's **Give to agent** button hands it over.
+- A note marked done stays in the list crossed out for 4 seconds before it is ticked in Reminders: **⌘Z** or another click on its circle takes it back. Closing the panel ticks it at once.
+- **Done** under the open notes folds out what was ticked lately (up to 20, the last 30 days, until the cleanup removes them). ⌘D or the circle on one of them makes it open again.
 - Editing, rescheduling and deleting stay in Reminders.
 
 ## Giving a Note to an Agent
@@ -64,7 +66,7 @@ With the field empty, the panel lists the open notes of the lists you used here 
 
 - **Remove completed notes** in Settings → Notes is on by default, after 7 days (1, 3, 7, 14 or 30). It runs at launch, then every 6 hours, and once more when the first save gets access to Reminders.
 - Only the lists you used here are cleaned: the default list (once it is picked in Settings or created by the first save) and every list a note was saved to or created in through the panel. In those lists every completed item goes, also ones added on the iPhone or in Reminders. No other list is touched.
-- Before a reminder is removed, a line is added to `~/Library/Application Support/Workdeck/Notes Archive/YYYY-MM.md`: `- [x] Проверить миграцию на staging — Workdeck · created 2026-11-06 · done 2026-11-07`. Only once the line is written is the reminder removed; if the archive cannot be written, nothing is removed. **Show Archive** in Settings → Notes opens the folder.
+- Before a reminder is removed, a line is added to `~/Library/Application Support/Workdeck/Notes Archive/YYYY-MM.md`: `- [x] Check the staging migration — Workdeck · created 2026-11-06 · done 2026-11-07`. Only once the line is written is the reminder removed; if the archive cannot be written, nothing is removed. **Show Archive** in Settings → Notes opens the folder.
 - The removal syncs to all your devices. The archive is plain text for you; Workdeck never reads it back.
 
 ## Reminders Access

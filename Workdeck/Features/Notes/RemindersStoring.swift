@@ -41,7 +41,11 @@ protocol RemindersStoring: AnyObject {
     func add(title: String, due: ParsedDate?, listID: String) throws -> ReminderItem
     func openItems(in listIDs: Set<String>) async -> [ReminderItem]
     func completedItems(in listIDs: Set<String>) async -> [ReminderItem]
+    /// Items completed since `date`: the panel's Done section.
+    func completedItems(in listIDs: Set<String>, since date: Date) async -> [ReminderItem]
     func markDone(_ id: String) throws
+    /// Takes the tick back: the reminder is open again.
+    func markUndone(_ id: String) throws
     /// Appends a line to the reminder's notes field.
     func appendNote(_ line: String, to id: String) throws
     /// Removes a reminder; with `commit` false the removal waits for `commit()`.
@@ -188,9 +192,21 @@ final class EventKitRemindersStore: RemindersStoring {
         return await fetch(eventStore.predicateForCompletedReminders(withCompletionDateStarting: nil, ending: nil, calendars: lists))
     }
 
+    func completedItems(in listIDs: Set<String>, since date: Date) async -> [ReminderItem] {
+        let lists = self.lists(withIDs: listIDs)
+        guard !lists.isEmpty else { return [] }
+        return await fetch(eventStore.predicateForCompletedReminders(withCompletionDateStarting: date, ending: nil, calendars: lists))
+    }
+
     func markDone(_ id: String) throws {
         let reminder = try reminder(withID: id)
         reminder.isCompleted = true
+        try eventStore.save(reminder, commit: true)
+    }
+
+    func markUndone(_ id: String) throws {
+        let reminder = try reminder(withID: id)
+        reminder.isCompleted = false
         try eventStore.save(reminder, commit: true)
     }
 

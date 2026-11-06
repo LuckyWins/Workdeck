@@ -132,7 +132,9 @@ When the text field is empty, the panel shows the open items:
 - **Order:** overdue first, then by due date, then items without a date from oldest to newest. At most eight rows visible, the rest scroll.
 - Right column: the due date (orange when today or overdue), "→ agent · time" when the item was handed to an agent (§5.4), else its age ("3 d").
 - **Typing filters** the list by text; `#name` limits it to one project. Typing also starts a new note: ↩ always saves the typed text as a new note, never acts on a row.
-- **↑↓** select a row; **⌘↩** hands the selected item to its project's agent; **⌘D** marks it done (it fades out of the list). When no row is selected, ⌘↩ acts on the typed text.
+- **↑↓** select a row; **⌘↩** hands the selected item to its project's agent; **⌘D** marks it done. When no row is selected, ⌘↩ acts on the typed text.
+- **Taking a tick back** (the user, 2026-11-06, after the check at the Mac): a ticked row stays in place crossed out, with "⌘Z Undo", for 4 seconds before the tick is written to Reminders; ⌘Z (the last tick first, then the field's own undo) or another click on the circle takes it back. Closing the panel writes waiting ticks at once.
+- **Done section:** under the open items, "› Done · N" folds out the items of the used lists completed in the last 30 days (the cleanup's longest setting), newest first, at most 20, filtered as the open items are, each with "Done 2 h ago". Folded out, its rows join ↑↓ after the open items; ⌘D or the circle opens one again (`isCompleted = false`). Folded or not is kept while Workdeck runs.
 - **Mouse:** the circle marks done (it shows a checkmark on hover); hovering a row shows a "Give to agent" button; a click on a row selects it.
 - Empty state: "No open notes".
 

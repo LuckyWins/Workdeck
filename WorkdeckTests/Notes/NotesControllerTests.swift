@@ -879,6 +879,74 @@ struct NotesControllerTests {
         #expect(controller.lists.first?.openCount == 1)
     }
 
+    @Test func doneItemsAreTheUsedListsRecentlyCompletedNewestFirst() async {
+        store.listInfos = [list("a", "Workdeck"), list("b", "Other")]
+        settings.markUsed("a")
+        let now = clock.date
+        func done(_ id: String, in listID: String = "a", hoursAgo: Double) -> ReminderItem {
+            var done = item(id, in: listID)
+            done.completed = now.addingTimeInterval(-hoursAgo * 3_600)
+            return done
+        }
+        store.items = [
+            done("older", hoursAgo: 30), done("newer", hoursAgo: 2), done("elsewhere", in: "b", hoursAgo: 1),
+            done("stale", hoursAgo: 24 * 31), item("open"),
+        ]
+        let controller = makeController()
+        await controller.reload()
+
+        #expect(controller.doneItems.map(\.id) == ["newer", "older"])
+        #expect(store.calls.contains(.completedItemsSince(["a"], now.addingTimeInterval(-NotesController.doneWindow))))
+    }
+
+    @Test func doneItemsAreCapped() async {
+        store.listInfos = [list("a", "Workdeck")]
+        settings.markUsed("a")
+        store.items = (0 ..< 30).map { index in
+            var done = item("d\(index)", in: "a")
+            done.completed = clock.date.addingTimeInterval(-Double(index) * 60)
+            return done
+        }
+        let controller = makeController()
+        await controller.reload()
+
+        #expect(controller.doneItems.count == NotesController.doneLimit)
+        #expect(controller.doneItems.first?.id == "d0")
+    }
+
+    @Test func markUndoneReopensTheItem() async {
+        store.listInfos = [list("a", "Workdeck")]
+        settings.markUsed("a")
+        var reminder = item("r1", in: "a")
+        reminder.completed = clock.date.addingTimeInterval(-60)
+        store.items = [reminder]
+        let controller = makeController()
+        await controller.reload()
+        #expect(controller.doneItems.map(\.id) == ["r1"])
+
+        await controller.markUndone(reminder)
+
+        #expect(store.calls.contains(.markUndone("r1")))
+        #expect(controller.doneItems.isEmpty)
+        #expect(controller.openItems.map(\.id) == ["r1"])
+    }
+
+    @Test func aFailedMarkUndoneKeepsItDone() async {
+        store.listInfos = [list("a", "Workdeck")]
+        settings.markUsed("a")
+        var reminder = item("r1", in: "a")
+        reminder.completed = clock.date.addingTimeInterval(-60)
+        store.items = [reminder]
+        store.markUndoneError = FakeRemindersStore.Failure()
+        let controller = makeController()
+        await controller.reload()
+
+        await controller.markUndone(reminder)
+
+        #expect(controller.doneItems.map(\.id) == ["r1"])
+        #expect(controller.openItems.isEmpty)
+    }
+
     @Test func aFailedMarkDoneKeepsTheItem() async {
         store.listInfos = [list("a", "Workdeck")]
         settings.markUsed("a")

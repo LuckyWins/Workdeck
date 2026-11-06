@@ -11,7 +11,9 @@ final class FakeRemindersStore: RemindersStoring {
         case add(title: String, due: ParsedDate?, listID: String)
         case openItems(Set<String>)
         case completedItems(Set<String>)
+        case completedItemsSince(Set<String>, Date)
         case markDone(String)
+        case markUndone(String)
         case appendNote(line: String, id: String)
         case remove(String)
         case commit
@@ -31,6 +33,7 @@ final class FakeRemindersStore: RemindersStoring {
     var createListError: (any Error)?
     var addError: (any Error)?
     var markDoneError: (any Error)?
+    var markUndoneError: (any Error)?
     var appendNoteError: (any Error)?
     var removeError: (any Error)?
     var commitError: (any Error)?
@@ -109,6 +112,21 @@ final class FakeRemindersStore: RemindersStoring {
         await beforeCompletedItems?()
         guard access == .granted else { return [] }
         return items.filter { (ignoresListFilter || listIDs.contains($0.listID)) && $0.completed != nil }
+    }
+
+    func completedItems(in listIDs: Set<String>, since date: Date) async -> [ReminderItem] {
+        calls.append(.completedItemsSince(listIDs, date))
+        guard access == .granted else { return [] }
+        return items.filter { item in
+            (ignoresListFilter || listIDs.contains(item.listID)) && item.completed.map { $0 >= date } == true
+        }
+    }
+
+    func markUndone(_ id: String) throws {
+        calls.append(.markUndone(id))
+        try requireAccess()
+        if let markUndoneError { throw markUndoneError }
+        items[try index(of: id)].completed = nil
     }
 
     func markDone(_ id: String) throws {

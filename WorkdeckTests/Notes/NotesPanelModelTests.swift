@@ -40,7 +40,9 @@ struct NotesPanelModelTests {
         settings.remember(AgentDestination(agent: .claude, instance: "main", folder: folder.path), for: "work")
     }
 
-    private func makeModel(launcher override: (any TerminalLaunching)? = nil, candidates: [FolderCandidate] = []) async -> (NotesPanelModel, NotesController) {
+    private func makeModel(
+        launcher override: (any TerminalLaunching)? = nil, candidates: [FolderCandidate] = [], doneUndoDelay: Duration = .seconds(60)
+    ) async -> (NotesPanelModel, NotesController) {
         let now = now
         let instances: [ClaudeInstance] = [.main(home: home), .extra(named: "work", home: home)]
         let controller = NotesController(
@@ -50,7 +52,7 @@ struct NotesPanelModelTests {
         )
         let recorder = recorder
         let model = NotesPanelModel(
-            controller: controller, now: { now }, calendar: calendar, confirmationDuration: .seconds(60),
+            controller: controller, now: { now }, calendar: calendar, confirmationDuration: .seconds(60), doneUndoDelay: doneUndoDelay,
             openURL: { recorder.opened.append($0) }, copy: { recorder.copied.append($0) }
         )
         model.onClose = { recorder.closes += 1 }
@@ -371,17 +373,137 @@ struct NotesPanelModelTests {
         #expect(launcher.commands.count == 1)
     }
 
-    @Test func commandDMarksDone() async {
+    /// The model's tasks (a tick's undo time, a write on close) run on later turns of the main actor.
+    private func eventually(_ condition: () -> Bool) async -> Bool {
+        for _ in 0..<300 {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return condition()
+    }
+
+    @Test func commandDTicksAfterTheUndoTime() async {
         addOpenItems()
-        let (model, _) = await makeModel()
+        let (model, controller) = await makeModel(doneUndoDelay: .milliseconds(80))
         await model.opened()
         #expect(await model.handle(.down))
         #expect(await model.handle(.down))
         #expect(await model.handle(.commandD))
 
-        #expect(store.calls.contains(.markDone("limits")))
-        #expect(model.visibleItems.map(\.id) == ["migration", "letters"])
+        // Crossed out in place, not written yet.
+        #expect(model.pendingDone.map(\.id) == ["limits"])
+        #expect(!store.calls.contains(.markDone("limits")))
+        #expect(model.visibleItems.map(\.id) == ["migration", "limits", "letters"])
+        #expect(model.isDone(model.visibleItems[1]))
+
+        #expect(await eventually { store.calls.contains(.markDone("limits")) })
+        #expect(await eventually { model.pendingDone.isEmpty && model.visibleItems.map(\.id) == ["migration", "letters"] })
+        #expect(controller.doneItems.map(\.id) == ["limits"])
         #expect(model.selectedRow == 1)
+    }
+
+    @Test func commandZTakesTheLastTickBack() async {
+        addOpenItems()
+        let (model, _) = await makeModel()
+        await model.opened()
+        // Nothing ticked: ⌘Z is the field's own undo.
+        #expect(model.handleImmediately(.commandZ) == false)
+        await model.toggleDone(store.items[0])
+        await model.toggleDone(store.items[1])
+        #expect(model.pendingDone.map(\.id) == ["migration", "limits"])
+
+        #expect(model.handleImmediately(.commandZ) == true)
+        #expect(model.pendingDone.map(\.id) == ["migration"])
+        #expect(model.handleImmediately(.commandZ) == true)
+        #expect(model.pendingDone.isEmpty)
+        #expect(model.handleImmediately(.commandZ) == false)
+        #expect(!store.calls.contains { if case .markDone = $0 { true } else { false } })
+    }
+
+    @Test func theUndoRingRunsDownOverTheUndoTime() async {
+        addOpenItems()
+        let (model, _) = await makeModel(doneUndoDelay: .seconds(4))
+        await model.opened()
+        let item = store.items[0]
+        #expect(model.pendingDoneStart(of: item) == nil)
+        await model.toggleDone(item)
+        let start = try? #require(model.pendingDoneStart(of: item))
+        guard let start else { return }
+        #expect(model.undoTimeLeft(since: start, at: start) == 1)
+        #expect(abs(model.undoTimeLeft(since: start, at: start.addingTimeInterval(1)) - 0.75) < 1e-9)
+        #expect(model.undoTimeLeft(since: start, at: start.addingTimeInterval(5)) == 0)
+        // Taken back: no ring.
+        await model.toggleDone(item)
+        #expect(model.pendingDoneStart(of: item) == nil)
+    }
+
+    @Test func aSecondClickTakesTheTickBack() async {
+        addOpenItems()
+        let (model, _) = await makeModel(doneUndoDelay: .milliseconds(50))
+        await model.opened()
+        let item = store.items[0]
+        await model.toggleDone(item)
+        await model.toggleDone(item)
+
+        #expect(model.pendingDone.isEmpty)
+        try? await Task.sleep(for: .milliseconds(150))
+        #expect(!store.calls.contains(.markDone(item.id)))
+        #expect(model.visibleItems.contains { $0.id == item.id })
+    }
+
+    @Test func closingThePanelWritesWaitingTicks() async {
+        addOpenItems()
+        let (model, _) = await makeModel()
+        await model.opened()
+        await model.toggleDone(store.items[2])
+
+        model.closed()
+
+        #expect(await eventually { store.calls.contains(.markDone("letters")) })
+        #expect(model.pendingDone.isEmpty)
+    }
+
+    @Test func theDoneSectionReopensANote() async {
+        addOpenItems()
+        store.items.append(ReminderItem(
+            id: "shots", listID: "work", title: "Обновить скриншоты", due: nil, hasDueTime: false,
+            created: now.addingTimeInterval(-86_400 * 4), completed: now.addingTimeInterval(-7_200), notes: nil
+        ))
+        let (model, controller) = await makeModel()
+        await model.opened()
+        #expect(model.visibleDoneItems.map(\.id) == ["shots"])
+        #expect(model.doneDetail(of: model.visibleDoneItems[0]) == "Done 2 h ago")
+        // Folded: ↑↓ stay in the open items.
+        #expect(model.rows.count == 3)
+
+        model.toggleDoneSection()
+        #expect(model.rows.map(\.id) == ["migration", "limits", "letters", "shots"])
+        for _ in 0..<4 {
+            #expect(await model.handle(.down))
+        }
+        #expect(model.selectedItem?.id == "shots")
+        #expect(await model.handle(.commandD))
+
+        #expect(store.calls.contains(.markUndone("shots")))
+        #expect(controller.doneItems.isEmpty)
+        #expect(model.visibleItems.contains { $0.id == "shots" })
+        #expect(model.selectedRow == 3)
+    }
+
+    @Test func theDoneSectionIsFilteredAsTheOpenItemsAre() async {
+        store.items = [
+            ReminderItem(id: "a", listID: "work", title: "Обновить скриншоты", due: nil, hasDueTime: false,
+                         created: now, completed: now.addingTimeInterval(-60), notes: nil),
+            ReminderItem(id: "b", listID: "wb", title: "Поиграть с весами", due: nil, hasDueTime: false,
+                         created: now, completed: now.addingTimeInterval(-60), notes: nil),
+        ]
+        let (model, _) = await makeModel()
+        await model.opened()
+        #expect(Set(model.visibleDoneItems.map(\.id)) == ["a", "b"])
+        model.textChanged("скрин")
+        #expect(model.visibleDoneItems.map(\.id) == ["a"])
+        // Only done items match: the section still shows.
+        #expect(model.showsOpenItems)
     }
 
     @Test func upFromTheFirstRowLeavesTheList() async {

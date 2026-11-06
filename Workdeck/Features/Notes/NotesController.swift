@@ -55,6 +55,12 @@ final class NotesController {
     private(set) var lists: [ReminderListInfo] = []
     /// The open items of the lists used through Workdeck: overdue first, then by due date, then undated oldest first.
     private(set) var openItems: [ReminderItem] = []
+    /// What was completed lately in those lists, most recent first: the panel's Done section, where a tick can be
+    /// taken back. At most `doneLimit`, completed within `doneWindow`.
+    private(set) var doneItems: [ReminderItem] = []
+    static let doneLimit = 20
+    /// The longest a completed note can stay before the cleanup (30 days, its longest setting).
+    static let doneWindow: TimeInterval = 30 * 86_400
     /// A command Terminal could not run, offered for copying; cleared by the next hand-off.
     var failedCommand: String?
     /// The popover row opens the panel through this.
@@ -109,6 +115,7 @@ final class NotesController {
         guard access == .granted else {
             lists = []
             openItems = []
+            doneItems = []
             return
         }
         let all = store.lists()
@@ -132,7 +139,13 @@ final class NotesController {
             return list
         }
         let used = settings.usedListIDs
+        let usedHere = used.intersection(all.map(\.id))
+        let done = usedHere.isEmpty ? [] : await store.completedItems(in: usedHere, since: now().addingTimeInterval(-Self.doneWindow))
+        guard generation == reloadGeneration else { return }
         openItems = items.filter { used.contains($0.listID) }.sorted(by: Self.isListedBefore)
+        doneItems = Array(done.filter { usedHere.contains($0.listID) && $0.completed != nil }
+            .sorted { ($0.completed ?? .distantPast) > ($1.completed ?? .distantPast) }
+            .prefix(Self.doneLimit))
     }
 
     /// Reads the access again (it may have changed in System Settings); writes only a change: the popover row
@@ -395,6 +408,18 @@ final class NotesController {
         await reload()
     }
 
+    /// Takes a tick back in Reminders: the item leaves the Done section at once and is open again with the reload.
+    func markUndone(_ item: ReminderItem) async {
+        guard !isDemoActive else { return }
+        do {
+            try store.markUndone(item.id)
+            doneItems.removeAll { $0.id == item.id }
+        } catch {
+            WorkdeckLog.notes.error("Could not reopen a note: \(Self.describe(error), privacy: .public)")
+        }
+        await reload()
+    }
+
     // MARK: Demo
 
     /// Why nothing was saved or started while the demo plays.
@@ -409,6 +434,7 @@ final class NotesController {
         reloadGeneration += 1
         lists = demoLists
         openItems = []
+        doneItems = []
     }
 
     /// Back to the user's lists and notes.

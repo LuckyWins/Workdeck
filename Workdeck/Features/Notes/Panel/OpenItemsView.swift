@@ -1,17 +1,22 @@
 import SwiftUI
 
-/// The open notes under an empty field, filtered by what is typed (quick notes spec §3.3).
+/// The open notes under an empty field, filtered by what is typed (quick notes spec §3.3), and the Done section under
+/// them: what was ticked lately, folded until clicked open.
 struct OpenItemsView: View {
     let model: NotesPanelModel
-    /// At most this many rows show; the rest scroll. Fewer rows never scroll.
+    /// At most this many open rows show; the rest scroll. Fewer rows never scroll.
     static let visibleRows = 8
+    /// As `visibleRows`, for the Done section.
+    static let visibleDoneRows = 5
     static let rowHeight: CGFloat = 30
 
     var body: some View {
         let items = model.visibleItems
+        let done = model.visibleDoneItems
+        let openCount = items.filter { !model.isPendingDone($0) }.count
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Open · \(items.count)")
+                Text("Open · \(openCount)")
                     .font(NotesPanelStyle.secondaryBold)
                 Spacer()
                 if model.draft.text.isEmpty, !items.isEmpty {
@@ -28,37 +33,41 @@ struct OpenItemsView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 14)
             } else {
-                ScrollViewReader { proxy in
-                    ScrollView(.vertical) {
-                        VStack(spacing: 2) {
-                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                                OpenItemRow(model: model, item: item, isSelected: model.selectedRow == index) {
-                                    model.selectedRow = index
-                                }
-                                .id(item.id)
-                                .transition(.opacity)
-                            }
-                        }
-                        .animation(.easeOut(duration: 0.25), value: items.map(\.id))
+                rows(items, from: 0, visible: Self.visibleRows)
+            }
+
+            if !done.isEmpty {
+                Button {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        model.toggleDoneSection()
                     }
-                    .scrollIndicators(.never)
-                    // Up to `visibleRows` the list grows with the panel and stays still; only more rows scroll.
-                    .scrollBounceBehavior(.basedOnSize)
-                    .scrollDisabled(items.count <= Self.visibleRows)
-                    .frame(height: CGFloat(min(items.count, Self.visibleRows)) * (Self.rowHeight + 2))
-                    .onChange(of: model.selectedRow) { _, row in
-                        if let row, items.indices.contains(row) {
-                            proxy.scrollTo(items[row].id)
-                        }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9, weight: .bold))
+                            .rotationEffect(.degrees(model.isDoneShown ? 90 : 0))
+                        Text("Done · \(done.count)")
+                            .font(NotesPanelStyle.secondaryBold)
                     }
+                    .foregroundStyle(NotesPanelStyle.secondary)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(model.isDoneShown ? "Hide done notes" : "Show done notes")
+                .padding(.top, 4)
+                if model.isDoneShown {
+                    rows(done, from: items.count, visible: Self.visibleDoneRows)
                 }
             }
 
             HStack(spacing: 14) {
-                if !items.isEmpty {
+                if !model.pendingDone.isEmpty {
+                    KeyHint(key: "⌘Z", label: "Undo")
+                }
+                if !model.rows.isEmpty {
                     KeyHint(key: "↑↓", label: "Select")
                     KeyHint(key: "⌘↩", label: "Give to agent")
-                    KeyHint(key: "⌘D", label: "Done")
+                    KeyHint(key: "⌘D", label: model.selectedItem.map(model.isDone) == true ? "Not done" : "Done")
                 }
                 Spacer()
                 if !model.hasText {
@@ -70,6 +79,34 @@ struct OpenItemsView: View {
             .padding(.top, 4)
         }
         .padding(.bottom, model.hasText ? 12 : 0)
+    }
+
+    /// `items` as rows, the first one being row `first` of the selection; up to `visible` show, the rest scroll.
+    private func rows(_ items: [ReminderItem], from first: Int, visible: Int) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView(.vertical) {
+                VStack(spacing: 2) {
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                        OpenItemRow(model: model, item: item, isSelected: model.selectedRow == first + index) {
+                            model.selectedRow = first + index
+                        }
+                        .id(item.id)
+                        .transition(.opacity)
+                    }
+                }
+                .animation(.easeOut(duration: 0.25), value: items.map(\.id))
+            }
+            .scrollIndicators(.never)
+            // Up to `visible` rows the list grows with the panel and stays still; only more rows scroll.
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDisabled(items.count <= visible)
+            .frame(height: CGFloat(min(items.count, visible)) * (Self.rowHeight + 2))
+            .onChange(of: model.selectedRow) { _, row in
+                if let row, row >= first, row - first < items.count {
+                    proxy.scrollTo(items[row - first].id)
+                }
+            }
+        }
     }
 }
 
@@ -83,27 +120,42 @@ struct OpenItemRow: View {
     @State private var isCircleHovered = false
 
     var body: some View {
+        let isDone = model.isDone(item)
         HStack(spacing: 10) {
             Button {
                 Task { await model.toggleDone(item) }
             } label: {
-                Image(systemName: isCircleHovered ? "checkmark.circle" : "circle")
-                    .font(.system(size: 15))
-                    .foregroundStyle(isSelected ? Color.white : NotesPanelStyle.secondary)
+                if let start = model.pendingDoneStart(of: item) {
+                    UndoRing(model: model, start: start, color: isSelected ? Color.white : NotesPanelStyle.text)
+                } else {
+                    Image(systemName: isDone ? "checkmark.circle.fill" : isCircleHovered ? "checkmark.circle" : "circle")
+                        .font(.system(size: 15))
+                        .foregroundStyle(isSelected ? Color.white : NotesPanelStyle.secondary)
+                }
             }
             .buttonStyle(.plain)
             .onHover { isCircleHovered = $0 }
-            .help("Mark as done")
+            .help(isDone ? "Mark as not done" : "Mark as done")
 
             Text(item.title)
                 .font(NotesPanelStyle.font())
+                .strikethrough(isDone)
+                .foregroundStyle(isDone && !isSelected ? NotesPanelStyle.secondary : isSelected ? Color.white : NotesPanelStyle.text)
                 .lineLimit(1)
                 .truncationMode(.tail)
             if let list = model.list(withID: item.listID) {
                 ListChip(title: list.title, color: isSelected ? .white : list.color, size: 12)
             }
             Spacer(minLength: 8)
-            if isHovered {
+            if model.isPendingDone(item) {
+                KeyHint(key: "⌘Z", label: "Undo")
+            } else if item.completed != nil {
+                Text(model.doneDetail(of: item))
+                    .font(NotesPanelStyle.font(12))
+                    .foregroundStyle(isSelected ? Color.white : NotesPanelStyle.secondary)
+                    .lineLimit(1)
+                    .fixedSize()
+            } else if isHovered {
                 Button {
                     Task { await model.handOff(item) }
                 } label: {
@@ -154,5 +206,35 @@ struct OpenItemRow: View {
                 .font(NotesPanelStyle.font(12))
                 .foregroundStyle(isSelected ? Color.white : NotesPanelStyle.secondary)
         }
+    }
+}
+
+/// A tick that can still be taken back: a checkmark in a ring that runs down, clockwise from the top, over the undo
+/// time; the note goes to Done when it is gone.
+struct UndoRing: View {
+    let model: NotesPanelModel
+    let start: Date
+    var color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        // With reduced motion the ring steps once a second instead of running smoothly.
+        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1 / 30)) { context in
+            let left = model.undoTimeLeft(since: start, at: context.date)
+            ZStack {
+                Circle()
+                    .stroke(color.opacity(0.22), lineWidth: 1.5)
+                Circle()
+                    .trim(from: 0, to: left)
+                    .stroke(color, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Image(systemName: "checkmark")
+                    .font(.system(size: 7.5, weight: .heavy))
+                    .foregroundStyle(color)
+            }
+            .frame(width: 14, height: 14)
+            .padding(0.5)
+        }
+        .accessibilityLabel("Done, undo possible")
     }
 }
