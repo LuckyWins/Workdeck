@@ -4,6 +4,8 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 
 ## Unreleased
 
+## 1.3.0 — 2026-11-06
+
 ### New
 - Quick notes: tap the right Option key, type a note, press Return; it goes to Reminders. # picks a project, a date sets a reminder, ⌘↩ gives the note to Claude Code or Codex. A note marked done can be taken back with ⌘Z, and Done shows what was ticked lately.
 
