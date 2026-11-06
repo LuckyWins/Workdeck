@@ -70,6 +70,10 @@ A Claude Code plan limit runs out in the middle of a task, a session sits waitin
     <td align="center" width="45%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/screenshots/statistics-dark.png"><img src="docs/media/screenshots/statistics-light.png" width="141" alt="The Statistics window with the activity grid"></picture></td>
     <td><b>7. And everything before</b><br>Statistics keeps half a year: any week in detail, an activity grid of days and your streak, for Claude Code and Codex.</td>
   </tr>
+  <tr>
+    <td align="center" width="45%"><img src="docs/media/screenshots/notes-capture-animated.png" width="314" alt="The right Option key tapped under the notch, the quick notes panel growing out of it, a note typed with a date and a project, then saved"></td>
+    <td><b>8. Jot it down</b><br>Tap the right Option key, type, press Return: the note is a reminder in Apple Reminders, on your iPhone too. <code>#</code> and Tab pick the project, "tomorrow at 4pm" sets the reminder, ⌘↩ gives the note to Claude Code or Codex in the project's folder.</td>
+  </tr>
 </table>
 
 ## Try It Without Claude Code
@@ -120,6 +124,8 @@ Claude Code reports plan usage only for Pro and Max subscriptions. Details: [doc
 | Click a limit alert | opens Chats on that account, to go on with another one |
 | Turn on **Notify when a session finishes** in Settings → Notch and start a long task | tells you when it is done, with how long it worked |
 | Click the chart button in the popover's header | shows this week's coding time by day and project |
+| Tap the right Option key, type a note and press Return | saves it to Apple Reminders; `#wo` and Tab put it in a project |
+| Press ⌘D on a note in the panel, then ⌘Z | ticks it, then takes the tick back before it is written |
 | Turn on Closed-Lid Mode and close the lid | keeps the build running |
 | Settings → General → **Try Demo** | plays the one-minute tour |
 
