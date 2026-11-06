@@ -853,6 +853,21 @@ struct NotchPresenterTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
+    func takeAlertsCollapsesAndHandsBackWhatWasShowing() async throws {
+        let (presenter, _) = makePresenter(alertDuration: .seconds(5))
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        #expect(presenter.takeAlerts().isEmpty)
+        presenter.flash([.sessionFinished(project: "a", worked: 60)])
+        await waitFor { presenter.appliedTarget == .expanded }
+
+        #expect(presenter.takeAlerts() == [.sessionFinished(project: "a", worked: 60)])
+        #expect(presenter.model.alerts.isEmpty)
+        await waitFor { presenter.appliedTarget == .compact }
+        #expect(presenter.takeAlerts().isEmpty)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
     func aRecapForAShorterTimeCountsThatDown() async throws {
         let (presenter, _) = makePresenter()
         presenter.show(state(.notch(.normal)))

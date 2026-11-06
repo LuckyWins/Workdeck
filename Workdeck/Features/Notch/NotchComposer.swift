@@ -32,6 +32,9 @@ final class NotchComposer {
     @ObservationIgnored var onOpenReleaseNotes: ((String) -> Void)?
     /// A recap card waits for Got it: the notch stays up whatever the mode.
     @ObservationIgnored var recapKeepsVisible = false
+    /// The quick notes panel is open where the notch is: the notch hides and alerts wait (quick notes spec §3).
+    @ObservationIgnored private(set) var isSuspended = false
+    @ObservationIgnored private var suspendedAlerts: [LimitsAlert] = []
 
     init(
         settings: NotchSettings,
@@ -139,6 +142,10 @@ final class NotchComposer {
         for alert in alerts where LimitsText.alertProject(alert) == nil {
             WorkdeckLog.alerts.notice("\(LimitsText.alertTitle(alert, showsAccount: true), privacy: .public), alert")
         }
+        guard !isSuspended else {
+            suspendedAlerts += alerts
+            return
+        }
         presenter.flash(alerts)
     }
 
@@ -245,8 +252,33 @@ final class NotchComposer {
             collapsesOtherAccounts: settings.collapsesOtherAccounts,
             showsAgentMarks: showsMarks
         )
-        presenter.show(state)
+        if isSuspended {
+            var hidden = state
+            hidden.display = .hidden
+            hidden.isPeekable = false
+            hidden.isPeeking = false
+            presenter.show(hidden)
+        } else {
+            presenter.show(state)
+        }
         flash(alerts)
+    }
+
+    /// Hides the notch while the quick notes panel is open: an alert on screen collapses and waits with the ones that
+    /// come meanwhile; all of them show again when the panel closes. `state` keeps describing the notch for the popover.
+    func setSuspended(_ suspended: Bool) {
+        guard suspended != isSuspended else { return }
+        isSuspended = suspended
+        if suspended {
+            suspendedAlerts = presenter.takeAlerts() + suspendedAlerts
+        }
+        refresh()
+        if !suspended, !suspendedAlerts.isEmpty {
+            let waiting = suspendedAlerts
+            suspendedAlerts = []
+            // Already logged when they first came.
+            presenter.flash(waiting)
+        }
     }
 
     /// The agent whose session had the latest event; without sessions, the agent whose limits changed last

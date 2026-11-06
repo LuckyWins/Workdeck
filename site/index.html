@@ -44,7 +44,7 @@
   .copy { flex: none; border: 0; border-radius: 8px; padding: 6px 13px; background: var(--indigo); color: #fff; font: 13px -apple-system, system-ui, sans-serif; cursor: pointer; }
   .small { font-size: 13.5px; color: var(--dim); margin: 11px 0 0; }
 
-  /* The tour: five features on the left, one screen on the right; it moves on by itself until the pointer is over it. */
+  /* The tour: the features on the left, one screen on the right; it moves on by itself until the pointer is over it. */
   .tour { display: grid; grid-template-columns: 340px 1fr; gap: 28px; margin-top: 20px; }
   .tabs { display: flex; flex-direction: column; gap: 6px; }
   .tab { text-align: left; border: 1px solid transparent; background: transparent; border-radius: 14px; padding: 14px 16px; cursor: pointer; font: inherit; color: inherit; transition: background .2s, border-color .2s; }
@@ -108,6 +108,7 @@
       <button class="tab" role="tab" id="tab-3" aria-controls="slide-3"><b>Out of limit? Switch accounts</b><span>Run a second Claude Code account and carry any chat on to it in Chats.</span><div class="bar"><i></i></div></button>
       <button class="tab" role="tab" id="tab-4" aria-controls="slide-4"><b>Every account, set up alike</b><span>See which skills, MCP servers, plugins and CLAUDE.md each Claude Code account has, and copy what's missing in one click.</span><div class="bar"><i></i></div></button>
       <button class="tab" role="tab" id="tab-5" aria-controls="slide-5"><b>Your week at a glance</b><span>A recap on the first unlock of a week, and half a year of work in Statistics.</span><div class="bar"><i></i></div></button>
+      <button class="tab" role="tab" id="tab-6" aria-controls="slide-6"><b>Quick notes to Reminders</b><span>Tap the right Option key, type a note, press Return. # picks a project, a date sets a reminder, ⌘↩ gives the note to Claude Code or Codex.</span><div class="bar"><i></i></div></button>
     </div>
     <div class="screen">
       <div class="slide top" role="tabpanel" id="slide-0" aria-labelledby="tab-0"><picture><source media="(prefers-reduced-motion: reduce)" srcset="screenshots/notch-expanded.png"><img src="screenshots/notch-expanded.png" data-animated="screenshots/notch-hover-animated.png" alt="The notch opening under the pointer: limits of two Claude Code accounts and Codex, and live sessions with an agent" data-zoom></picture></div>
@@ -116,6 +117,7 @@
       <div class="slide" role="tabpanel" id="slide-3" aria-labelledby="tab-3"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/chats-dark.png"><img src="screenshots/chats-light.png" alt="The Chats window with two accounts" loading="lazy" data-zoom></picture></div>
       <div class="slide" role="tabpanel" id="slide-4" aria-labelledby="tab-4"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/instances-dark.png"><img src="screenshots/instances-light.png" alt="The Instances window: skills of three Claude Code accounts side by side, one opened on the right" loading="lazy" data-zoom></picture></div>
       <div class="slide" role="tabpanel" id="slide-5" aria-labelledby="tab-5"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/statistics-dark.png"><img src="screenshots/statistics-light.png" alt="The Statistics window with the activity grid" loading="lazy" data-zoom></picture></div>
+      <div class="slide top" role="tabpanel" id="slide-6" aria-labelledby="tab-6"><img src="screenshots/notes-capture.png" alt="The quick notes panel growing out of the notch: a note with its date tinted and the list of matching projects open" loading="lazy" data-zoom></div>
     </div>
   </section>
 

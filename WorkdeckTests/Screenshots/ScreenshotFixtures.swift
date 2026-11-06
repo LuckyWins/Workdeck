@@ -186,6 +186,55 @@ final class ScreenshotFixtures {
         UpdateController(updater: InertUpdater(), defaults: defaults(), installedVersion: "1.1.2", installedBuild: 4, isDemoActive: { false }, showAlert: { _ in })
     }
 
+    // MARK: Quick notes (made-up lists and items in the fake Reminders store)
+
+    /// Made-up Reminders lists: the ones the `#` picker offers in the capture.
+    private let noteLists = [
+        ReminderListInfo(id: "inbox", title: "Inbox", red: 0.56, green: 0.56, blue: 0.58, openCount: 0),
+        ReminderListInfo(id: "workdeck", title: "Workdeck", red: 0.0, green: 0.48, blue: 1.0, openCount: 0),
+        ReminderListInfo(id: "workdeck-site", title: "Workdeck-site", red: 0.0, green: 0.78, blue: 0.82, openCount: 0),
+        ReminderListInfo(id: "wordle-bot", title: "Wordle-bot", red: 1.0, green: 0.58, blue: 0.0, openCount: 0),
+        ReminderListInfo(id: "homework", title: "Homework", red: 0.4, green: 0.8, blue: 0.3, openCount: 0),
+    ]
+
+    /// Quick notes over a fake Reminders store with five open notes in the lists used through Workdeck, and two in
+    /// Homework, which was never used here.
+    func notes() async -> NotesController {
+        let now = monday
+        let open: [(String, String)] = [
+            ("workdeck", "Проверить миграцию на staging"), ("workdeck", "Спросить Сашу про лимиты"), ("workdeck", "Обновить скриншоты"),
+            ("workdeck-site", "Поправить отступы в футере"), ("wordle-bot", "Поиграть с весами букв"),
+            ("homework", "Задача 4"), ("homework", "Задача 5"),
+        ]
+        let items = open.enumerated().map { index, entry in
+            ReminderItem(
+                id: "note-\(index)", listID: entry.0, title: entry.1, due: nil, hasDueTime: false,
+                created: now.addingTimeInterval(-Double(index + 1) * 86_400), completed: nil, notes: nil
+            )
+        }
+        let settings = NotesSettings(defaults: defaults())
+        for id in ["wordle-bot", "workdeck-site", "workdeck"] {
+            settings.markUsed(id)
+        }
+        let controller = NotesController(
+            settings: settings, store: FakeRemindersStore(lists: noteLists, items: items), launcher: FakeTerminalLauncher(),
+            instances: { [] }, codexBinary: { nil }, folderCandidates: { [] }, now: { now }, calendar: calendar
+        )
+        await controller.reload()
+        return controller
+    }
+
+    /// The panel with a note being typed: the date tinted, the `#wo` list open (Workdeck and Workdeck-site were used
+    /// lately, so they come first).
+    func notesCapture() async -> NotesPanelModel {
+        let controller = await notes()
+        let now = monday
+        let model = NotesPanelModel(controller: controller, now: { now }, calendar: calendar, openURL: { _ in }, copy: { _ in })
+        await model.opened()
+        model.textChanged("Проверить миграцию на staging завтра в 16 #wo")
+        return model
+    }
+
     // MARK: Chats (made-up transcripts for two accounts)
 
     private func makeChat(_ id: String, title: String, project: String, home: URL, configFolder: String, minutesAgo: Double) throws {

@@ -59,6 +59,16 @@ final class FakePresenter: LimitsPresenting {
     func flash(_ alerts: [LimitsAlert]) {
         flashes.append(alerts)
         self.alerts += alerts
+        onScreen += alerts
+    }
+
+    /// Alerts shown and not yet taken back (the fake never closes them on its own).
+    private(set) var onScreen: [LimitsAlert] = []
+    private(set) var takes = 0
+    func takeAlerts() -> [LimitsAlert] {
+        takes += 1
+        defer { onScreen = [] }
+        return onScreen
     }
 
     private(set) var refreshAction: (() -> Void)?
@@ -121,6 +131,7 @@ final class FakePresenter: LimitsPresenting {
     private(set) var clears = 0
     func clearAlerts() {
         clears += 1
+        onScreen = []
     }
 
     private(set) var recapDismissAction: (() -> Void)?

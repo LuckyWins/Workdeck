@@ -105,9 +105,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         launcher: TerminalAppLauncher.standard()
     )
 
+    /// The chats Workdeck has read, shared by the Chats window and the notes' folder prompt: one cache of transcripts.
+    private lazy var chatIndex = ChatIndex()
+
     private(set) lazy var chats = ChatsController(
         instances: instances,
-        index: ChatIndex(),
+        index: chatIndex,
         launcher: TerminalAppLauncher.standard(),
         liveSessions: { [unowned self] in self.claudeCode.sessions.store.sessions },
         vscode: SystemVSCodeLauncher.standard(),
@@ -122,6 +125,72 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             now: { Date() }
         )
     )
+
+    // MARK: Quick notes (quick notes spec §9)
+
+    /// Reminders, shared by the panel and the cleanup. Asks for access on the first save only, never at launch, and
+    /// opens EventKit only once it is needed.
+    private lazy var notesStore = EventKitRemindersStore()
+
+    /// Where agents ran: the folder prompt's suggestions.
+    private lazy var notesFolders = NotesFolderSource(
+        index: chatIndex,
+        instances: { [unowned self] in instances.instances },
+        liveCwds: { [unowned self] in
+            (claudeCode.sessions.store.sessions + codex.sessions.store.sessions).compactMap(\.cwd)
+        }
+    )
+
+    private(set) lazy var notes: NotesController = {
+        let instances = self.instances
+        let codexSettings = codex.settings
+        let folders = notesFolders
+        return NotesController(
+            settings: NotesSettings(),
+            store: notesStore,
+            launcher: TerminalAppLauncher.standard(),
+            instances: { instances.instances },
+            // Codex is offered while its tool is on and the command is installed.
+            codexBinary: { codexSettings.isEnabled ? CodexBinaryLocator.standard().locate() : nil },
+            folderCandidates: { folders.candidates() },
+            now: { Date() }
+        )
+    }()
+
+    private(set) lazy var notesPanel = NotesPanelPresenter(model: NotesPanelModel(controller: notes, now: { Date() }), composer: notch)
+
+    /// The key: a tap of right Option or right Command, or a recorded combination (spec §2).
+    private(set) lazy var notesShortcuts = NotesShortcutMonitor(
+        settings: notes.settings,
+        poller: CGEventSourceKeyState(),
+        hotKeys: CarbonHotKey(),
+        onTap: { [unowned self] in toggleNotesPanel() }
+    )
+
+    private lazy var notesCleanup = NotesCleanup(
+        store: notesStore,
+        settings: notes.settings,
+        archiveFolder: NotesCleanup.standardArchiveFolder(),
+        now: { Date() }
+    )
+
+    private lazy var notesDemo = NotesDemo(
+        controller: notes,
+        model: notesPanel.model,
+        open: { [unowned self] in notesPanel.open(takingKeyboard: false) },
+        close: { [unowned self] in notesPanel.close() },
+        isOpen: { [unowned self] in notesPanel.isOpen }
+    )
+
+    /// Opens the panel, or closes it when open (spec §2.1). While the demo plays in it, the key does nothing.
+    private func toggleNotesPanel() {
+        guard !notesDemo.isShowing else { return }
+        if !notesPanel.isOpen {
+            // The folder prompt may ask in a moment: the chats are read meanwhile.
+            notesFolders.refresh()
+        }
+        notesPanel.toggle()
+    }
 
     /// Send Feedback in Settings → About (feedback spec): an email to the developer with the Copy Diagnostics report.
     private(set) lazy var feedback: FeedbackSender = {
@@ -181,8 +250,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         claudeCode.start()
         codex.start()
         recap.start()
+        notes.onOpenPanel = { [unowned self] in
+            guard !notesPanel.isOpen else { return }
+            toggleNotesPanel()
+        }
+        // Cleanup needs Reminders access; it does nothing until then, and runs once when the first save gets it.
+        notes.onAccessGranted = { [unowned self] in Task { await notesCleanup.run() } }
+        notesCleanup.start()
+        notesShortcuts.start()
         demo.register(claudeCode)
         demo.register(recap)
+        demo.register(notesDemo)
         demo.register(UpdatesDemoParticipant(updates: updates))
         notch.onOpenReleaseNotes = { [unowned self] version in
             updates.showReleaseNotes(version: version)

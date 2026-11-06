@@ -11,4 +11,6 @@ nonisolated enum WorkdeckLog {
     static let codexLimits = Logger(subsystem: subsystem, category: "codexLimits")
     static let chats = Logger(subsystem: subsystem, category: "chats")
     static let updates = Logger(subsystem: subsystem, category: "updates")
+    /// Quick notes: counts and errors only, never a note's text or title.
+    static let notes = Logger(subsystem: subsystem, category: "notes")
 }

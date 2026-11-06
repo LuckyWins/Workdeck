@@ -27,6 +27,9 @@ protocol LimitsPresenting: AnyObject {
     func showRecap(_ recap: WeeklyRecapSummary?, for duration: Duration?)
     /// Drops alerts and holds on screen or waiting, and their flash: the demo's start and stop (demo mode spec §2.1).
     func clearAlerts()
+    /// Collapses the alerts on screen or waiting and hands them back, to be flashed again later: the quick notes panel
+    /// opens where the notch is (quick notes spec §3). Nothing changes when there are none.
+    func takeAlerts() -> [LimitsAlert]
     /// The recap is expanded or about to expand, not only its `◆` mark.
     var isRecapExpanded: Bool { get }
     /// What `Got it` on the recap does.
@@ -344,6 +347,13 @@ final class NotchPresenter: LimitsPresenting {
 
     var isRecapExpanded: Bool {
         isShowingRecap || recapTask != nil
+    }
+
+    func takeAlerts() -> [LimitsAlert] {
+        let taken = model.alerts + pendingAlerts
+        guard !taken.isEmpty else { return [] }
+        clearAlerts()
+        return taken
     }
 
     func clearAlerts() {

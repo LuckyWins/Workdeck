@@ -30,6 +30,10 @@ Agreed on 2026-10-16, from a survey of other agent companions (see the links in 
     - **24-hour strip.** Still open: `recap.json` keeps no hours, so the strip needs coding time per hour recorded first.
 11. **Resource measurements.** A `make resources` script that samples the running app's CPU, memory, footprint and leaks and times `workdeck-hook` and `workdeck-statusline`; run it in a few states and add a Resource use section to the README, as [hyderay/notch](https://github.com/hyderay/notch) does.
 
+Agreed on 2026-11-06, from [Lumio](https://lumiomac.com/).
+
+12. **Quick notes.** A tap of the right Option opens a panel from the notch: one line, Return, and it is a reminder in Apple Reminders. `#` picks a project (a Reminders list) with terminal-style Tab completion, a date in the text sets the reminder, ⌘↩ hands the note to Claude Code or Codex in Terminal in the project's folder, completed notes are removed after a week with a copy in an archive. Being built: `specs/2026-11-06-quick-notes-design.md` (plan `plans/2026-11-06-quick-notes.md`). Later: resurface notes when an agent finishes in the project, `workdeck-note` for agents, notes in the recap, a note to `TODO.md` or a GitHub issue.
+
 ## Distribution
 
 - **README media.** Screenshots done: `make screenshots` (spec `specs/2026-11-04-screenshots-design.md`). Still open: a demo GIF or MP4 of the notch in motion for the README header and the page, recorded from the demo on the MacBook notch (`screencapture` needs Screen Recording for the app that runs it; Terminal works without restarting VS Code).

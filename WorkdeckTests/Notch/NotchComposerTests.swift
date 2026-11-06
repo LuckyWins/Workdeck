@@ -211,6 +211,48 @@ struct NotchComposerTests {
         #expect(presenter.flashes == [[.sessionNeedsYou(project: "a")]])
     }
 
+    @Test func suspendingHidesTheNotchAndHoldsAlerts() throws {
+        let composer = makeComposer()
+        add(part(.claudeCode, sessions: [session("a", at: 0)]), to: composer)
+        composer.refresh()
+
+        composer.setSuspended(true)
+        #expect(try #require(presenter.shown.last).display == .hidden)
+        #expect(composer.state.display == .notch(.normal))
+
+        composer.refresh(alerts: [.sessionNeedsYou(project: "a")])
+        #expect(try #require(presenter.shown.last).display == .hidden)
+        #expect(presenter.flashes.isEmpty)
+
+        composer.setSuspended(false)
+        #expect(try #require(presenter.shown.last).display == .notch(.normal))
+        #expect(presenter.flashes == [[.sessionNeedsYou(project: "a")]])
+    }
+
+    @Test func suspendingCollapsesAnExpandedAlertAndShowsItAgainAfter() throws {
+        let composer = makeComposer()
+        add(part(.claudeCode), to: composer)
+        composer.refresh(alerts: [.sessionFinished(project: "a", worked: 60)])
+        #expect(presenter.onScreen == [.sessionFinished(project: "a", worked: 60)])
+
+        composer.setSuspended(true)
+        #expect(presenter.onScreen.isEmpty)
+        composer.refresh(alerts: [.sessionNeedsYou(project: "b")])
+        #expect(presenter.flashes.count == 1)
+
+        composer.setSuspended(false)
+        #expect(presenter.flashes.last == [.sessionFinished(project: "a", worked: 60), .sessionNeedsYou(project: "b")])
+    }
+
+    @Test func withoutSuspensionAlertsAreNotTaken() {
+        let composer = makeComposer()
+        add(part(.claudeCode), to: composer)
+        composer.refresh(alerts: [.sessionNeedsYou(project: "a")])
+        composer.refresh()
+        #expect(presenter.takes == 0)
+        #expect(presenter.onScreen == [.sessionNeedsYou(project: "a")])
+    }
+
     @Test func claudeCodeIsASource() {
         let settings = ClaudeCodeSettings(defaults: makeTestDefaults())
         let directory = makeTemporaryDirectory()

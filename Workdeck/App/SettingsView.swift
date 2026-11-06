@@ -7,6 +7,8 @@ struct SettingsView: View {
     let claudeCode: ClaudeCodeController
     let instances: ClaudeInstancesController
     let codex: CodexController
+    let notes: NotesController
+    let notesShortcuts: NotesShortcutMonitor
     let demo: DemoMode
     let updates: UpdateController
     let feedback: FeedbackSender
@@ -39,7 +41,7 @@ struct SettingsView: View {
             } header: {
                 SettingsHeader("General", symbol: "gearshape.fill", color: .gray)
             } footer: {
-                Text("The demo plays a one-minute scripted tour in the notch, then stops: limits, two accounts, sessions with agents, alerts and a weekly recap. Nothing is written to disk; your real sessions are still tracked.")
+                Text("The demo plays a one-minute scripted tour in the notch, then stops: limits, two accounts, sessions with agents, alerts, a quick note and a weekly recap. Nothing is written to disk or to Reminders; your real sessions are still tracked.")
                     .foregroundStyle(.secondary)
             }
 
@@ -72,6 +74,7 @@ struct SettingsView: View {
             ClaudeSessionsSettingsSection(controller: claudeCode.sessions)
             InstancesSettingsSection(controller: instances, claudeCode: claudeCode)
             CodexSettingsSection(controller: codex)
+            NotesSettingsSection(controller: notes, shortcuts: notesShortcuts)
 
             Section {
                 LabeledContent {

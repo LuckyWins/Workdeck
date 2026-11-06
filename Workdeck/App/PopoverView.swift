@@ -5,6 +5,7 @@ struct PopoverView: View {
     let controller: LidSleepController
     let claudeCode: ClaudeCodeController
     let codex: CodexController
+    let notes: NotesController
     let recap: RecapController
     let demo: DemoMode
     let updates: UpdateController
@@ -72,6 +73,12 @@ struct PopoverView: View {
 
             Divider()
 
+            NotesRow(controller: notes)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+
+            Divider()
+
             // A waiting update, above Quit; not while the demo plays (in-app updates spec §2.4, §10).
             if let update = updates.available, !demo.isActive {
                 UpdatePopoverRow(update: update, updates: updates)
@@ -101,6 +108,8 @@ struct PopoverView: View {
         .task {
             claudeCode.popoverOpened()
             codex.popoverOpened()
+            // The open count; reads nothing without Reminders access.
+            Task { await notes.reload() }
             await controller.refresh()
         }
     }

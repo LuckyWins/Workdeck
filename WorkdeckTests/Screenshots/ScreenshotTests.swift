@@ -101,6 +101,22 @@ struct ScreenshotTests {
         #expect(fixtures.handedOut.allSatisfy { !$0.path.contains("/.claude") && !$0.path.contains("/.codex") })
     }
 
+    // MARK: Quick notes
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func notesCapture() async throws {
+        let model = await fixtures.notesCapture()
+        #expect(model.isListOpen)
+        #expect(model.parsedDate != nil)
+        // The panel hangs from the top edge below a notch's height, as the notch shots do; a margin on the other sides.
+        let panel = NotesPanelView(model: model, topInset: NotchGeometry.housing.height)
+            .frame(width: NotesPanelStyle.width)
+            .padding([.horizontal, .bottom], 24)
+        let width = NotesPanelStyle.width + 48
+        let url = try ScreenshotRenderer.write(panel, name: "notes-capture", dark: true, width: width)
+        try expectWritten(url, points: width)
+    }
+
     // MARK: Popover and Chats
 
     @Test(.enabled(if: ScreenshotRenderer.isEnabled))
@@ -111,7 +127,7 @@ struct ScreenshotTests {
         #expect(lid.isActive)
         let composer = NotchComposer(settings: NotchSettings(defaults: fixtures.defaults()), presenter: FakePresenter(), cameraHousings: { [true] }, clock: { Date() })
         let popover = PopoverView(
-            controller: lid, claudeCode: claudeCode, codex: codex,
+            controller: lid, claudeCode: claudeCode, codex: codex, notes: await fixtures.notes(),
             recap: fixtures.recap(composer: composer), demo: DemoMode(), updates: fixtures.updates()
         )
         let scene = PopoverScene(
@@ -221,7 +237,7 @@ struct ScreenshotTests {
         // been written in this run, not merely be on disk from an earlier one.
         let expected: Set = ["notch-compact", "notch-expanded", "notch-alert", "notch-recap", "popover-light", "popover-dark",
                              "statistics-light", "statistics-dark", "chats-light", "chats-dark", "instances-light", "instances-dark",
-                             "notch-hover-animated", "notch-alert-animated"]
+                             "notch-hover-animated", "notch-alert-animated", "notes-capture"]
         #expect(expected.isSubset(of: ScreenshotRenderer.writtenThisRun), "missing: \(expected.subtracting(ScreenshotRenderer.writtenThisRun).sorted())")
     }
 }

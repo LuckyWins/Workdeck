@@ -8,5 +8,8 @@
 	<string>https://github.com/LuckyWins/Workdeck/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>DTsU8g/BpGO4Sht/E5AWsw//qtYna1OUVnklMJsIXF4=</string>
+	<!-- Quick notes save to Reminders and clean up completed ones (quick notes spec §4.3). -->
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Workdeck saves your quick notes as reminders and removes completed ones you chose to clean up.</string>
 </dict>
 </plist>

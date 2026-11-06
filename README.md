@@ -34,6 +34,7 @@ A Claude Code plan limit runs out in the middle of a task, a session sits waitin
 - 📅 **Weekly recap and Statistics** — last week's coding time by project, sessions, files, lines, commands, agents and limit hits on the first unlock of a week, for Claude Code and Codex with each agent's own time; any of the last 26 weeks in a window with a GitHub-style activity grid and your streak, filtered by agent. Counts and names only, stored locally. [More](docs/claude-code.md#weekly-recap-and-statistics)
 - 👥 **Two accounts side by side** — run a second Claude Code instance with its own login, see both accounts' limits, and continue a chat on the other account when a limit runs out. [More](docs/claude-code.md#instances-and-chats)
 - 🔀 **Compare your accounts' setups** — one window lists the skills, MCP servers, plugins and `CLAUDE.md` of every instance, marks what is missing, off or different, shows a skill's contents, and copies or installs an item into another instance after showing what will change. [More](docs/claude-code.md#instances-window)
+- 📝 **Quick notes** — tap the right Option key, type a note, press Return: it goes to Apple Reminders. `#` picks a project, a date sets a reminder, ⌘↩ gives the note to Claude Code or Codex in the project's folder; completed notes are cleaned up after a copy goes to an archive. [More](docs/quick-notes.md)
 - 🖥️ **Any display** — on an external monitor with the lid closed, a virtual notch at the top of the screen, or plain text in the menu bar.
 - 🧪 **Demo mode** — a one-minute scripted tour in the notch, no Claude Code needed.
 - 🔒 **Private by design** — prompts, answers and file contents are never stored; every change to a `settings.json` is shown as a diff first and backed up.
@@ -73,7 +74,7 @@ A Claude Code plan limit runs out in the middle of a task, a session sits waitin
 
 ## Try It Without Claude Code
 
-Open Settings from the gear in the popover and click **Try Demo** under General. For one minute the notch plays a scripted session: two accounts' limits, a session with a step ticker and an agent, a second session that needs you, a limit alert, a finished session, a Codex session working in parallel and a weekly recap whose **Details…** open the Statistics window with 26 made-up weeks. Nothing is written to disk, and your real sessions are still tracked while it plays.
+Open Settings from the gear in the popover and click **Try Demo** under General. For one minute the notch plays a scripted session: two accounts' limits, a session with a step ticker and an agent, a second session that needs you, a limit alert, a finished session, a Codex session working in parallel, a quick note typed into the panel and a weekly recap whose **Details…** open the Statistics window with 26 made-up weeks. Nothing is written to disk, and your real sessions are still tracked while it plays.
 
 ## Install
 
@@ -106,6 +107,7 @@ The first time you turn on Closed-Lid Mode, macOS asks you to approve Workdeck's
 3. **Optional:** only working in the Claude Code VS Code extension, whose panel does not run the status line? Turn on **Fetch usage from Anthropic (unofficial)**: it calls an undocumented endpoint with Claude Code's login token. Read the [risks](docs/claude-code.md#limits) first.
 4. **Optional:** add a second account in Settings → Claude Code · Instances.
 5. **Optional:** turn on **Codex** in the popover to see its limits (it needs Codex signed in with ChatGPT), and connect its session hooks in Settings → Codex.
+6. **Quick notes** need nothing set up: tap the right Option key and save a note; the first save asks for access to Reminders. See [Quick Notes](docs/quick-notes.md).
 
 Claude Code reports plan usage only for Pro and Max subscriptions. Details: [docs/claude-code.md](docs/claude-code.md).
 
@@ -134,6 +136,7 @@ Claude Code reports plan usage only for Pro and Max subscriptions. Details: [doc
 - Prompts, answers, file contents and chat titles are never stored or logged; tool calls keep only the tool name, a short target with secret-looking values masked, and line counts.
 - The login token is read from your Keychain only for the opt-in usage call; it is never refreshed, stored or logged.
 - Codex limits come from Codex's own session files and `codex app-server`; Workdeck never reads Codex's login.
+- Quick notes live in Reminders and, once cleaned up, in a local archive; their text is never logged or kept anywhere else.
 - Every `settings.json` change is shown as a diff before it is written; `settings.json` and `~/.zshrc` are backed up before Workdeck changes them.
 
 <details>

@@ -21,6 +21,22 @@ nonisolated enum ShellCommand {
         return parts.joined(separator: " ")
     }
 
+    /// Starts `claude` for the instance in `directory` with `prompt` as its first message (quick notes spec §5).
+    /// The prompt goes through `quoted(_:)` only, after `--` so a prompt that starts with `-` is not read as a flag.
+    static func claude(_ instance: ClaudeInstance, in directory: URL, prompt: String) -> String {
+        var parts = ["cd", quoted(directory.path), "&&"]
+        if !instance.isMain {
+            parts.append("CLAUDE_CONFIG_DIR=" + quoted(instance.directory.path))
+        }
+        parts += ["claude", "--", quoted(prompt)]
+        return parts.joined(separator: " ")
+    }
+
+    /// Starts `codex` (the binary at `binary`) in `directory` with `prompt` as its first message; quoted like Claude's.
+    static func codex(_ binary: URL, in directory: URL, prompt: String) -> String {
+        ["cd", quoted(directory.path), "&&", quoted(binary.path), "--", quoted(prompt)].joined(separator: " ")
+    }
+
     /// A Terminal `.command` script: it deletes itself, then runs `command` in an interactive login zsh, so `PATH`
     /// matches the user's terminal.
     static func script(running command: String) -> String {
