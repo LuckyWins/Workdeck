@@ -198,15 +198,15 @@ final class ScreenshotFixtures {
     ]
 
     /// Quick notes over a fake Reminders store with five open notes in the lists used through Workdeck, and two in
-    /// Homework, which was never used here.
-    func notes() async -> NotesController {
+    /// Homework, which was never used here. `leavingOut` drops the open note with that title.
+    func notes(leavingOut title: String? = nil) async -> NotesController {
         let now = monday
         let open: [(String, String)] = [
-            ("workdeck", "Проверить миграцию на staging"), ("workdeck", "Спросить Сашу про лимиты"), ("workdeck", "Обновить скриншоты"),
-            ("workdeck-site", "Поправить отступы в футере"), ("wordle-bot", "Поиграть с весами букв"),
-            ("homework", "Задача 4"), ("homework", "Задача 5"),
+            ("workdeck", "Check the staging migration"), ("workdeck", "Ask Sam about the limits"), ("workdeck", "Update the screenshots"),
+            ("workdeck-site", "Fix the footer spacing"), ("wordle-bot", "Tune the letter weights"),
+            ("homework", "Exercise 4"), ("homework", "Exercise 5"),
         ]
-        let items = open.enumerated().map { index, entry in
+        let items = open.enumerated().filter { $0.element.1 != title }.map { index, entry in
             ReminderItem(
                 id: "note-\(index)", listID: entry.0, title: entry.1, due: nil, hasDueTime: false,
                 created: now.addingTimeInterval(-Double(index + 1) * 86_400), completed: nil, notes: nil
@@ -227,11 +227,18 @@ final class ScreenshotFixtures {
     /// The panel with a note being typed: the date tinted, the `#wo` list open (Workdeck and Workdeck-site were used
     /// lately, so they come first).
     func notesCapture() async -> NotesPanelModel {
-        let controller = await notes()
+        await notesPanel(typed: "Check the staging migration tomorrow at 4pm #wo")
+    }
+
+    /// The panel over the quick notes fixture with `typed` in the field; `leavingOut` as in `notes`.
+    func notesPanel(typed: String, leavingOut title: String? = nil) async -> NotesPanelModel {
+        let controller = await notes(leavingOut: title)
         let now = monday
         let model = NotesPanelModel(controller: controller, now: { now }, calendar: calendar, openURL: { _ in }, copy: { _ in })
         await model.opened()
-        model.textChanged("Проверить миграцию на staging завтра в 16 #wo")
+        if !typed.isEmpty {
+            model.textChanged(typed)
+        }
         return model
     }
 

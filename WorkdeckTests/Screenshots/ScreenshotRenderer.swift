@@ -216,8 +216,8 @@ enum ScreenshotRenderer {
     /// motion (spinners, shimmers, SwiftUI animations) keeps its pace; the file gets the timeline's delays, never the time
     /// a capture took.
     @discardableResult
-    static func writeAnimation<V: View>(
-        _ view: V, canvas: CGSize, frames: [NotchAnimationFrame], name: String, update: (NotchAnimationFrame) -> Void
+    static func writeAnimation<V: View, Frame: RecordedFrame>(
+        _ view: V, canvas: CGSize, frames: [Frame], name: String, update: (Frame) -> Void
     ) async throws -> URL {
         ActiveAppearance.install()
         let appearance = NSAppearance(named: .darkAqua)!

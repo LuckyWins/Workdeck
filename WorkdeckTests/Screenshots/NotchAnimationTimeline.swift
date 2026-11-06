@@ -25,8 +25,18 @@ nonisolated enum NotchAnimationPhase: Equatable, Sendable {
     }
 }
 
+/// What `ScreenshotRenderer.writeAnimation` needs of a frame: when it starts, how long it shows, and whether the
+/// view's own wall-clock motion plays meanwhile.
+nonisolated protocol RecordedFrame: Sendable {
+    /// Its start, from the animation's start.
+    var time: TimeInterval { get }
+    var delay: TimeInterval { get }
+    /// The recorder captures it at its own moment of real time.
+    var isLive: Bool { get }
+}
+
 /// One frame of a notch animation and how long it shows.
-nonisolated struct NotchAnimationFrame: Equatable, Sendable {
+nonisolated struct NotchAnimationFrame: Equatable, RecordedFrame {
     /// Its start, from the animation's start.
     var time: TimeInterval
     var delay: TimeInterval

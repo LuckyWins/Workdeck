@@ -231,13 +231,43 @@ struct ScreenshotTests {
         try expectAnimation(try await animation.writeAlert(), canvas: animation.alertCanvas)
     }
 
+    /// Runs in every test run: no view is measured (that blocks the main actor long enough to upset timed tests).
+    @Test func theNotesAnimationShowsTheOpenNotesAndEndsSaved() async {
+        // The empty field shows the open notes, the typed note is not among them, the script ends on the confirmation.
+        let model = await fixtures.notesPanel(typed: "", leavingOut: NotesAnimation.typedNote)
+        #expect(model.showsOpenItems)
+        #expect(!model.visibleItems.isEmpty)
+        #expect(!model.visibleItems.contains { $0.title == NotesAnimation.typedNote })
+        NotesAnimation.show(script: NotesDemoScript.length - 0.1, in: model)
+        #expect(model.mode == .confirmation(NotesDemoScript.saved))
+    }
+
+    @Test func theNotesScriptCommitsTheFixturesWorkdeckList() async {
+        let model = await fixtures.notesPanel(typed: "", leavingOut: NotesAnimation.typedNote)
+        // Just before the save: the whole note typed, Tab made the project a chip.
+        NotesAnimation.show(script: 7, in: model)
+        #expect(model.draft.project?.listID == "workdeck")
+        #expect(model.parsedDate != nil)
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func notesAnimation() async throws {
+        // Before the panel's views are first measured: `NotesPanelStyle.selection` keeps the accent it first reads.
+        ActiveAppearance.install()
+        let animation = await NotesAnimation.make(fixtures: fixtures)
+        #expect(animation.canvas.width >= NotesPanelStyle.width + 2 * NotchTransitionView.margin)
+        #expect(animation.canvas.height >= animation.panelSize.height + NotchTransitionView.margin)
+        #expect(animation.canvas.height >= animation.compactSize.height + NotesAnimationView.keycapGap + OptionKeycap.size.height)
+        try expectAnimation(try await animation.write(), canvas: animation.canvas)
+    }
+
     @Test(.enabled(if: ScreenshotRenderer.isEnabled))
     func everyImageWasWritten() {
         // The suite is serialized and runs in declaration order, so this comes last: every image of spec §2 must have
         // been written in this run, not merely be on disk from an earlier one.
         let expected: Set = ["notch-compact", "notch-expanded", "notch-alert", "notch-recap", "popover-light", "popover-dark",
                              "statistics-light", "statistics-dark", "chats-light", "chats-dark", "instances-light", "instances-dark",
-                             "notch-hover-animated", "notch-alert-animated", "notes-capture"]
+                             "notch-hover-animated", "notch-alert-animated", "notes-capture", "notes-capture-animated"]
         #expect(expected.isSubset(of: ScreenshotRenderer.writtenThisRun), "missing: \(expected.subtracting(ScreenshotRenderer.writtenThisRun).sorted())")
     }
 }

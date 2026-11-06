@@ -32,7 +32,7 @@ struct NotesDemoScriptTests {
     }
 
     @Test func typesThenConfirms() {
-        let typed = "Проверить миграцию на staging завтра в 16 #Workdeck"
+        let typed = "Check the staging migration tomorrow at 4pm #Workdeck"
         #expect(NotesDemoScript.note == typed)
         #expect(NotesDemoScript.frame(at: -0.5) == nil)
         // Half-way through, a part of the note.

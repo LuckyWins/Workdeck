@@ -54,13 +54,18 @@
   .tab:focus-visible { outline: 3px solid var(--indigo); outline-offset: 2px; }
   .tab[aria-selected="true"] { background: var(--tab); border-color: var(--line); box-shadow: 0 6px 20px rgba(72,70,212,.10); }
   .tab[aria-selected="true"] b { color: var(--link); }
-  .tab[aria-selected="true"] span { max-height: 120px; opacity: 1; margin-top: 4px; }
+  /* --open is the text's own height (set by the tour script): the closing and the opening tab then change by the same
+     amount at the same time, and the list never grows in between. */
+  .tab[aria-selected="true"] span { max-height: var(--open, 120px); opacity: 1; margin-top: 4px; }
   .bar { height: 3px; border-radius: 2px; background: var(--track); margin-top: 10px; overflow: hidden; display: none; }
   .tab[aria-selected="true"] .bar { display: block; }
   .bar i { display: block; height: 100%; width: 0; background: var(--indigo); }
   .tab[aria-selected="true"] .bar i { animation: fill 6s linear forwards; }
   .tour.paused .bar i { animation-play-state: paused !important; }
   @keyframes fill { to { width: 100%; } }
+  /* While the tour measures its tallest tab, nothing animates. */
+  .tour.measuring .tab, .tour.measuring .tab span { transition: none !important; }
+  .tour.measuring .tabs { align-self: start; min-height: 0 !important; }
   @media (prefers-reduced-motion: reduce) { .bar { display: none !important; } }
 
   .screen { position: relative; min-height: 540px; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 50px rgba(72,70,212,.25);
@@ -102,13 +107,13 @@
 
   <section class="tour" aria-label="What Workdeck does">
     <div class="tabs" role="tablist" aria-orientation="vertical">
-      <button class="tab" role="tab" id="tab-0" aria-controls="slide-0"><b>Limits and sessions in the notch</b><span>Hover the notch: every account's 5-hour and weekly limits with a forecast, and every session with its agents and changed lines.</span><div class="bar"><i></i></div></button>
-      <button class="tab" role="tab" id="tab-1" aria-controls="slide-1"><b>Alerts that come to you</b><span>A limit at 80 % or 95 %, a session waiting for a permission, one that finished. Click to jump to its window.</span><div class="bar"><i></i></div></button>
+      <button class="tab" role="tab" id="tab-0" aria-controls="slide-0" data-seconds="7"><b>Limits and sessions in the notch</b><span>Hover the notch: every account's 5-hour and weekly limits with a forecast, and every session with its agents and changed lines.</span><div class="bar"><i></i></div></button>
+      <button class="tab" role="tab" id="tab-1" aria-controls="slide-1" data-seconds="7"><b>Alerts that come to you</b><span>A limit at 80 % or 95 %, a session waiting for a permission, one that finished. Click to jump to its window.</span><div class="bar"><i></i></div></button>
       <button class="tab" role="tab" id="tab-2" aria-controls="slide-2"><b>Everything in the menu bar</b><span>One row per tool. Closed-Lid Mode keeps the Mac awake with the lid closed, for long builds and SSH.</span><div class="bar"><i></i></div></button>
       <button class="tab" role="tab" id="tab-3" aria-controls="slide-3"><b>Out of limit? Switch accounts</b><span>Run a second Claude Code account and carry any chat on to it in Chats.</span><div class="bar"><i></i></div></button>
       <button class="tab" role="tab" id="tab-4" aria-controls="slide-4"><b>Every account, set up alike</b><span>See which skills, MCP servers, plugins and CLAUDE.md each Claude Code account has, and copy what's missing in one click.</span><div class="bar"><i></i></div></button>
       <button class="tab" role="tab" id="tab-5" aria-controls="slide-5"><b>Your week at a glance</b><span>A recap on the first unlock of a week, and half a year of work in Statistics.</span><div class="bar"><i></i></div></button>
-      <button class="tab" role="tab" id="tab-6" aria-controls="slide-6"><b>Quick notes to Reminders</b><span>Tap the right Option key, type a note, press Return. # picks a project, a date sets a reminder, ⌘↩ gives the note to Claude Code or Codex.</span><div class="bar"><i></i></div></button>
+      <button class="tab" role="tab" id="tab-6" aria-controls="slide-6" data-seconds="12"><b>Quick notes to Reminders</b><span>Tap the right Option key, type a note, press Return. # picks a project, a date sets a reminder, ⌘↩ gives the note to Claude Code or Codex.</span><div class="bar"><i></i></div></button>
     </div>
     <div class="screen">
       <div class="slide top" role="tabpanel" id="slide-0" aria-labelledby="tab-0"><picture><source media="(prefers-reduced-motion: reduce)" srcset="screenshots/notch-expanded.png"><img src="screenshots/notch-expanded.png" data-animated="screenshots/notch-hover-animated.png" alt="The notch opening under the pointer: limits of two Claude Code accounts and Codex, and live sessions with an agent" data-zoom></picture></div>
@@ -117,7 +122,7 @@
       <div class="slide" role="tabpanel" id="slide-3" aria-labelledby="tab-3"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/chats-dark.png"><img src="screenshots/chats-light.png" alt="The Chats window with two accounts" loading="lazy" data-zoom></picture></div>
       <div class="slide" role="tabpanel" id="slide-4" aria-labelledby="tab-4"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/instances-dark.png"><img src="screenshots/instances-light.png" alt="The Instances window: skills of three Claude Code accounts side by side, one opened on the right" loading="lazy" data-zoom></picture></div>
       <div class="slide" role="tabpanel" id="slide-5" aria-labelledby="tab-5"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/statistics-dark.png"><img src="screenshots/statistics-light.png" alt="The Statistics window with the activity grid" loading="lazy" data-zoom></picture></div>
-      <div class="slide top" role="tabpanel" id="slide-6" aria-labelledby="tab-6"><img src="screenshots/notes-capture.png" alt="The quick notes panel growing out of the notch: a note with its date tinted and the list of matching projects open" loading="lazy" data-zoom></div>
+      <div class="slide top" role="tabpanel" id="slide-6" aria-labelledby="tab-6"><picture><source media="(prefers-reduced-motion: reduce)" srcset="screenshots/notes-capture.png"><img src="screenshots/notes-capture.png" data-animated="screenshots/notes-capture-animated.png" alt="The right Option key tapped under the notch, the quick notes panel growing out of it, a note typed with a date and a project, then saved" loading="lazy" data-zoom></picture></div>
     </div>
   </section>
 
@@ -147,6 +152,7 @@
 
   // The tour: a click or the arrow keys pick a feature; otherwise the next one comes when the bar fills.
   // The bar pauses while the pointer or focus is in the tour; with reduced motion there is no bar and no moving on.
+  // A tab with an animation stays as long as it plays (data-seconds), and the animation starts over when its tab shows.
   (function () {
     var tour = document.querySelector('.tour');
     var tabs = [].slice.call(tour.querySelectorAll('.tab'));
@@ -161,6 +167,8 @@
       slides.forEach(function (slide, n) { slide.classList.toggle('on', n === i); });
       var bar = tabs[i].querySelector('.bar i');
       bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = '';
+      bar.style.animationDuration = (tabs[i].getAttribute('data-seconds') || 6) + 's';
+      slides[i].querySelectorAll('img[data-animated]').forEach(function (img) { if (img.play) img.play(); });
       if (focus) tabs[i].focus();
     }
     tabs.forEach(function (tab, n) {
@@ -179,18 +187,63 @@
     tour.addEventListener('mouseleave', resume);
     tour.addEventListener('focusin', pause);
     tour.addEventListener('focusout', function () { setTimeout(resume, 0); });
+    // The open tab's text makes the list taller or shorter: the list keeps the height of its tallest tab, so the page
+    // below does not move when the tour moves on. Measured again when the width changes the text's wrapping.
+    var list = tour.querySelector('.tabs');
+    function holdHeight() {
+      tour.classList.add('measuring');
+      tabs.forEach(function (tab) {
+        var text = tab.querySelector('span');
+        text.style.setProperty('--open', text.scrollHeight + 'px');
+      });
+      var tallest = 0;
+      tabs.forEach(function (tab) {
+        tabs.forEach(function (other) { other.setAttribute('aria-selected', other === tab ? 'true' : 'false'); });
+        tallest = Math.max(tallest, list.offsetHeight);
+      });
+      tour.classList.remove('measuring');
+      list.style.minHeight = tallest + 'px';
+    }
+    var width = window.innerWidth, resizing = null;
+    window.addEventListener('resize', function () {
+      if (window.innerWidth === width) return;
+      width = window.innerWidth;
+      clearTimeout(resizing);
+      resizing = setTimeout(function () { holdHeight(); show(current); }, 150);
+    });
+    holdHeight();
     show(0);
   })();
 </script>
 <script>
-  // The notch animations are a few MB: the stills load with the page, and each animation takes its still's place once
+  // The animations are a few MB: the stills load with the page, and each animation takes its still's place once
   // the page has loaded. With reduced motion the still stays and the animation is never fetched.
+  // An animated image plays on from wherever it is, even out of sight; each play() gives it a URL of its own for the
+  // same downloaded file, so it starts from its first frame. Without fetch (a file opened from disk) it just loops.
   window.addEventListener('load', function () {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     document.querySelectorAll('img[data-animated]').forEach(function (img) {
-      var animation = new Image();
-      animation.onload = function () { img.src = animation.src; };
-      animation.src = img.getAttribute('data-animated');
+      var url = img.getAttribute('data-animated');
+      var shown = img.closest('.slide');
+      function fallback() {
+        var animation = new Image();
+        animation.onload = function () { img.src = animation.src; };
+        animation.src = url;
+      }
+      if (!window.fetch || !window.URL || !URL.createObjectURL) return fallback();
+      fetch(url).then(function (response) {
+        if (!response.ok) throw new Error(response.status);
+        return response.blob();
+      }).then(function (blob) {
+        var current = null;
+        img.play = function () {
+          var previous = current;
+          current = URL.createObjectURL(blob);
+          img.src = current;
+          if (previous) setTimeout(function () { URL.revokeObjectURL(previous); }, 1000);
+        };
+        if (shown && shown.classList.contains('on')) img.play();
+      }).catch(fallback);
     });
   });
 </script>

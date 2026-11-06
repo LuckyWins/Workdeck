@@ -17,7 +17,7 @@ nonisolated enum NotesDemoScript {
     /// From the panel opening to its closing.
     static let length: TimeInterval = 9.5
 
-    static let note = "Проверить миграцию на staging завтра в 16 #Workdeck"
+    static let note = "Check the staging migration tomorrow at 4pm #Workdeck"
     static let workdeckID = "demo-workdeck"
 
     /// The made-up Reminders lists the `#` picker offers while the demo plays.
