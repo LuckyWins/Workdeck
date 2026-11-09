@@ -5,6 +5,7 @@ Ideas and deferred work. **Planned** lists what is agreed and in what order; eac
 ## To Discuss First
 
 - **Updating an installed Workdeck, and CI.** Being designed: `specs/2026-11-04-in-app-updates-design.md` (Sparkle, releases from CI on a tag, Release Notes window, `CHANGELOG.md`).
+- **Reordering quick notes.** Move the selected open note one place up or down with ⌥↑ / ⌥↓, or drag it with the mouse (asked on 2026-11-09). EventKit exposes no manual order of Reminders, so the order would live in Workdeck (`UserDefaults`, reminder identifiers only) and differ from Reminders on the iPhone. Open question first: once notes were moved, where does a new note go (top, bottom, or by its date among the others), and does the date order still apply to the rest?
 - **Landing page and Terminal install.** Being built: `specs/2026-11-04-landing-page-design.md` (a brew.sh-style page on GitHub Pages; `install.sh` is the only install path).
 
 
