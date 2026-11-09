@@ -33,6 +33,13 @@ nonisolated protocol RecordedFrame: Sendable {
     var delay: TimeInterval { get }
     /// The recorder captures it at its own moment of real time.
     var isLive: Bool { get }
+    /// The recorder stores the first frame's image again instead of capturing: the loop's seam holds even while a
+    /// spinner runs on the wall clock.
+    var repeatsFirstFrame: Bool { get }
+}
+
+nonisolated extension RecordedFrame {
+    var repeatsFirstFrame: Bool { false }
 }
 
 /// One frame of a notch animation and how long it shows.

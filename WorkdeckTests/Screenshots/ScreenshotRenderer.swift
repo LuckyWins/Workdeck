@@ -164,6 +164,25 @@ enum ScreenshotRenderer {
     private static func capture(
         _ shown: (window: NSWindow, host: NSView, appearance: NSAppearance), size: CGSize, name: String, dark: Bool
     ) throws -> URL {
+        try save(try capturedFrame(shown, size: size, name: name, dark: dark), name: name)
+    }
+
+    /// The window as `writeWindow` frames it (title bar, toolbar, corners, shadow), kept in memory at 2× for a scene of
+    /// the landing tour (landing tour animations spec §4.1).
+    static func snapshotWindow<V: View>(_ view: V, title: String, size: CGSize, dark: Bool) throws -> CGImage {
+        let shown = openWindow(view, title: title, size: size, dark: dark)
+        defer { shown.window.orderOut(nil) }
+        spin(0.5)
+        removeGlass(of: shown)
+        spin(0.4)
+        let name = "snapshot of \(title)"
+        guard let image = try capturedFrame(shown, size: size, name: name, dark: dark).cgImage else { throw Failure.noBitmap(name) }
+        return image
+    }
+
+    private static func capturedFrame(
+        _ shown: (window: NSWindow, host: NSView, appearance: NSAppearance), size: CGSize, name: String, dark: Bool
+    ) throws -> NSBitmapImageRep {
         let host = shown.host
         host.layoutSubtreeIfNeeded()
         // The frame view draws the title bar and toolbar around the content; it has square corners and no shadow.
@@ -174,7 +193,7 @@ enum ScreenshotRenderer {
         guard rep.pixelsWide == Int((size.width * 2).rounded()) else {
             throw Failure.notRetina(name, rep.pixelsWide, size.width)
         }
-        return try save(try framed(rep, dark: dark, name: name), name: name)
+        return try framed(rep, dark: dark, name: name)
     }
 
     /// A toolbar's segmented control (macOS 26 glass) draws its selected segment's label outside the view's drawing, so
@@ -247,6 +266,10 @@ enum ScreenshotRenderer {
         var latest: TimeInterval = 0
         var dropped = 0
         for (index, frame) in frames.enumerated() {
+            if frame.repeatsFirstFrame, let first = images.first {
+                images.append((first.image, frame.delay))
+                continue
+            }
             update(frame)
             host.layoutSubtreeIfNeeded()
             // Waiting yields the main actor: a view's own tasks (the flash's timed fade) run only while this does not.
@@ -322,6 +345,11 @@ enum ScreenshotRenderer {
         context.strokePath()
         guard let result = context.makeImage() else { throw Failure.noBitmap(name) }
         return NSBitmapImageRep(cgImage: result)
+    }
+
+    /// Writes `image` as it is (2× pixels) to `<name>.png`.
+    static func writeImage(_ image: CGImage, name: String) throws -> URL {
+        try save(NSBitmapImageRep(cgImage: image), name: name)
     }
 
     private static func save(_ rep: NSBitmapImageRep, name: String) throws -> URL {

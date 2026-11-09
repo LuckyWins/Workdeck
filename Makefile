@@ -49,7 +49,7 @@ release-prep:
 	python3 -I scripts/release/release.py prepare $(VERSION)
 
 ## screenshots: render the README and landing page images from demo data into docs/media/screenshots
-## (the notch animations are then squeezed losslessly by oxipng: brew install oxipng)
+## (the animations and the Your week stills are then squeezed losslessly by oxipng: brew install oxipng)
 screenshots:
 	@command -v oxipng >/dev/null || { echo "error: make screenshots needs oxipng to compress the notch animations: brew install oxipng"; exit 1; }
 	@mkdir -p $(BUILD_DIR)
@@ -57,7 +57,13 @@ screenshots:
 		-destination '$(DESTINATION)' test -only-testing:WorkdeckTests/ScreenshotTests 2>&1 \
 		| tee $(BUILD_DIR)/screenshots.log | grep -E "error:|recorded an issue|Test run with|\*\* TEST|^Wrote "
 	@n=$$(grep -c '^Wrote .*docs/media/screenshots/[a-z-]*\.png' $(BUILD_DIR)/screenshots.log); \
-		if [ "$$n" -lt 16 ]; then echo "error: only $$n images written; the switch may not have reached the tests"; exit 1; fi
-	@# Lossless, keeps the animation: about a third smaller than ImageIO's deflate.
-	@oxipng -q -o 4 --strip safe docs/media/screenshots/*-animated.png
-	@ls -lh docs/media/screenshots/*-animated.png | awk '{print "Compressed " $$9 " to " $$5}'
+		if [ "$$n" -lt 24 ]; then echo "error: only $$n images written; the switch may not have reached the tests"; exit 1; fi
+	@# Lossless, keeps the animation: about a third smaller than ImageIO's deflate. The landing page's Your week
+	@# stills too: the page loads them with the tour.
+	@oxipng -q -o 4 --strip safe docs/media/screenshots/*-animated.png docs/media/screenshots/week-*.png \
+		docs/media/screenshots/alert-session.png docs/media/screenshots/closed-lid.png
+	@ls -lh docs/media/screenshots/*-animated.png docs/media/screenshots/week-*.png | awk '{print "Compressed " $$9 " to " $$5}'
+	@# The landing page loads each animation with its tab: about 4 MB at most (landing tour animations spec §4.4).
+	@for f in docs/media/screenshots/*-animated.png; do \
+		n=$$(stat -f %z "$$f"); if [ "$$n" -gt 4500000 ]; then echo "error: $$f is $$n bytes after oxipng (limit 4.5 MB)"; exit 1; fi; \
+	done

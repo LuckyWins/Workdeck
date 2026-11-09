@@ -77,6 +77,31 @@
   .slide img { max-width: 100%; max-height: 100%; border-radius: 10px; }
   /* The notch images start at the notch's top edge, which meets the card's. */
   .slide.top img { border-radius: 0; }
+  /* A scene with a window touches the block's top and bottom: the picture fills it, top-aligned, and the block crops
+     the window's bottom (landing tour animations spec §2). */
+  .slide.bleed { align-items: flex-start; padding: 0 28px; container-type: size; }
+  .slide.bleed > picture img { width: 100%; height: 100%; max-height: none; object-fit: cover; object-position: top center; border-radius: 0; }
+  /* A block taller than wide (a phone, a narrow window): cover would crop the scene's sides, so the whole width shows. */
+  @container (max-aspect-ratio: 1 / 1) { .slide.bleed > picture img { object-fit: contain; } }
+  /* Your week: the Statistics window's frame, its body scrolled by the page under the toolbar, and the empty grid
+     uncovered week by week (week-frame.png 540 × 513 pt; the body at 40, 64, 460 wide; week-body.png 460 × 868,
+     scrolling 419; the empty grid's cells at 40, 66 in the body, 27 weeks of 15 pt). Made by `make screenshots`
+     (WeekScene); its test fails when these numbers change. */
+  .week { position: relative; flex: none; width: max(100cqw, calc(100cqh * 540 / 513)); aspect-ratio: 540 / 513; }
+  @container (max-aspect-ratio: 540 / 513) { .week { width: 100cqw; } }
+  .week img { display: block; width: 100%; max-width: none; max-height: none; border-radius: 0; }
+  .week .body { position: absolute; left: 7.407%; top: 12.476%; width: 85.185%; height: 87.524%; overflow: hidden; }
+  .week .content { position: relative; }
+  .week .grid { position: absolute; left: 8.696%; top: 7.604%; width: 88.043%; clip-path: inset(0 0 0 100%); }
+  .week.playing .grid { animation: week-grid 1s steps(27, end) .6s both; }
+  .week.playing .content { animation: week-scroll 10s infinite; }
+  @keyframes week-grid { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 0 100%); } }
+  @keyframes week-scroll {
+    0%, 22% { transform: translateY(0); animation-timing-function: ease-in-out; }
+    72%, 82% { transform: translateY(-48.272%); animation-timing-function: ease-in-out; }
+    94%, 100% { transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) { .week.playing .grid, .week.playing .content { animation: none; } }
 
   .after { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin: 56px 0 0; padding: 26px 0 0; border-top: 1px solid var(--line); list-style: none; counter-reset: step; }
   .after li { counter-increment: step; color: var(--dim); font-size: 15px; }
@@ -108,21 +133,21 @@
   <section class="tour" aria-label="What Workdeck does">
     <div class="tabs" role="tablist" aria-orientation="vertical">
       <button class="tab" role="tab" id="tab-0" aria-controls="slide-0" data-seconds="7"><b>Limits and sessions in the notch</b><span>Hover the notch: every account's 5-hour and weekly limits with a forecast, and every session with its agents and changed lines.</span><div class="bar"><i></i></div></button>
-      <button class="tab" role="tab" id="tab-1" aria-controls="slide-1" data-seconds="7"><b>Alerts that come to you</b><span>A limit at 80 % or 95 %, a session waiting for a permission, one that finished. Click to jump to its window.</span><div class="bar"><i></i></div></button>
-      <button class="tab" role="tab" id="tab-2" aria-controls="slide-2"><b>Everything in the menu bar</b><span>One row per tool. Closed-Lid Mode keeps the Mac awake with the lid closed, for long builds and SSH.</span><div class="bar"><i></i></div></button>
-      <button class="tab" role="tab" id="tab-3" aria-controls="slide-3"><b>Out of limit? Switch accounts</b><span>Run a second Claude Code account and carry any chat on to it in Chats.</span><div class="bar"><i></i></div></button>
-      <button class="tab" role="tab" id="tab-4" aria-controls="slide-4"><b>Every account, set up alike</b><span>See which skills, MCP servers, plugins and CLAUDE.md each Claude Code account has, and copy what's missing in one click.</span><div class="bar"><i></i></div></button>
-      <button class="tab" role="tab" id="tab-5" aria-controls="slide-5"><b>Your week at a glance</b><span>A recap on the first unlock of a week, and half a year of work in Statistics.</span><div class="bar"><i></i></div></button>
-      <button class="tab" role="tab" id="tab-6" aria-controls="slide-6" data-seconds="12"><b>Quick notes to Reminders</b><span>Tap the right Option key, type a note, press Return. # picks a project, a date sets a reminder, ⌘↩ gives the note to Claude Code or Codex.</span><div class="bar"><i></i></div></button>
+      <button class="tab" role="tab" id="tab-1" aria-controls="slide-1" data-seconds="8"><b>Alerts that come to you</b><span>A session that finished or waits for a permission, a limit running low. Click to jump to its window.</span><div class="bar"><i></i></div></button>
+      <button class="tab" role="tab" id="tab-2" aria-controls="slide-2" data-seconds="10"><b>Out of limit? Switch accounts</b><span>A limit alert opens Chats: carry the chat on to your second Claude Code account in one click.</span><div class="bar"><i></i></div></button>
+      <button class="tab" role="tab" id="tab-3" aria-controls="slide-3" data-seconds="10"><b>Close the lid, the work goes on</b><span>Closed-Lid Mode keeps the Mac awake with the lid closed: agents, builds and SSH finish while you're away.</span><div class="bar"><i></i></div></button>
+      <button class="tab" role="tab" id="tab-4" aria-controls="slide-4" data-seconds="12"><b>Quick notes to Reminders</b><span>Tap the right Option key, type a note, press Return. # picks a project, a date sets a reminder, ⌘↩ gives the note to Claude Code or Codex.</span><div class="bar"><i></i></div></button>
+      <button class="tab" role="tab" id="tab-5" aria-controls="slide-5" data-seconds="10"><b>Your week at a glance</b><span>Half a year of work in Statistics: time, projects and limits by week. A recap comes on the first unlock of each week.</span><div class="bar"><i></i></div></button>
+      <button class="tab" role="tab" id="tab-6" aria-controls="slide-6"><b>Every account, set up alike</b><span>See which skills, MCP servers, plugins and CLAUDE.md each Claude Code account has, and copy what's missing in one click.</span><div class="bar"><i></i></div></button>
     </div>
     <div class="screen">
       <div class="slide top" role="tabpanel" id="slide-0" aria-labelledby="tab-0"><picture><source media="(prefers-reduced-motion: reduce)" srcset="screenshots/notch-expanded.png"><img src="screenshots/notch-expanded.png" data-animated="screenshots/notch-hover-animated.png" alt="The notch opening under the pointer: limits of two Claude Code accounts and Codex, and live sessions with an agent" data-zoom></picture></div>
-      <div class="slide top" role="tabpanel" id="slide-1" aria-labelledby="tab-1"><picture><source media="(prefers-reduced-motion: reduce)" srcset="screenshots/notch-alert.png"><img src="screenshots/notch-alert.png" data-animated="screenshots/notch-alert-animated.png" alt="The notch opening by itself with a limit alert" loading="lazy" data-zoom></picture></div>
-      <div class="slide top" role="tabpanel" id="slide-2" aria-labelledby="tab-2"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/popover-dark.png"><img src="screenshots/popover-light.png" alt="The menu bar popover" loading="lazy" data-zoom></picture></div>
-      <div class="slide" role="tabpanel" id="slide-3" aria-labelledby="tab-3"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/chats-dark.png"><img src="screenshots/chats-light.png" alt="The Chats window with two accounts" loading="lazy" data-zoom></picture></div>
-      <div class="slide" role="tabpanel" id="slide-4" aria-labelledby="tab-4"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/instances-dark.png"><img src="screenshots/instances-light.png" alt="The Instances window: skills of three Claude Code accounts side by side, one opened on the right" loading="lazy" data-zoom></picture></div>
-      <div class="slide" role="tabpanel" id="slide-5" aria-labelledby="tab-5"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/statistics-dark.png"><img src="screenshots/statistics-light.png" alt="The Statistics window with the activity grid" loading="lazy" data-zoom></picture></div>
-      <div class="slide top" role="tabpanel" id="slide-6" aria-labelledby="tab-6"><picture><source media="(prefers-reduced-motion: reduce)" srcset="screenshots/notes-capture.png"><img src="screenshots/notes-capture.png" data-animated="screenshots/notes-capture-animated.png" alt="The right Option key tapped under the notch, the quick notes panel growing out of it, a note typed with a date and a project, then saved" loading="lazy" data-zoom></picture></div>
+      <div class="slide top" role="tabpanel" id="slide-1" aria-labelledby="tab-1"><picture><source media="(prefers-reduced-motion: reduce)" srcset="screenshots/alert-session.png"><img src="screenshots/alert-session.png" data-animated="screenshots/alert-session-animated.png" alt="The notch opening by itself: orbit-app finished; a click on the alert brings its Terminal window to the front" loading="lazy" data-zoom></picture></div>
+      <div class="slide bleed" role="tabpanel" id="slide-2" aria-labelledby="tab-2"><picture><source media="(prefers-reduced-motion: reduce)" srcset="screenshots/chats-dark.png"><img src="screenshots/chats-dark.png" data-animated="screenshots/switch-account-animated.png" alt="A 95 % limit alert opens Chats; the chat is opened in Terminal on the personal account and resumes there" loading="lazy" data-zoom></picture></div>
+      <div class="slide" role="tabpanel" id="slide-3" aria-labelledby="tab-3"><picture><source media="(prefers-reduced-motion: reduce)" srcset="screenshots/closed-lid.png"><img src="screenshots/closed-lid.png" data-animated="screenshots/closed-lid-animated.png" alt="Closed-Lid Mode turned on, the MacBook's lid closed while forty minutes pass, then the notch shows the session finished meanwhile" loading="lazy" data-zoom></picture></div>
+      <div class="slide top" role="tabpanel" id="slide-4" aria-labelledby="tab-4"><picture><source media="(prefers-reduced-motion: reduce)" srcset="screenshots/notes-capture.png"><img src="screenshots/notes-capture.png" data-animated="screenshots/notes-capture-animated.png" alt="The right Option key tapped under the notch, the quick notes panel growing out of it, a note typed with a date and a project, then saved" loading="lazy" data-zoom></picture></div>
+      <div class="slide bleed" role="tabpanel" id="slide-5" aria-labelledby="tab-5"><div class="week"><img src="screenshots/week-frame.png" alt="The Statistics window: the activity grid fills week by week, then the window scrolls through the week's time, projects, work and limits"><div class="body"><div class="content"><img src="screenshots/week-body.png" alt=""><img class="grid" src="screenshots/week-grid-empty.png" alt=""></div></div></div></div>
+      <div class="slide" role="tabpanel" id="slide-6" aria-labelledby="tab-6"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/instances-dark.png"><img src="screenshots/instances-light.png" alt="The Instances window: skills of three Claude Code accounts side by side, one opened on the right" loading="lazy" data-zoom></picture></div>
     </div>
   </section>
 
@@ -169,6 +194,18 @@
       bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = '';
       bar.style.animationDuration = (tabs[i].getAttribute('data-seconds') || 6) + 's';
       slides[i].querySelectorAll('img[data-animated]').forEach(function (img) { if (img.play) img.play(); });
+      // An animation is fetched when its tab shows, and the next one's ahead of it, not all of them with the page.
+      if (window.tourAnimations) {
+        window.tourAnimations.prepare(slides[i]);
+        window.tourAnimations.prepare(slides[(i + 1) % slides.length]);
+      }
+      // Your week moves by CSS: it starts over each time its tab shows, and stands still while another one does.
+      slides.forEach(function (slide, n) {
+        slide.querySelectorAll('.week').forEach(function (week) {
+          week.classList.remove('playing');
+          if (n === i) { void week.offsetWidth; week.classList.add('playing'); }
+        });
+      });
       if (focus) tabs[i].focus();
     }
     tabs.forEach(function (tab, n) {
@@ -216,36 +253,48 @@
   })();
 </script>
 <script>
-  // The animations are a few MB: the stills load with the page, and each animation takes its still's place once
-  // the page has loaded. With reduced motion the still stays and the animation is never fetched.
+  // The animations are a few MB each: the stills load with the page, and an animation is fetched once the page has
+  // loaded and its tab (or the tab before it) shows; it then takes its still's place. With reduced motion the still
+  // stays and no animation is fetched.
   // An animated image plays on from wherever it is, even out of sight; each play() gives it a URL of its own for the
   // same downloaded file, so it starts from its first frame. Without fetch (a file opened from disk) it just loops.
-  window.addEventListener('load', function () {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    document.querySelectorAll('img[data-animated]').forEach(function (img) {
-      var url = img.getAttribute('data-animated');
-      var shown = img.closest('.slide');
-      function fallback() {
-        var animation = new Image();
-        animation.onload = function () { img.src = animation.src; };
-        animation.src = url;
-      }
-      if (!window.fetch || !window.URL || !URL.createObjectURL) return fallback();
-      fetch(url).then(function (response) {
-        if (!response.ok) throw new Error(response.status);
-        return response.blob();
-      }).then(function (blob) {
-        var current = null;
-        img.play = function () {
-          var previous = current;
-          current = URL.createObjectURL(blob);
-          img.src = current;
-          if (previous) setTimeout(function () { URL.revokeObjectURL(previous); }, 1000);
-        };
-        if (shown && shown.classList.contains('on')) img.play();
-      }).catch(fallback);
+  (function () {
+    var loaded = false;
+    function prepare(slide) {
+      if (!loaded || !slide || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      slide.querySelectorAll('img[data-animated]').forEach(function (img) {
+        if (img.hasAttribute('data-fetching')) return;
+        img.setAttribute('data-fetching', '');
+        var url = img.getAttribute('data-animated');
+        function fallback() {
+          var animation = new Image();
+          animation.onload = function () { img.src = animation.src; };
+          animation.src = url;
+        }
+        if (!window.fetch || !window.URL || !URL.createObjectURL) return fallback();
+        fetch(url).then(function (response) {
+          if (!response.ok) throw new Error(response.status);
+          return response.blob();
+        }).then(function (blob) {
+          var current = null;
+          img.play = function () {
+            var previous = current;
+            current = URL.createObjectURL(blob);
+            img.src = current;
+            if (previous) setTimeout(function () { URL.revokeObjectURL(previous); }, 1000);
+          };
+          if (slide.classList.contains('on')) img.play();
+        }).catch(fallback);
+      });
+    }
+    window.tourAnimations = { prepare: prepare };
+    window.addEventListener('load', function () {
+      loaded = true;
+      var shown = document.querySelector('.slide.on');
+      prepare(shown);
+      prepare(shown && (shown.nextElementSibling || shown.parentElement.firstElementChild));
     });
-  });
+  })();
 </script>
 <div class="lightbox" role="dialog" aria-modal="true" aria-label="Screenshot" tabindex="-1"><img alt=""></div>
 <script>

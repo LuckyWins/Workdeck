@@ -185,7 +185,11 @@ class PageTests(unittest.TestCase):
 
     def test_animations_have_a_still_for_reduced_motion(self):
         page = (ROOT / "site" / "index.html").read_text()
-        for still, animated in [("notch-expanded", "notch-hover-animated"), ("notch-alert", "notch-alert-animated")]:
+        for still, animated in [
+            ("notch-expanded", "notch-hover-animated"), ("alert-session", "alert-session-animated"),
+            ("chats-dark", "switch-account-animated"), ("closed-lid", "closed-lid-animated"),
+            ("notes-capture", "notes-capture-animated"),
+        ]:
             source = f'<source media="(prefers-reduced-motion: reduce)" srcset="screenshots/{still}.png">'
             # The still loads with the page; the script swaps in the animation once the page has loaded.
             image = f'src="screenshots/{still}.png" data-animated="screenshots/{animated}.png"'
@@ -193,6 +197,38 @@ class PageTests(unittest.TestCase):
             self.assertIn(image, page)
             self.assertLess(page.index(source), page.index(image))
         self.assertIn("img[data-animated]", page)
+
+    def test_every_tour_image_exists(self):
+        page = (ROOT / "site" / "index.html").read_text()
+        import re
+        for name in set(re.findall(r'screenshots/([a-z0-9-]+\.png)', page)):
+            self.assertTrue((ROOT / "docs" / "media" / "screenshots" / name).exists(), name)
+
+    def test_animations_load_with_their_tab_not_all_at_once(self):
+        page = (ROOT / "site" / "index.html").read_text()
+        # Five animations are about 15 MB: each is fetched when its tab (or the one before it) shows.
+        self.assertNotIn("document.querySelectorAll('img[data-animated]').forEach", page)
+        self.assertIn("window.tourAnimations.prepare(slides[i])", page)
+        self.assertIn("window.tourAnimations.prepare(slides[(i + 1) % slides.length])", page)
+
+    def test_narrow_blocks_show_the_whole_window_scene(self):
+        page = (ROOT / "site" / "index.html").read_text()
+        # Taller than wide, cover would crop the scene's sides (the chooser, the Terminal): contain instead.
+        self.assertIn("@container (max-aspect-ratio: 1 / 1) { .slide.bleed > picture img { object-fit: contain; } }", page)
+        self.assertIn("@container (max-aspect-ratio: 540 / 513) { .week { width: 100cqw; } }", page)
+
+    def test_the_week_stills_match_the_page_numbers(self):
+        # The .week CSS has these sizes written in (WeekScene's printout); a new render must keep them.
+        def size(name):
+            data = (ROOT / "docs" / "media" / "screenshots" / name).read_bytes()
+            return int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
+        self.assertEqual(size("week-frame.png"), (1080, 1026))
+        self.assertEqual(size("week-body.png"), (920, 1736))
+        self.assertEqual(size("week-grid-empty.png"), (810, 204))
+
+    def test_the_week_scene_stops_moving_for_reduced_motion(self):
+        page = (ROOT / "site" / "index.html").read_text()
+        self.assertIn("@media (prefers-reduced-motion: reduce) { .week.playing .grid, .week.playing .content { animation: none; } }", page)
 
     def test_readme_no_longer_sends_people_to_the_zip(self):
         readme = (ROOT / "README.md").read_text()

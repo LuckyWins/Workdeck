@@ -41,12 +41,16 @@ final class ScreenshotFixtures {
     }
 
     /// The notch the demo shows `elapsed` seconds in, built by the real pipeline (as `ClaudeCodeDemoControllerTests`).
-    func demoNotch(elapsed: TimeInterval) -> (state: LimitsViewState, alerts: [LimitsAlert]) {
+    /// `firstThreshold` replaces the 80 % the demo's limit climbs to and alerts at (the Out of limit scene's 95 %).
+    func demoNotch(elapsed: TimeInterval, firstThreshold: Int? = nil) -> (state: LimitsViewState, alerts: [LimitsAlert]) {
         let presenter = FakePresenter()
         let connector = FakeConnector()
         connector.status = .connected
         let settings = ClaudeCodeSettings(defaults: defaults())
         settings.isEnabled = true
+        if let firstThreshold {
+            settings.notch.firstThreshold = firstThreshold
+        }
         let now = monday
         let usage = ClaudeUsageStore(fileURL: url("notch/claude-usage.json")) { now }
         let limits = ClaudeLimitsController(settings: settings, store: usage, connector: connector, poller: FakePoller(), activity: FakeActivity())
@@ -74,11 +78,12 @@ final class ScreenshotFixtures {
         return model
     }
 
-    func statistics() -> StatisticsController {
+    /// `days` replaces the demo's made-up half year (the Your week scene's empty grid passes none).
+    func statistics(days: [RecapDay]? = nil) -> StatisticsController {
         let now = thursday
         let controller = StatisticsController(calendar: calendar) { now }
         controller.isVisible = true
-        controller.update(days: RecapDemoScript.days(now: now, calendar: calendar), connectedAgents: [.claudeCode, .codex], thresholds: [80, 95])
+        controller.update(days: days ?? RecapDemoScript.days(now: now, calendar: calendar), connectedAgents: [.claudeCode, .codex], thresholds: [80, 95])
         return controller
     }
 
@@ -163,12 +168,12 @@ final class ScreenshotFixtures {
         return controller
     }
 
-    /// Closed-Lid Mode on: the helper fake reports sleep off.
-    func closedLidMode() async -> LidSleepController {
+    /// Closed-Lid Mode on (the helper fake reports sleep off), or off for the Closed-Lid scene's first moment.
+    func closedLidMode(on: Bool = true) async -> LidSleepController {
         let helper = FakeHelperClient()
-        helper.sleepDisabled = true
+        helper.sleepDisabled = on
         let settings = AppSettings(defaults: defaults())
-        settings.closedLidModeWanted = true
+        settings.closedLidModeWanted = on
         let controller = LidSleepController(
             helper: helper, installer: FakeHelperInstaller(status: .enabled),
             powerMonitor: FakePowerSourceMonitor(), thermalMonitor: FakeThermalMonitor(),

@@ -199,7 +199,9 @@ struct ScreenshotTests {
         return bytes
     }
 
-    private func expectAnimation(_ url: URL, canvas: CGSize) throws {
+    /// `limit` is before `oxipng`, which takes about half off: the notch's own animations stay under 5 MB; the tour's
+    /// window scenes may reach 8 MB, about 4 MB on the page (landing tour animations spec §4.4).
+    private func expectAnimation(_ url: URL, canvas: CGSize, limit: Int = 5_000_000) throws {
         let source = try #require(CGImageSourceCreateWithURL(url as CFURL, nil))
         #expect(CGImageSourceGetCount(source) > 1)
         let png = (CGImageSourceCopyProperties(source, nil) as? [CFString: Any])?[kCGImagePropertyPNGDictionary] as? [CFString: Any]
@@ -210,7 +212,7 @@ struct ScreenshotTests {
         let last = try #require(CGImageSourceCreateImageAtIndex(source, CGImageSourceGetCount(source) - 1, nil))
         #expect(pixels(first) == pixels(last), "\(url.lastPathComponent): the loop jumps at its seam")
         let bytes = try #require(try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int)
-        #expect(bytes < 5_000_000, "\(url.lastPathComponent) is \(bytes) bytes")
+        #expect(bytes < limit, "\(url.lastPathComponent) is \(bytes) bytes")
     }
 
     /// Measures views only, writes nothing: runs in every test run, not only with the screenshot switch.
@@ -276,13 +278,137 @@ struct ScreenshotTests {
         try expectAnimation(try await animation.write(), canvas: animation.canvas)
     }
 
+    // MARK: Landing tour scenes
+
+    /// The 95 % alert reads as the product shows it with its default thresholds (80 %, 95 %): red, a danger.
+    @Test func theOutOfLimitAlertIsADanger() throws {
+        let (_, state) = try SwitchAccountAnimation.alert(fixtures: fixtures)
+        #expect(state.thresholds == [80, 95])
+    }
+
+    /// Measures views only, writes nothing: runs in every test run. The Closed-Lid pointer clicks the popover's switch
+    /// and rests on the compact notch, inside the drawn screen.
+    @Test func closedLidPointerTargetsTheSwitchAndTheNotch() async throws {
+        let animation = await ClosedLidAnimation.make(fixtures: fixtures)
+        let origin = animation.screenOrigin
+        let popover = animation.popoverFrame.offsetBy(dx: origin.x, dy: origin.y)
+        // The switch sits at the row's right end, in its upper half.
+        let switchArea = CGRect(x: popover.maxX - 60 * ClosedLidAnimation.popoverScale, y: popover.minY, width: 60 * ClosedLidAnimation.popoverScale, height: popover.height / 2 + 8)
+        let notchWidth = animation.compactSize.width * ClosedLidAnimation.notchScale, notchHeight = animation.compactSize.height * ClosedLidAnimation.notchScale
+        let notch = CGRect(x: origin.x + DrawnMacBook<EmptyView>.screenSize.width / 2 - notchWidth / 2, y: origin.y, width: notchWidth, height: notchHeight)
+        let track = animation.pointer
+        #expect(track.clicks.count == 1)
+        #expect(switchArea.contains(try #require(track.point(at: track.clicks[0]))))
+        #expect(notch.contains(try #require(track.point(at: SceneTimeline.start(of: "finished", in: ClosedLidAnimation.phases)!))))
+    }
+
+    /// Each scene's last moment shows what its first does: the recorder repeats the first image there, so a scene
+    /// that ended elsewhere would jump at the seam with no test noticing.
+    @Test func everySceneEndsAsItStarts() async throws {
+        let alertFrames = SceneTimeline.frames(AlertSessionAnimation.phases)
+        let alert = try AlertSessionAnimation(fixtures: fixtures)
+        for frame in [alertFrames.first!, alertFrames.last!] {
+            #expect(AlertSessionAnimation.notchProgress(frame) == 0)
+            #expect(AlertSessionAnimation.windowShown(frame) == 0)
+            #expect(alert.pointer.point(at: frame.time) == nil)
+        }
+        let switchFrames = SceneTimeline.frames(SwitchAccountAnimation.phases)
+        #expect(SwitchAccountAnimation.shown(switchFrames.last!) == SwitchAccountAnimation.shown(switchFrames.first!))
+        #expect(SwitchAccountAnimation.notchProgress(switchFrames.last!) == SwitchAccountAnimation.notchProgress(switchFrames.first!))
+        let lid = await ClosedLidAnimation.make(fixtures: fixtures)
+        let lidFrames = SceneTimeline.frames(ClosedLidAnimation.phases)
+        let first = ClosedLidState(), last = ClosedLidState()
+        lid.show(lidFrames.first!, in: first, track: lid.pointer)
+        lid.show(lidFrames.last!, in: last, track: lid.pointer)
+        #expect(first.lidOpen == last.lidOpen && first.screenOn == last.screenOn && first.switchOn == last.switchOn)
+        #expect(first.popover == last.popover && first.finished == last.finished && first.clock == last.clock && first.pointer == last.pointer)
+        #expect(ClosedLidAnimation.notchProgress(lidFrames.last!) == 0)
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func theWindowSnapshotIsTwiceItsPointSize() async throws {
+        let controller = try await fixtures.chats()
+        let image = try ScreenshotRenderer.snapshotWindow(
+            ChatsWindow(controller: controller), title: "Claude Code Chats", size: CGSize(width: 640, height: 520), dark: true
+        )
+        #expect(image.width == Int((640 + 2 * ScreenshotRenderer.windowMargin) * 2))
+    }
+
+    /// Measures views only, writes nothing: runs in every test run.
+    @Test func alertSessionPointerTargetsAreInsideTheCanvas() throws {
+        let animation = try AlertSessionAnimation(fixtures: fixtures)
+        let track = animation.pointer
+        #expect(track.clicks.count == 1)
+        for time in track.clicks {
+            let tip = try #require(track.point(at: time))
+            let alert = CGRect(x: (animation.canvas.width - animation.alertSize.width) / 2, y: 0, width: animation.alertSize.width, height: animation.alertSize.height)
+            #expect(alert.contains(tip))
+        }
+        #expect(animation.canvas.width >= animation.terminalSize.width + 2 * AlertSessionAnimation.windowMargin)
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func alertSessionAnimation() async throws {
+        let animation = try AlertSessionAnimation(fixtures: fixtures)
+        try expectAnimation(try await animation.write(), canvas: animation.canvas)
+        let still = try animation.writeStill()
+        #expect(FileManager.default.fileExists(atPath: still.path))
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func switchAccountAnimation() async throws {
+        let animation = try await SwitchAccountAnimation.make(fixtures: fixtures)
+        // The clicks land on the alert, the row's Terminal button and the chooser's personal row.
+        let track = animation.pointer
+        let targets = [
+            CGRect(x: (animation.canvas.width - animation.alertSize.width) / 2, y: 0, width: animation.alertSize.width, height: animation.alertSize.height),
+            animation.terminalButton, animation.personalRow,
+        ]
+        #expect(track.clicks.count == targets.count)
+        for (time, target) in zip(track.clicks, targets) {
+            #expect(target.contains(try #require(track.point(at: time))))
+        }
+        try expectAnimation(try await animation.write(), canvas: animation.canvas, limit: 8_000_000)
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func closedLidAnimation() async throws {
+        let animation = await ClosedLidAnimation.make(fixtures: fixtures)
+        // The pointer clicks the switch and rests on the notch, both on the screen.
+        let screen = CGRect(origin: animation.screenOrigin, size: DrawnMacBook<EmptyView>.screenSize)
+        #expect(screen.contains(animation.switchPoint))
+        #expect(screen.contains(animation.notchPoint))
+        try expectAnimation(try await animation.write(), canvas: animation.canvas, limit: 8_000_000)
+        let still = try animation.writeStill()
+        #expect(FileManager.default.fileExists(atPath: still.path))
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func weekScene() throws {
+        let scene = try WeekScene.make(fixtures: fixtures)
+        // site/index.html's Your week slide has these numbers written in (the week CSS): a different screen or layout
+        // that changes them must change the page too.
+        #expect(scene.frameRect.size == CGSize(width: 540, height: 513), "update site/index.html's .week numbers")
+        #expect(scene.bodyRect.origin == CGPoint(x: 40, y: 64), "update site/index.html's .week numbers")
+        #expect(scene.bodyHeight == 868, "update site/index.html's .week numbers")
+        #expect(scene.scrollDistance == 419, "update site/index.html's .week numbers")
+        #expect(scene.gridRect == CGRect(x: 40, y: 66, width: 405, height: 102), "update site/index.html's .week numbers")
+        for url in try scene.write() {
+            #expect(FileManager.default.fileExists(atPath: url.path))
+        }
+        // The page lays the stills out at these numbers (site/index.html's Your week slide).
+        print("week: frame \(scene.frameRect.size), body \(scene.bodyRect), body height \(scene.bodyHeight), grid \(scene.gridRect), scroll \(scene.scrollDistance)")
+    }
+
     @Test(.enabled(if: ScreenshotRenderer.isEnabled))
     func everyImageWasWritten() {
         // The suite is serialized and runs in declaration order, so this comes last: every image of spec §2 must have
         // been written in this run, not merely be on disk from an earlier one.
         let expected: Set = ["notch-compact", "notch-expanded", "notch-alert", "notch-recap", "popover-light", "popover-dark",
                              "statistics-light", "statistics-dark", "chats-light", "chats-dark", "instances-light", "instances-dark",
-                             "notch-hover-animated", "notch-alert-animated", "notes-capture", "notes-capture-animated"]
+                             "notch-hover-animated", "notch-alert-animated", "notes-capture", "notes-capture-animated",
+                             "alert-session-animated", "alert-session", "switch-account-animated",
+                             "closed-lid-animated", "closed-lid", "week-frame", "week-body", "week-grid-empty"]
         #expect(expected.isSubset(of: ScreenshotRenderer.writtenThisRun), "missing: \(expected.subtracting(ScreenshotRenderer.writtenThisRun).sorted())")
     }
 }
