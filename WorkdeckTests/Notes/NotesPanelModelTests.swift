@@ -69,9 +69,9 @@ struct NotesPanelModelTests {
 
     private func addOpenItems() {
         store.items = [
-            item("migration", in: "work", "Проверить миграцию на staging", createdDaysAgo: 5),
-            item("limits", in: "work", "Спросить Сашу про лимиты", createdDaysAgo: 3),
-            item("letters", in: "wb", "Поиграть с весами букв", createdDaysAgo: 1),
+            item("migration", in: "work", "Check the staging migration", createdDaysAgo: 5),
+            item("limits", in: "work", "Ask Sasha about limits", createdDaysAgo: 3),
+            item("letters", in: "wb", "Play with letter weights", createdDaysAgo: 1),
         ]
     }
 
@@ -90,10 +90,10 @@ struct NotesPanelModelTests {
 
     @Test func returnSavesAndShowsNeutralConfirmation() async {
         let (model, _) = await makeModel()
-        await typeWithProject(model, "Проверить миграцию на staging завтра в 16 #Workdeck")
+        await typeWithProject(model, "Check the staging migration tomorrow at 4pm #Workdeck")
 
         #expect(await model.handle(.returnKey))
-        #expect(addedTitles == ["Проверить миграцию на staging"])
+        #expect(addedTitles == ["Check the staging migration"])
         #expect(model.mode == .confirmation(NotesConfirmation(symbol: "checkmark", title: "Saved · Workdeck", subtitle: "Reminds tomorrow at 16:00")))
         #expect(model.draft.text.isEmpty)
 
@@ -101,14 +101,14 @@ struct NotesPanelModelTests {
         #expect(recorder.closes == 1)
         #expect(model.mode == .typing)
 
-        await typeWithProject(model, "Обновить скриншоты #Workdeck")
+        await typeWithProject(model, "Update screenshots #Workdeck")
         #expect(await model.handle(.returnKey))
         #expect(model.mode == .confirmation(NotesConfirmation(symbol: "checkmark", title: "Saved · Workdeck", subtitle: "No reminder")))
     }
 
     @Test func aDateWithoutATimeRemindsAtNine() async {
         let (model, _) = await makeModel()
-        await typeWithProject(model, "Продлить домен 20 ноября #Workdeck")
+        await typeWithProject(model, "Renew the domain Nov 20 #Workdeck")
         #expect(await model.handle(.returnKey))
         #expect(model.mode == .confirmation(NotesConfirmation(symbol: "checkmark", title: "Saved · Workdeck", subtitle: "Reminds on Nov 20 at 09:00")))
     }
@@ -116,38 +116,38 @@ struct NotesPanelModelTests {
     @Test func aChipNamedTodayGivesNoReminder() async {
         store.listInfos.append(ReminderListInfo(id: "today", title: "Today", red: 1, green: 0, blue: 0, openCount: 0))
         let (model, _) = await makeModel()
-        await typeWithProject(model, "Купить молоко #Today")
+        await typeWithProject(model, "Buy milk #Today")
         #expect(model.parsedDate == nil)
         #expect(model.summaryDate == nil)
 
         #expect(await model.handle(.returnKey))
-        #expect(store.added == [.add(title: "Купить молоко", due: nil, listID: "today")])
+        #expect(store.added == [.add(title: "Buy milk", due: nil, listID: "today")])
         #expect(model.mode == .confirmation(NotesConfirmation(symbol: "checkmark", title: "Saved · Today", subtitle: "No reminder")))
     }
 
     @Test func aChipNamedTodayKeepsTheTypedDate() async {
         store.listInfos.append(ReminderListInfo(id: "today", title: "Today", red: 1, green: 0, blue: 0, openCount: 0))
         let (model, _) = await makeModel()
-        await typeWithProject(model, "Позвонить завтра в 16 #Today")
+        await typeWithProject(model, "Call tomorrow at 4pm #Today")
         #expect(model.summaryDate == "Tomorrow, 16:00")
 
         #expect(await model.handle(.returnKey))
-        #expect(addedTitles == ["Позвонить"])
+        #expect(addedTitles == ["Call"])
         #expect(model.mode == .confirmation(NotesConfirmation(symbol: "checkmark", title: "Saved · Today", subtitle: "Reminds tomorrow at 16:00")))
     }
 
     @Test func failedSaveKeepsText() async {
         store.addError = FakeRemindersStore.Failure()
         let (model, _) = await makeModel()
-        model.textChanged("Купить молоко")
+        model.textChanged("Buy milk")
 
         #expect(await model.handle(.returnKey))
         #expect(model.mode == .confirmation(NotesConfirmation(symbol: "exclamationmark", title: "Couldn't save", subtitle: "Reminders could not save the note")))
-        #expect(model.draft.text == "Купить молоко")
+        #expect(model.draft.text == "Buy milk")
 
         model.finishConfirmation()
         #expect(model.mode == .typing)
-        #expect(model.draft.text == "Купить молоко")
+        #expect(model.draft.text == "Buy milk")
         #expect(recorder.closes == 0)
     }
 
@@ -165,7 +165,7 @@ struct NotesPanelModelTests {
     @Test func doubleReturnSavesOnce() async {
         store.beforeOpenItems = { try? await Task.sleep(for: .milliseconds(50)) }
         let (model, _) = await makeModel()
-        model.textChanged("Купить молоко")
+        model.textChanged("Buy milk")
 
         async let first = model.handle(.returnKey)
         async let second = model.handle(.returnKey)
@@ -184,7 +184,7 @@ struct NotesPanelModelTests {
         #expect(model.acceptsTyping)
         let gate = Gate()
         store.beforeOpenItems = { await withCheckedContinuation { gate.release = $0 } }
-        model.textChanged("Купить молоко")
+        model.textChanged("Buy milk")
 
         let saving = Task { await model.handle(.returnKey) }
         for _ in 0..<500 where gate.release == nil {
@@ -194,7 +194,7 @@ struct NotesPanelModelTests {
         // What is typed now would be dropped when the saved note leaves the field.
         #expect(!model.acceptsTyping)
         #expect(model.handleImmediately(.space) == true)
-        #expect(model.draft.text == "Купить молоко")
+        #expect(model.draft.text == "Buy milk")
 
         store.beforeOpenItems = nil
         gate.release?.resume()
@@ -206,13 +206,13 @@ struct NotesPanelModelTests {
     @Test func deniedAccessShowsHint() async {
         store.access = .denied
         let (model, _) = await makeModel()
-        model.textChanged("Купить молоко")
+        model.textChanged("Buy milk")
 
         #expect(await model.handle(.returnKey))
         #expect(model.needsAccess)
         #expect(NotesPanelModel.accessHint == "Workdeck needs access to Reminders")
         #expect(model.mode == .typing)
-        #expect(model.draft.text == "Купить молоко")
+        #expect(model.draft.text == "Buy milk")
 
         model.openAccessSettings()
         #expect(recorder.opened == [NotesPanelModel.remindersPrivacyURL])
@@ -223,29 +223,29 @@ struct NotesPanelModelTests {
 
     @Test func tabInsideQueryIsConsumedOutsideIsNot() async {
         let (model, _) = await makeModel()
-        model.textChanged("Спросить Сашу")
+        model.textChanged("Ask Sasha")
         #expect(await model.handle(.tab) == false)
 
-        model.textChanged("Спросить Сашу #w")
+        model.textChanged("Ask Sasha #w")
         #expect(model.matches.map(\.id) == ["work", "wb", "site"])
         #expect(model.ghost == "or")
         #expect(await model.handle(.tab))
-        #expect(model.draft.text == "Спросить Сашу #Wor")
+        #expect(model.draft.text == "Ask Sasha #Wor")
 
-        model.textChanged("Спросить Сашу #Work")
+        model.textChanged("Ask Sasha #Work")
         #expect(model.ghost == "deck")
         #expect(await model.handle(.tab))
-        #expect(model.draft.text == "Спросить Сашу #Workdeck")
+        #expect(model.draft.text == "Ask Sasha #Workdeck")
         #expect(model.ghost == nil)
 
         // The name is complete: Tab puts the selected list in place, and again moves to the next match.
         #expect(await model.handle(.tab))
         #expect(model.draft.project?.listID == "work")
-        #expect(model.draft.text == "Спросить Сашу Workdeck")
+        #expect(model.draft.text == "Ask Sasha Workdeck")
         #expect(model.matches.isEmpty)
         #expect(await model.handle(.tab))
         #expect(model.draft.project?.listID == "site")
-        #expect(model.draft.text == "Спросить Сашу Workdeck-site")
+        #expect(model.draft.text == "Ask Sasha Workdeck-site")
     }
 
     @Test func arrowsMoveTheListSelectionAndTabTakesIt() async {
@@ -260,7 +260,7 @@ struct NotesPanelModelTests {
 
     @Test func aQueryWithoutMatchOffersCreatingAndClosesWhenTypingOn() async {
         let (model, _) = await makeModel()
-        model.textChanged("Продлить домен #infra")
+        model.textChanged("Renew the domain #infra")
         #expect(model.matches.isEmpty)
         #expect(model.createListTitle == "infra")
 
@@ -268,7 +268,7 @@ struct NotesPanelModelTests {
         #expect(model.createListTitle == nil)
         #expect(await model.handle(.tab) == false)
 
-        model.textChanged("Продлить домен #infra")
+        model.textChanged("Renew the domain #infra")
         #expect(await model.handle(.tab))
         #expect(model.draft.project?.newListTitle == "infra")
         #expect(model.summaryListTitle == "infra (new)")
@@ -280,7 +280,7 @@ struct NotesPanelModelTests {
         #expect(model.tintedQuery == model.draft.query()?.range)
         #expect(model.tintedQuery != nil)
 
-        model.textChanged("#1 проверить стейдж")
+        model.textChanged("#1 check staging")
         #expect(!model.isListOpen)
         #expect(model.tintedQuery == nil)
         #expect(await model.handle(.returnKey))
@@ -288,14 +288,14 @@ struct NotesPanelModelTests {
             Issue.record("expected a save")
             return
         }
-        #expect(title == "#1 проверить стейдж")
+        #expect(title == "#1 check staging")
     }
 
     @Test func typingRightAfterAChipAddsASpace() async {
         let (model, _) = await makeModel()
         await typeWithProject(model, "Note #Workdeck")
-        model.textChanged("Note Workdeckз")
-        #expect(model.draft.text == "Note Workdeck з")
+        model.textChanged("Note Workdeckq")
+        #expect(model.draft.text == "Note Workdeck q")
         #expect(model.draft.project?.listID == "work")
     }
 
@@ -339,7 +339,7 @@ struct NotesPanelModelTests {
         #expect(store.added.isEmpty)
         #expect(!store.calls.contains(.createList("infra")))
 
-        model.textChanged("Продлить домен infra")
+        model.textChanged("Renew the domain infra")
         #expect(model.draft.project?.newListTitle == "infra")
         #expect(await model.handle(.returnKey))
         #expect(store.calls.contains(.createList("infra")))
@@ -348,7 +348,7 @@ struct NotesPanelModelTests {
             Issue.record("expected a save")
             return
         }
-        #expect(title == "Продлить домен")
+        #expect(title == "Renew the domain")
         #expect(listID == created?.id)
     }
 
@@ -373,7 +373,7 @@ struct NotesPanelModelTests {
         await model.opened()
         #expect(model.visibleItems.map(\.id) == ["migration", "limits", "letters"])
 
-        model.textChanged("миграц")
+        model.textChanged("migrat")
         #expect(model.visibleItems.map(\.id) == ["migration"])
 
         model.textChanged("#Workdeck")
@@ -381,7 +381,7 @@ struct NotesPanelModelTests {
 
         model.textChanged("#Workdeck")
         #expect(await model.handle(.space))
-        model.textChanged("Workdeck лимит")
+        model.textChanged("Workdeck limit")
         #expect(model.visibleItems.map(\.id) == ["limits"])
     }
 
@@ -389,12 +389,12 @@ struct NotesPanelModelTests {
         addOpenItems()
         let (model, _) = await makeModel()
         await model.opened()
-        model.textChanged("миграц")
+        model.textChanged("migrat")
         #expect(await model.handle(.down))
         #expect(model.selectedRow == 0)
 
         #expect(await model.handle(.returnKey))
-        #expect(addedTitles == ["миграц"])
+        #expect(addedTitles == ["migrat"])
         #expect(launcher.commands.isEmpty)
     }
 
@@ -406,7 +406,7 @@ struct NotesPanelModelTests {
         #expect(await model.handle(.commandReturn))
         #expect(store.added.isEmpty)
         #expect(launcher.commands.count == 1)
-        #expect(launcher.commands.first?.contains("Проверить миграцию на staging") == true)
+        #expect(launcher.commands.first?.contains("Check the staging migration") == true)
         #expect(model.mode == .confirmation(NotesConfirmation(
             symbol: "arrow.right", title: "Claude · main", subtitle: "Started in Terminal · Workdeck", mark: .claude
         )))
@@ -414,12 +414,12 @@ struct NotesPanelModelTests {
         #expect(recorder.closes == 1)
 
         await model.opened()
-        await typeWithProject(model, "Новая заметка #Workdeck")
+        await typeWithProject(model, "New note #Workdeck")
         #expect(model.selectedRow == nil)
         #expect(await model.handle(.commandReturn))
-        #expect(addedTitles == ["Новая заметка"])
+        #expect(addedTitles == ["New note"])
         #expect(launcher.commands.count == 2)
-        #expect(launcher.commands.last?.contains("Новая заметка") == true)
+        #expect(launcher.commands.last?.contains("New note") == true)
     }
 
     @Test func doubleCommandReturnHandsOffOnce() async {
@@ -528,7 +528,7 @@ struct NotesPanelModelTests {
     @Test func theDoneSectionReopensANote() async {
         addOpenItems()
         store.items.append(ReminderItem(
-            id: "shots", listID: "work", title: "Обновить скриншоты", due: nil, hasDueTime: false,
+            id: "shots", listID: "work", title: "Update screenshots", due: nil, hasDueTime: false,
             created: now.addingTimeInterval(-86_400 * 4), completed: now.addingTimeInterval(-7_200), notes: nil
         ))
         let (model, controller) = await makeModel()
@@ -554,15 +554,15 @@ struct NotesPanelModelTests {
 
     @Test func theDoneSectionIsFilteredAsTheOpenItemsAre() async {
         store.items = [
-            ReminderItem(id: "a", listID: "work", title: "Обновить скриншоты", due: nil, hasDueTime: false,
+            ReminderItem(id: "a", listID: "work", title: "Update screenshots", due: nil, hasDueTime: false,
                          created: now, completed: now.addingTimeInterval(-60), notes: nil),
-            ReminderItem(id: "b", listID: "wb", title: "Поиграть с весами", due: nil, hasDueTime: false,
+            ReminderItem(id: "b", listID: "wb", title: "Play with weights", due: nil, hasDueTime: false,
                          created: now, completed: now.addingTimeInterval(-60), notes: nil),
         ]
         let (model, _) = await makeModel()
         await model.opened()
         #expect(Set(model.visibleDoneItems.map(\.id)) == ["a", "b"])
-        model.textChanged("скрин")
+        model.textChanged("screen")
         #expect(model.visibleDoneItems.map(\.id) == ["a"])
         // Only done items match: the section still shows.
         #expect(model.showsOpenItems)
@@ -599,7 +599,7 @@ struct NotesPanelModelTests {
 
     @Test func commandShiftReturnOpensPickerAndEscapeGoesBack() async {
         let (model, _) = await makeModel()
-        await typeWithProject(model, "Проверить миграцию #Workdeck")
+        await typeWithProject(model, "Check the migration #Workdeck")
 
         #expect(await model.handle(.commandShiftReturn))
         #expect(model.mode == .picker)
@@ -611,21 +611,21 @@ struct NotesPanelModelTests {
 
         #expect(await model.handle(.escape))
         #expect(model.mode == .typing)
-        #expect(model.draft.text == "Проверить миграцию Workdeck")
+        #expect(model.draft.text == "Check the migration Workdeck")
         #expect(recorder.closes == 0)
         #expect(store.added.isEmpty)
     }
 
     @Test func pickerChoiceIsRemembered() async {
         let (model, controller) = await makeModel()
-        await typeWithProject(model, "Проверить миграцию #Workdeck")
+        await typeWithProject(model, "Check the migration #Workdeck")
         #expect(await model.handle(.commandShiftReturn))
 
         await model.pickAgent(AgentDestination(agent: .claude, instance: "work", folder: nil))
         #expect(model.mode == .confirmation(NotesConfirmation(
             symbol: "arrow.right", title: "Claude · work", subtitle: "Started in Terminal · Workdeck", mark: .claude
         )))
-        #expect(addedTitles == ["Проверить миграцию"])
+        #expect(addedTitles == ["Check the migration"])
         #expect(launcher.commands.count == 1)
         let remembered = controller.destination(for: "work")
         #expect(remembered.instance == "work")
@@ -634,13 +634,13 @@ struct NotesPanelModelTests {
 
     @Test func pickerOnAnUnsavedNoteWithoutProjectSavesFirst() async throws {
         let (model, controller) = await makeModel()
-        model.textChanged("Купить молоко")
+        model.textChanged("Buy milk")
         #expect(await model.handle(.commandShiftReturn))
         #expect(await model.handle(.down))
         #expect(await model.handle(.returnKey))
 
         let inbox = try #require(store.listInfos.first { $0.title == "Inbox" })
-        #expect(addedTitles == ["Купить молоко"])
+        #expect(addedTitles == ["Buy milk"])
         #expect(model.mode == .folder(listID: inbox.id, listTitle: "Inbox"))
         #expect(!model.folderIsChange)
         #expect(controller.destination(for: inbox.id).instance == "work")
@@ -666,10 +666,10 @@ struct NotesPanelModelTests {
         let suggested = folder.appending(path: "wordle-bot")
         try? FileManager.default.createDirectory(at: suggested, withIntermediateDirectories: true)
         let (model, controller) = await makeModel(candidates: [FolderCandidate(path: suggested.path, lastUsed: now)])
-        await typeWithProject(model, "Поиграть с весами букв #Wordle-bot")
+        await typeWithProject(model, "Play with letter weights #Wordle-bot")
 
         #expect(await model.handle(.commandReturn))
-        #expect(addedTitles == ["Поиграть с весами букв"])
+        #expect(addedTitles == ["Play with letter weights"])
         #expect(model.mode == .folder(listID: "wb", listTitle: "Wordle-bot"))
         #expect(model.folderNoteWasSaved)
         #expect(model.folderSuggestions.map(\.path) == [suggested.path])
@@ -686,21 +686,21 @@ struct NotesPanelModelTests {
 
     @Test func escapeInFolderPromptKeepsSavedNote() async {
         let (model, _) = await makeModel()
-        await typeWithProject(model, "Поиграть с весами букв #Wordle-bot")
+        await typeWithProject(model, "Play with letter weights #Wordle-bot")
         #expect(await model.handle(.commandReturn))
         #expect(model.mode == .folder(listID: "wb", listTitle: "Wordle-bot"))
 
         #expect(await model.handle(.escape))
         #expect(recorder.closes == 1)
         #expect(store.added.count == 1)
-        #expect(store.items.contains { $0.title == "Поиграть с весами букв" })
+        #expect(store.items.contains { $0.title == "Play with letter weights" })
         #expect(!store.calls.contains { if case .remove = $0 { true } else { false } })
         #expect(model.draft.text.isEmpty)
     }
 
     @Test func pickedFolderIsRememberedAndStarts() async {
         let (model, controller) = await makeModel()
-        await typeWithProject(model, "Поиграть #Wordle-bot")
+        await typeWithProject(model, "Play #Wordle-bot")
         #expect(await model.handle(.commandReturn))
 
         await model.pickFolder(folder.path)
@@ -724,7 +724,7 @@ struct NotesPanelModelTests {
         #expect(confirmation.title == "Couldn't open Terminal")
         #expect(confirmation.symbol == "exclamationmark")
         let command = try #require(model.failedCommand)
-        #expect(command.contains("Проверить миграцию на staging"))
+        #expect(command.contains("Check the staging migration"))
 
         model.copyFailedCommand()
         #expect(recorder.copied == [command])
@@ -760,7 +760,7 @@ struct NotesPanelModelTests {
 
     @Test func changeFolderAsksWithoutSayingTheListHasNone() async {
         let (model, _) = await makeModel()
-        await typeWithProject(model, "Проверить миграцию #Workdeck")
+        await typeWithProject(model, "Check the migration #Workdeck")
         #expect(await model.handle(.commandShiftReturn))
         #expect(await model.handle(.down))
         #expect(await model.handle(.down))
@@ -774,8 +774,374 @@ struct NotesPanelModelTests {
 
     @Test func aMissingFolderIsSaidSo() async {
         let (model, _) = await makeModel()
-        await typeWithProject(model, "Поиграть #Wordle-bot")
+        await typeWithProject(model, "Play #Wordle-bot")
         #expect(await model.handle(.commandReturn))
         #expect(model.folderPrompt == "Wordle-bot has no folder yet. Where should the agent start?")
     }
+
+    // MARK: Row menu (row menu spec)
+
+    private func note(_ id: String = "migration", title: String = "Check the staging migration", due: Date? = nil, hasTime: Bool = true, repeats: Bool = false) -> ReminderItem {
+        var item = ReminderItem(id: id, listID: "work", title: title, due: due, hasDueTime: due != nil && hasTime, created: now, completed: nil, notes: nil)
+        item.repeats = repeats
+        return item
+    }
+
+    private var updates: [FakeRemindersStore.Call] {
+        store.calls.filter { if case .update = $0 { true } else { false } }
+    }
+
+    private func moment(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+        calendar.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour, minute: minute))!
+    }
+
+    @Test func editPutsTheNoteInTheLineWithItsListAndDate() async throws {
+        let item = note(due: moment(12, 16))
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.startEdit(item)
+        #expect(model.isEditing)
+        #expect(model.draft.text == "Check the staging migration Workdeck Nov 12 at 16:00")
+        #expect(model.draft.project?.listID == "work")
+        #expect(model.parsedDate?.date == moment(12, 16))
+        #expect(!model.showsOpenItems)
+    }
+
+    @Test func returnDuringAnEditUpdatesTheSameReminder() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.startEdit(item)
+        model.textChanged(model.draft.text.replacingOccurrences(of: "staging", with: "prod"))
+        #expect(await model.handle(.returnKey))
+        #expect(await model.handle(.returnKey))
+        #expect(updates == [.update(id: "migration", title: "Check the prod migration", due: .keep, listID: nil)])
+        #expect(store.added.isEmpty)
+        guard case let .confirmation(confirmation) = model.mode else {
+            Issue.record("expected a confirmation")
+            return
+        }
+        #expect(confirmation.title == "Saved · Workdeck")
+    }
+
+    @Test func anUntouchedReturnWritesNothing() async {
+        let item = note(due: moment(12, 16))
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.startEdit(item)
+        #expect(await model.handle(.returnKey))
+        #expect(updates.isEmpty)
+        #expect(!model.isEditing)
+    }
+
+    @Test func anUnchangedDatePhraseKeepsAnOverdueDate() async {
+        let item = note(due: moment(5, 10))
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.startEdit(item)
+        model.textChanged(model.draft.text.replacingOccurrences(of: "staging", with: "prod"))
+        #expect(await model.handle(.returnKey))
+        #expect(updates == [.update(id: "migration", title: "Check the prod migration", due: .keep, listID: nil)])
+    }
+
+    @Test func removingThePhraseRemovesTheDate() async {
+        let item = note(due: moment(12, 16))
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.startEdit(item)
+        model.textChanged(model.draft.text.replacingOccurrences(of: " Nov 12 at 16:00", with: ""))
+        #expect(await model.handle(.returnKey))
+        #expect(updates == [.update(id: "migration", title: "Check the staging migration", due: .remove, listID: nil)])
+    }
+
+    @Test func changingThePhraseSetsTheDate() async throws {
+        let item = note(due: moment(12, 16))
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.startEdit(item)
+        model.textChanged(model.draft.text.replacingOccurrences(of: "16:00", with: "18:00"))
+        #expect(await model.handle(.returnKey))
+        guard case let .update(_, _, .set(date), _)? = updates.first else {
+            Issue.record("expected a new date")
+            return
+        }
+        #expect(date.date == moment(12, 18))
+    }
+
+    @Test func editingKeepsTitleDateWordsAsText() async {
+        let item = note(title: "Prepare Friday slides")
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.startEdit(item)
+        #expect(model.parsedDate == nil)
+        model.textChanged(model.draft.text.replacingOccurrences(of: "slides", with: "deck"))
+        #expect(await model.handle(.returnKey))
+        #expect(updates == [.update(id: "migration", title: "Prepare Friday deck", due: .keep, listID: nil)])
+    }
+
+    @Test func aRepeatingReminderKeepsItsDates() async {
+        let item = note(due: moment(12, 16), repeats: true)
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.startEdit(item)
+        #expect(model.draft.text == "Check the staging migration Workdeck")
+        model.textChanged(model.draft.text.replacingOccurrences(of: "staging", with: "prod"))
+        #expect(await model.handle(.returnKey))
+        #expect(updates == [.update(id: "migration", title: "Check the prod migration", due: .keep, listID: nil)])
+    }
+
+    @Test func theTypedTextComesBackAfterAnEdit() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.textChanged("half a note")
+        model.startEdit(item)
+        #expect(await model.handle(.escape))
+        #expect(model.draft.text == "half a note")
+        model.startEdit(item)
+        model.textChanged(model.draft.text.replacingOccurrences(of: "staging", with: "prod"))
+        #expect(await model.handle(.returnKey))
+        #expect(model.draft.text == "half a note")
+    }
+
+    @Test func escEndsAnEditWithoutClosing() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.startEdit(item)
+        #expect(await model.handle(.escape))
+        #expect(!model.isEditing)
+        #expect(recorder.closes == 0)
+        #expect(updates.isEmpty)
+    }
+
+    @Test func commandReturnSavesTheEditThenHandsItOff() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.startEdit(item)
+        model.textChanged(model.draft.text.replacingOccurrences(of: "staging", with: "prod"))
+        #expect(await model.handle(.commandReturn))
+        #expect(updates.count == 1)
+        #expect(launcher.commands.count == 1)
+        #expect(launcher.commands.first?.contains("prod") == true)
+    }
+
+    @Test func deleteWaitsAndUndoTakesItBack() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel(doneUndoDelay: .milliseconds(200))
+        model.delete(item)
+        #expect(model.isPendingDelete(item))
+        #expect(await model.handle(.commandZ))
+        #expect(!model.isPendingDelete(item))
+        try? await Task.sleep(for: .milliseconds(300))
+        #expect(!store.calls.contains(.remove("migration")))
+    }
+
+    @Test func aWaitingDeletionIsWrittenAfterItsTime() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel(doneUndoDelay: .milliseconds(50))
+        model.delete(item)
+        #expect(await eventually { store.calls.contains(.remove("migration")) })
+    }
+
+    @Test func closingCommitsAWaitingDeletion() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.delete(item)
+        model.closed()
+        #expect(await eventually { store.calls.contains(.remove("migration")) })
+    }
+
+    @Test func copyPutsTheTitleOnThePasteboard() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.copy(item)
+        #expect(recorder.copied == ["Check the staging migration"])
+        guard case let .confirmation(confirmation) = model.mode else {
+            Issue.record("expected a confirmation")
+            return
+        }
+        #expect(confirmation.title == "Copied")
+    }
+
+    @Test func moveConfirmsAndRefusalSaysCouldntMove() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        await model.move(item, to: wordle)
+        guard case let .confirmation(moved) = model.mode else {
+            Issue.record("expected a confirmation")
+            return
+        }
+        #expect(moved.title == "Moved · Wordle-bot")
+        store.updateError = RemindersStoreError.cannotMove
+        model.finishConfirmation()
+        await model.move(note(), to: site)
+        guard case let .confirmation(refused) = model.mode else {
+            Issue.record("expected a confirmation")
+            return
+        }
+        #expect(refused.title == "Couldn't move")
+    }
+
+    @Test func noMenuForDoneOrWaitingItemsOrWhileEditing() async {
+        let open = note()
+        var done = note("done")
+        done.completed = now
+        let waiting = note("waiting")
+        let deleting = note("deleting")
+        store.items = [open, waiting, deleting]
+        let (model, _) = await makeModel()
+        #expect(model.allowsMenu(for: open))
+        #expect(!model.allowsMenu(for: done))
+        await model.toggleDone(waiting)
+        #expect(!model.allowsMenu(for: waiting))
+        model.delete(deleting)
+        #expect(!model.allowsMenu(for: deleting))
+        model.startEdit(open)
+        #expect(!model.allowsMenu(for: open))
+    }
+
+    @Test func commandEAndCommandBackspaceActOnTheSelectedRow() async {
+        addOpenItems()
+        let (model, _) = await makeModel()
+        #expect(await model.handle(.commandBackspace) == false)
+        #expect(await model.handle(.down))
+        let first = model.rows[0]
+        #expect(await model.handle(.commandE))
+        #expect(model.editing?.id == first.id)
+        // Row keys rest while editing.
+        #expect(await model.handle(.commandD))
+        #expect(!model.isPendingDone(first))
+        #expect(await model.handle(.escape))
+        #expect(await model.handle(.down))
+        #expect(await model.handle(.down))
+        let second = model.rows[1]
+        #expect(await model.handle(.commandBackspace))
+        #expect(model.isPendingDelete(second))
+    }
+
+    @Test func editingADinnerNoteKeepsItsTitle() async {
+        let item = note(title: "Order dinner", due: calendar.date(from: DateComponents(year: 2026, month: 12, day: 3))!, hasTime: false)
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.startEdit(item)
+        model.textChanged(model.draft.text.replacingOccurrences(of: "Order", with: "Book"))
+        #expect(await model.handle(.returnKey))
+        #expect(updates == [.update(id: "migration", title: "Book dinner", due: .keep, listID: nil)])
+    }
+
+    @Test func closingWhileAnEditSavesKeepsTheTypedText() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.textChanged("half a note")
+        model.startEdit(item)
+        model.textChanged(model.draft.text.replacingOccurrences(of: "staging", with: "prod"))
+        store.beforeOpenItems = { model.closed() }
+        #expect(await model.handle(.returnKey))
+        store.beforeOpenItems = nil
+        #expect(model.draft.text == "half a note")
+    }
+
+    @Test func aNoteGoneElsewhereLeavesTheLineAsANewNote() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.textChanged("half a note")
+        model.startEdit(item)
+        model.textChanged(model.draft.text.replacingOccurrences(of: "staging", with: "prod"))
+        store.updateError = RemindersStoreError.reminderNotFound
+        #expect(await model.handle(.returnKey))
+        #expect(!model.isEditing)
+        #expect(model.draft.text.hasPrefix("Check the prod migration"))
+        model.finishConfirmation()
+        #expect(await model.handle(.returnKey))
+        #expect(addedTitles == ["Check the prod migration"])
+        #expect(model.draft.text == "half a note")
+    }
+
+    @Test func returnTwiceOnAnUntouchedEditAddsNothing() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.textChanged("half a note")
+        model.startEdit(item)
+        #expect(await model.handle(.returnKey))
+        #expect(await model.handle(.returnKey))
+        #expect(store.added.isEmpty)
+        #expect(updates.isEmpty)
+    }
+
+    @Test func theSummaryShowsAnOverdueDateAsItIs() async {
+        let item = note(due: moment(5, 10))
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.startEdit(item)
+        #expect(model.parsedDate?.date == moment(5, 10))
+    }
+
+    @Test func noMenuWhileANoteIsSaving() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        var allowedDuringSave: Bool?
+        model.textChanged("Something new")
+        store.beforeOpenItems = { allowedDuringSave = model.allowsMenu(for: item) }
+        #expect(await model.handle(.returnKey))
+        store.beforeOpenItems = nil
+        #expect(allowedDuringSave == false)
+    }
+
+    @Test func commandBackspaceOnACrossedOutRowKeepsTheText() async {
+        addOpenItems()
+        let (model, _) = await makeModel()
+        #expect(await model.handle(.down))
+        let first = model.rows[0]
+        await model.toggleDone(first)
+        #expect(await model.handle(.commandBackspace))
+        #expect(!model.isPendingDelete(first))
+    }
+
+    @Test func aRepeatingReminderShowsNoTypedDate() async {
+        let item = note(due: moment(12, 16), repeats: true)
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.startEdit(item)
+        model.textChanged(model.draft.text + " Nov 20")
+        #expect(model.parsedDate == nil)
+    }
+
+    @Test func theRingOfAWaitingDeletionTakesItBack() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.delete(item)
+        await model.toggleDone(item)
+        #expect(!model.isPendingDelete(item))
+        #expect(!model.isPendingDone(item))
+    }
+
+    @Test func aDeletionThatFailedWhileClosedShowsOnTheNextOpening() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        store.removeError = RemindersStoreError.noAccess
+        model.delete(item)
+        model.closed()
+        #expect(await eventually { store.calls.contains(.remove("migration")) })
+        try? await Task.sleep(for: .milliseconds(50))
+        await model.opened()
+        guard case let .confirmation(confirmation) = model.mode else {
+            Issue.record("expected the failure on opening")
+            return
+        }
+        #expect(confirmation.title == "Couldn't delete")
+    }
 }
+

@@ -39,6 +39,9 @@ nonisolated enum DraftEdit {
 nonisolated struct NoteDraft: Equatable, Sendable {
     var text: String
     var project: ProjectToken?       // committed only
+    /// While a saved note is edited: date words its title already held (`Prepare Friday slides`). They stay text, so
+    /// fixing a typo never gives the note a date (row menu spec §3).
+    var ignoredDatePhrases: [String] = []
 
     /// The `#…` being typed: the last `#` that starts a word (after the chip, if there is one), through the end of
     /// the text. The text after the `#` may hold spaces: list names can have several words.
@@ -78,26 +81,68 @@ nonisolated struct NoteDraft: Equatable, Sendable {
         return title.isEmpty ? Self.collapsingSpaces(text) : title
     }
 
-    /// The date phrase of the note, read with the chip blanked out: a list named "Today" or "Завтра" is a project,
+    /// The date phrase of the note, read with the chip blanked out: a list named "Today" or "Tomorrow" is a project,
     /// not a date. The range is in `text`.
     func date(now: Date, calendar: Calendar) -> ParsedDate? {
-        guard let chip = chipRange else {
+        var blanks: [Range<String.Index>] = []
+        if let chip = chipRange {
+            blanks.append(chip)
+        }
+        // Each date word of the title once, as a whole word, before the chip: "today and today" skips both, "Eat 5
+        // apples at 5" skips the last "at 5" (not the one inside "Eat 5"), and the phrase Edit appended is never hit.
+        let limit = chipRange?.lowerBound ?? text.endIndex
+        var used: [Range<String.Index>] = []
+        for phrase in ignoredDatePhrases where !phrase.isEmpty {
+            var from = text.startIndex
+            while from < limit, let range = text.range(of: phrase, options: .caseInsensitive, range: from..<limit) {
+                let startsWord = range.lowerBound == text.startIndex || !Self.isWordCharacter(text[text.index(before: range.lowerBound)])
+                let endsWord = range.upperBound == text.endIndex || !Self.isWordCharacter(text[range.upperBound])
+                if startsWord, endsWord, !used.contains(where: { $0.overlaps(range) }) {
+                    used.append(range)
+                    blanks.append(range)
+                    break
+                }
+                from = text.index(after: range.lowerBound)
+            }
+        }
+        guard !blanks.isEmpty else {
             return NoteDateParser.parse(text, now: now, calendar: calendar)
         }
-        // Spaces of the chip's UTF-8 length keep every offset outside it, so a range maps back by offset.
-        let chipStart = text.utf8Offset(of: chip.lowerBound)
-        let chipEnd = text.utf8Offset(of: chip.upperBound)
+        // Spaces of each blank's UTF-8 length keep every offset outside it, so a range maps back by offset.
+        let offsets = blanks.map { (text.utf8Offset(of: $0.lowerBound), text.utf8Offset(of: $0.upperBound)) }
         var blanked = text
-        blanked.replaceSubrange(chip, with: String(repeating: " ", count: chipEnd - chipStart))
-        guard var date = NoteDateParser.parse(blanked, now: now, calendar: calendar) else { return nil }
-        var lower = blanked.utf8Offset(of: date.range.lowerBound)
-        var upper = blanked.utf8Offset(of: date.range.upperBound)
-        // A phrase that reaches into the blanked chip (its spaces) stops at the chip's edge.
-        if lower > chipStart, lower < chipEnd { lower = chipEnd }
-        if upper > chipStart, upper < chipEnd { upper = chipStart }
-        guard lower < upper else { return nil }
-        date.range = text.index(utf8Offset: lower)..<text.index(utf8Offset: upper)
-        return date
+        for (start, end) in offsets.sorted(by: { $0.0 > $1.0 }) {
+            blanked.replaceSubrange(blanked.index(utf8Offset: start)..<blanked.index(utf8Offset: end), with: String(repeating: " ", count: end - start))
+        }
+        // The detector can join words across a blank ("dinner Workdeck Dec 3" around the chip): such a phrase is read
+        // again from after the blank, so the title keeps its words and the date is what follows (row menu review).
+        var prefixEnd = 0
+        for _ in 0...offsets.count {
+            var reading = blanked
+            if prefixEnd > 0 {
+                reading.replaceSubrange(reading.startIndex..<reading.index(utf8Offset: prefixEnd), with: String(repeating: " ", count: prefixEnd))
+            }
+            guard var date = NoteDateParser.parse(reading, now: now, calendar: calendar) else { return nil }
+            var lower = reading.utf8Offset(of: date.range.lowerBound)
+            var upper = reading.utf8Offset(of: date.range.upperBound)
+            if let swallowed = offsets.filter({ lower <= $0.0 && $0.1 <= upper }).map(\.1).max(), swallowed > prefixEnd {
+                prefixEnd = swallowed
+                continue
+            }
+            // A phrase that reaches into a blank (its spaces) stops at the blank's edge.
+            for (start, end) in offsets {
+                if lower > start, lower < end { lower = end }
+                if upper > start, upper < end { upper = start }
+            }
+            guard lower < upper else { return nil }
+            date.range = text.index(utf8Offset: lower)..<text.index(utf8Offset: upper)
+            return date
+        }
+        return nil
+    }
+
+    private static func isWordCharacter(_ character: Character) -> Bool {
+        character.isLetter || character.isNumber
     }
 
     private var chipRange: Range<String.Index>? {

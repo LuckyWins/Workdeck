@@ -9,10 +9,11 @@ nonisolated enum NoteKeyCommand: Equatable, Sendable {
     case selectAll, copy, cut, paste, undo, redo
 
     // Virtual key codes (Carbon `kVK_…`), the same on every layout: the letters' places on a US keyboard.
-    private static let letterKeys: [UInt16: Character] = [0: "a", 2: "d", 6: "z", 7: "x", 8: "c", 9: "v"]
+    private static let letterKeys: [UInt16: Character] = [0: "a", 2: "d", 6: "z", 7: "x", 8: "c", 9: "v", 14: "e"]
     private static let returnKey: UInt16 = 36
     private static let enterKey: UInt16 = 76
     private static let escapeKey: UInt16 = 53
+    private static let deleteKey: UInt16 = 51
     private static let downKey: UInt16 = 125
     private static let upKey: UInt16 = 126
 
@@ -32,6 +33,11 @@ nonisolated enum NoteKeyCommand: Equatable, Sendable {
             if flags == commandShift { return .panel(.commandShiftReturn) }
             return nil
         }
+        // ⌘⌫ deletes the selected open note; with none selected the panel declines and the field deletes to the line
+        // start as usual (row menu spec §2).
+        if keyCode == deleteKey {
+            return flags == command ? .panel(.commandBackspace) : nil
+        }
         switch letter(keyCode: keyCode, characters: characters) {
         case "z":
             if flags == command { return .undo }
@@ -41,6 +47,7 @@ nonisolated enum NoteKeyCommand: Equatable, Sendable {
             guard flags == command else { return nil }
             switch letter {
             case "d": return .panel(.commandD)
+            case "e": return .panel(.commandE)
             case "a": return .selectAll
             case "c": return .copy
             case "x": return .cut

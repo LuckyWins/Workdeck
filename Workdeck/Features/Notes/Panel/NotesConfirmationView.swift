@@ -22,11 +22,13 @@ struct NotesConfirmationView: View {
                     .font(Terminal.font(13, weight: .semibold))
                     .lineLimit(1)
             }
-            Text(confirmation.subtitle)
-                .font(Terminal.font(12))
-                .foregroundStyle(Terminal.dim)
-                .lineLimit(2)
-                .padding(.leading, 30)
+            if !confirmation.subtitle.isEmpty {
+                Text(confirmation.subtitle)
+                    .font(Terminal.font(12))
+                    .foregroundStyle(Terminal.dim)
+                    .lineLimit(2)
+                    .padding(.leading, 30)
+            }
             if model.confirmationStays, model.failedCommand != nil {
                 HStack(spacing: 8) {
                     Button("Copy Command") {

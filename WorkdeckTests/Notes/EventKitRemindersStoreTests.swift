@@ -19,4 +19,17 @@ struct EventKitRemindersStoreTests {
         _ = await cleanup.run()
         #expect(!store.hasEventStore)
     }
+
+    @Test func workdecksAlarmIsTheDueTimeOrNineOnAnAllDayDate() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Moscow")!
+        let due = calendar.date(from: DateComponents(year: 2026, month: 11, day: 12, hour: 16))!
+        #expect(EventKitRemindersStore.workdeckAlarm(due: due, hasTime: true, calendar: calendar) == due)
+        let day = calendar.date(from: DateComponents(year: 2026, month: 11, day: 12))!
+        let nine = calendar.date(from: DateComponents(year: 2026, month: 11, day: 12, hour: 9))!
+        #expect(EventKitRemindersStore.workdeckAlarm(due: day, hasTime: false, calendar: calendar) == nine)
+        #expect(EventKitRemindersStore.isWorkdeckAlarm(nine, due: day, hasTime: false, calendar: calendar))
+        #expect(EventKitRemindersStore.isWorkdeckAlarm(due, due: due, hasTime: true, calendar: calendar))
+        #expect(!EventKitRemindersStore.isWorkdeckAlarm(due, due: day, hasTime: false, calendar: calendar))
+    }
 }

@@ -10,6 +10,11 @@ nonisolated enum SaveResult: Equatable, Sendable {
     case failed(String)
 }
 
+nonisolated enum MoveResult: Equatable, Sendable {
+    case moved(listTitle: String)
+    case failed(String)
+}
+
 nonisolated enum HandOffResult: Equatable, Sendable {
     case started(label: String, listTitle: String)
     /// The list has no folder yet, or the remembered one is gone: ask where the agent should start.
@@ -209,7 +214,7 @@ final class NotesController {
             return .failed("The note is empty")
         }
         do {
-            let target = try listForSaving(draft)
+            let target = try listForSaving(draft.project)
             let saved = try store.add(title: title, due: date, listID: target.list.id)
             settings.markUsed(target.list.id)
             if target.becomesDefault {
@@ -225,7 +230,7 @@ final class NotesController {
             switch error {
             case .listNotFound: return .failed("The list is gone from Reminders")
             case .noSourceForNewList: return .failed("Reminders has no account to create the list in")
-            case .reminderNotFound, .noAccess: return .failed("Reminders could not save the note")
+            case .reminderNotFound, .noAccess, .cannotMove: return .failed("Reminders could not save the note")
             }
         } catch {
             WorkdeckLog.notes.error("Could not save a note: \(Self.describe(error), privacy: .public)")
@@ -235,9 +240,9 @@ final class NotesController {
 
     /// The list a draft goes to. Nothing is marked or remembered here: a save that fails after this leaves the
     /// settings as they were (a list that was just created stays in Reminders, and is found by name next time).
-    private func listForSaving(_ draft: NoteDraft) throws -> (list: ReminderListInfo, becomesDefault: Bool) {
+    private func listForSaving(_ project: ProjectToken?) throws -> (list: ReminderListInfo, becomesDefault: Bool) {
         let available = store.lists()
-        if let project = draft.project {
+        if let project {
             if let id = project.listID {
                 guard let list = available.first(where: { $0.id == id }) else { throw RemindersStoreError.listNotFound }
                 return (list, false)
@@ -257,6 +262,76 @@ final class NotesController {
             return (inbox, true)
         }
         return (try store.createList(titled: Self.inboxTitle), true)
+    }
+
+    // MARK: Row menu
+
+    static let goneReason = "The note is gone from Reminders"
+
+    /// Saves an edited note to the same reminder (row menu spec §3): its title, due date and, when the line's chip
+    /// names another list, its list. The list follows the new-note rules (no chip: the default list).
+    func saveEdit(_ item: ReminderItem, title: String, due: ReminderDueChange, project: ProjectToken?) async -> SaveResult {
+        guard !isDemoActive else {
+            return .failed(Self.demoReason)
+        }
+        guard !title.isEmpty else {
+            return .failed("The note is empty")
+        }
+        do {
+            let target = try listForSaving(project)
+            let listID = target.list.id == item.listID ? nil : target.list.id
+            let saved = try store.update(item.id, title: title, due: due, listID: listID)
+            settings.markUsed(target.list.id)
+            if target.becomesDefault {
+                settings.defaultListID = target.list.id
+            }
+            WorkdeckLog.notes.notice("Edited a note in the list \(target.list.title, privacy: .private)")
+            await reload()
+            return .saved(saved, listTitle: target.list.title)
+        } catch RemindersStoreError.noAccess {
+            return .needsAccess
+        } catch RemindersStoreError.reminderNotFound {
+            await reload()
+            return .failed(Self.goneReason)
+        } catch {
+            WorkdeckLog.notes.error("Could not edit a note: \(Self.describe(error), privacy: .public)")
+            return .failed("Reminders could not save the note")
+        }
+    }
+
+    /// Moves a note to another list (row menu spec §4); the list is used from now on.
+    func move(_ item: ReminderItem, to listID: String) async -> MoveResult {
+        guard !isDemoActive else {
+            return .failed(Self.demoReason)
+        }
+        do {
+            _ = try store.update(item.id, title: nil, due: .keep, listID: listID)
+            settings.markUsed(listID)
+            let title = listTitle(of: listID)
+            WorkdeckLog.notes.notice("Moved a note to the list \(title, privacy: .private)")
+            await reload()
+            return .moved(listTitle: title)
+        } catch {
+            WorkdeckLog.notes.error("Could not move a note: \(Self.describe(error), privacy: .public)")
+            return .failed("Couldn't move")
+        }
+    }
+
+    /// Removes a note from Reminders (row menu spec §6); not archived. One already gone counts as deleted.
+    func delete(_ item: ReminderItem) async -> Bool {
+        guard !isDemoActive else { return false }
+        do {
+            try store.remove(item.id, commit: true)
+        } catch RemindersStoreError.reminderNotFound {
+            // Gone already: the row just goes.
+        } catch {
+            WorkdeckLog.notes.error("Could not delete a note: \(Self.describe(error), privacy: .public)")
+            return false
+        }
+        openItems.removeAll { $0.id == item.id }
+        WorkdeckLog.notes.notice("Deleted a note from the list \(self.listTitle(of: item.listID), privacy: .private)")
+        await reload()
+        return true
     }
 
     private static func sameName(_ a: String, _ b: String) -> Bool {

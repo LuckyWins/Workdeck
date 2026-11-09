@@ -61,4 +61,12 @@ struct NoteKeyCommandTests {
         #expect(NoteKeyCommand.panelKey(keyCode: 53, modifiers: []) == .escape)
         #expect(NoteKeyCommand.panelKey(keyCode: 0, modifiers: []) == nil)
     }
+
+    @Test func commandEAndCommandBackspaceGoToThePanel() {
+        #expect(NoteKeyCommand.command(keyCode: 14, characters: "e", modifiers: .command) == .panel(.commandE))
+        // Under a Russian layout ⌘E's character is "у": the key's place decides.
+        #expect(NoteKeyCommand.command(keyCode: 14, characters: "у", modifiers: .command) == .panel(.commandE))
+        #expect(NoteKeyCommand.command(keyCode: 51, characters: "\u{7F}", modifiers: .command) == .panel(.commandBackspace))
+        #expect(NoteKeyCommand.command(keyCode: 51, characters: "\u{7F}", modifiers: []) == nil)
+    }
 }

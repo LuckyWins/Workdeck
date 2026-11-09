@@ -31,6 +31,22 @@ nonisolated enum NoteDateParser {
         parse(text, now: now, calendar: calendar, detect: detectWithSystemClock)
     }
 
+    /// Every date phrase in the text, in the order the parser finds them: each found phrase is blanked and the text
+    /// read again (row menu spec §3: the date words a title already holds).
+    static func phrases(in text: String, now: Date, calendar: Calendar) -> [String] {
+        var blanked = text
+        var found: [String] = []
+        // A handful at most; the bound only guards against a phrase the blanking cannot remove.
+        while found.count < 8, let date = parse(blanked, now: now, calendar: calendar) {
+            let start = blanked.utf8.distance(from: blanked.startIndex, to: date.range.lowerBound)
+            let end = blanked.utf8.distance(from: blanked.startIndex, to: date.range.upperBound)
+            let utf8 = Array(text.utf8)
+            found.append(String(decoding: utf8[start..<end], as: UTF8.self))
+            blanked.replaceSubrange(date.range, with: String(repeating: " ", count: end - start))
+        }
+        return found
+    }
+
     /// `detect` stands in for `NSDataDetector` (all its matches, in order) so tests can pretend the machine's
     /// clock reads another day. The first match Workdeck accepts wins.
     static func parse(

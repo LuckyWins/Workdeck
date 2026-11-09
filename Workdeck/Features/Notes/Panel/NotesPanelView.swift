@@ -359,6 +359,12 @@ struct NoteSummary: View {
                 .frame(height: 1)
                 .padding(.bottom, 2)
             HStack(spacing: 6) {
+                if model.isEditing {
+                    // ↩ updates the note being edited instead of saving a new one (row menu spec §3).
+                    Image(systemName: "pencil")
+                    Text("Editing").fontWeight(.semibold)
+                    Text("·")
+                }
                 if let date = model.summaryDate {
                     Image(systemName: "bell")
                     Text(date)

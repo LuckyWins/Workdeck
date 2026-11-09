@@ -12,6 +12,15 @@ nonisolated struct ReminderItem: Equatable, Sendable, Identifiable {
     var created: Date?
     var completed: Date?
     var notes: String?
+    /// A repeating reminder: an edit leaves its dates to Reminders (row menu spec §3).
+    var repeats = false
+}
+
+/// What an edit does to a reminder's due date (row menu spec §7).
+nonisolated enum ReminderDueChange: Equatable, Sendable {
+    case keep
+    case remove
+    case set(ParsedDate)
 }
 
 nonisolated enum RemindersAccess: Equatable, Sendable {
@@ -25,6 +34,8 @@ nonisolated enum RemindersStoreError: Error, Equatable, Sendable {
     case listNotFound
     case reminderNotFound
     case noSourceForNewList
+    /// Reminders refused to move the reminder to that list (another account).
+    case cannotMove
 }
 
 /// Apple Reminders as quick notes use it (quick notes spec §4). Behind a protocol so the panel and the cleanup are
@@ -39,6 +50,8 @@ protocol RemindersStoring: AnyObject {
     /// Saves a reminder. With a date and a time the alarm is at that time; with a date only, the due date is all-day
     /// and the alarm is at 09:00 that day.
     func add(title: String, due: ParsedDate?, listID: String) throws -> ReminderItem
+    /// Changes a reminder; nil leaves that field. A date change replaces only Workdeck's alarm (row menu spec §7).
+    func update(_ id: String, title: String?, due: ReminderDueChange, listID: String?) throws -> ReminderItem
     func openItems(in listIDs: Set<String>) async -> [ReminderItem]
     func completedItems(in listIDs: Set<String>) async -> [ReminderItem]
     /// Items completed since `date`: the panel's Done section.
@@ -62,7 +75,7 @@ protocol RemindersStoring: AnyObject {
 /// EventKit calls back on its own queues. Every callback converts to value types first, then hops to the main actor.
 final class EventKitRemindersStore: RemindersStoring {
     /// The time of the alarm of a reminder that has a date but no time.
-    static let allDayAlarmHour = 9
+    nonisolated static let allDayAlarmHour = 9
 
     /// Opened on first need: asking for access, or reading and writing once it is granted. Not at launch, and not to
     /// read the access (a class method): most users never use quick notes.
@@ -161,18 +174,67 @@ final class EventKitRemindersStore: RemindersStoring {
         reminder.title = title
         reminder.calendar = list
         if let due {
-            if due.hasTime {
-                reminder.dueDateComponents = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: due.date)
-                reminder.addAlarm(EKAlarm(absoluteDate: due.date))
-            } else {
-                reminder.dueDateComponents = calendar.dateComponents([.year, .month, .day], from: due.date)
-                if let nine = calendar.date(bySettingHour: Self.allDayAlarmHour, minute: 0, second: 0, of: due.date) {
-                    reminder.addAlarm(EKAlarm(absoluteDate: nine))
-                }
-            }
+            setDue(due, on: reminder)
         }
         try eventStore.save(reminder, commit: true)
         return Self.item(from: reminder, calendar: calendar)
+    }
+
+    func update(_ id: String, title: String?, due: ReminderDueChange, listID: String?) throws -> ReminderItem {
+        let reminder = try reminder(withID: id)
+        // Completed elsewhere meanwhile: gone as far as the open notes go (row menu spec §3).
+        guard !reminder.isCompleted else { throw RemindersStoreError.reminderNotFound }
+        if let title {
+            reminder.title = title
+        }
+        if due != .keep {
+            // Only Workdeck's alarm for the old date goes; the user's other alarms stay.
+            let old = Self.item(from: reminder, calendar: calendar)
+            if let oldDue = old.due {
+                for alarm in reminder.alarms ?? [] {
+                    if let date = alarm.absoluteDate, Self.isWorkdeckAlarm(date, due: oldDue, hasTime: old.hasDueTime, calendar: calendar) {
+                        reminder.removeAlarm(alarm)
+                    }
+                }
+            }
+            reminder.dueDateComponents = nil
+            if case let .set(newDue) = due {
+                setDue(newDue, on: reminder)
+            }
+        }
+        var moves = false
+        if let listID, listID != reminder.calendar?.calendarIdentifier {
+            guard let list = eventStore.calendar(withIdentifier: listID) else { throw RemindersStoreError.listNotFound }
+            reminder.calendar = list
+            moves = true
+        }
+        do {
+            try eventStore.save(reminder, commit: true)
+        } catch {
+            // The cached reminder keeps the unsaved changes otherwise, and a later save (a tick) would write them.
+            eventStore.reset()
+            throw moves ? RemindersStoreError.cannotMove : error
+        }
+        return Self.item(from: reminder, calendar: calendar)
+    }
+
+    private func setDue(_ due: ParsedDate, on reminder: EKReminder) {
+        let parts: Set<Calendar.Component> = due.hasTime ? [.year, .month, .day, .hour, .minute] : [.year, .month, .day]
+        reminder.dueDateComponents = calendar.dateComponents(parts, from: due.date)
+        if let alarm = Self.workdeckAlarm(due: due.date, hasTime: due.hasTime, calendar: calendar) {
+            reminder.addAlarm(EKAlarm(absoluteDate: alarm))
+        }
+    }
+
+    /// The alarm Workdeck sets for a due date: at that time, or at 09:00 on an all-day date.
+    nonisolated static func workdeckAlarm(due: Date, hasTime: Bool, calendar: Calendar) -> Date? {
+        hasTime ? due : calendar.date(bySettingHour: allDayAlarmHour, minute: 0, second: 0, of: due)
+    }
+
+    /// Whether an alarm is the one Workdeck set for that due date (alarms carry no marker).
+    nonisolated static func isWorkdeckAlarm(_ alarm: Date, due: Date, hasTime: Bool, calendar: Calendar) -> Bool {
+        guard let expected = workdeckAlarm(due: due, hasTime: hasTime, calendar: calendar) else { return false }
+        return abs(alarm.timeIntervalSince(expected)) < 1
     }
 
     func openItems(in listIDs: Set<String>) async -> [ReminderItem] {
@@ -268,7 +330,8 @@ final class EventKitRemindersStore: RemindersStoring {
             hasDueTime: components?.hour != nil,
             created: reminder.creationDate,
             completed: reminder.completionDate,
-            notes: reminder.notes
+            notes: reminder.notes,
+            repeats: reminder.hasRecurrenceRules
         )
     }
 }

@@ -51,7 +51,9 @@ With the field empty, the panel lists the open notes of the lists you used here 
 - ↑↓ select a note, **⌘↩** gives it to its project's agent, **⌘D** marks it done. With the mouse: the circle marks it done, a row's **Give to agent** button hands it over.
 - A note marked done stays in the list crossed out for 4 seconds before it is ticked in Reminders: **⌘Z** or another click on its circle takes it back. Closing the panel ticks it at once.
 - **Done** under the open notes folds out what was ticked lately (up to 20, the last 30 days, until the cleanup removes them). ⌘D or the circle on one of them makes it open again.
-- Editing, rescheduling and deleting stay in Reminders.
+- Right-click an open note for **Edit**, **Move to List**, **Copy** and **Delete**; **⌘E** and **⌘⌫** edit and delete the selected one.
+  - **Edit** puts the note back in the line with its list as the chip and its date as text (`Nov 12 at 16:00`), marked "Editing". Change the text, the list or the date, and Return updates the same reminder; delete the date phrase to remove the reminder's date. Esc ends the edit, and whatever you were typing before comes back. Date words that were already in the note (`Prepare Friday slides`) stay text, and a repeating reminder keeps its dates.
+  - **Delete** crosses the note out for 4 seconds like a tick: **⌘Z** brings it back. Deleted notes are not archived.
 
 ## Giving a Note to an Agent
 

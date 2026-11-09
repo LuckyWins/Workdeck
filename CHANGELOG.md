@@ -5,6 +5,7 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 ## Unreleased
 
 ### New
+- Quick notes: right-click a note to edit it, move it to another list, copy it or delete it.
 - The expanded notch has tabs: Sessions, Notes and this week's Stats. Hovering opens it on Sessions; the right Option opens it on Notes.
 
 ### Fixed

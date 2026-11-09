@@ -120,12 +120,13 @@ struct OpenItemRow: View {
     @State private var isCircleHovered = false
 
     var body: some View {
-        let isDone = model.isDone(item)
+        let isDeleting = model.isPendingDelete(item)
+        let isDone = model.isDone(item) || isDeleting
         HStack(spacing: 10) {
             Button {
                 Task { await model.toggleDone(item) }
             } label: {
-                if let start = model.pendingDoneStart(of: item) {
+                if let start = model.pendingDoneStart(of: item) ?? model.pendingDeleteStart(of: item) {
                     UndoRing(model: model, start: start, color: isSelected ? Color.white : NotesPanelStyle.text)
                 } else {
                     Image(systemName: isDone ? "checkmark.circle.fill" : isCircleHovered ? "checkmark.circle" : "circle")
@@ -147,7 +148,13 @@ struct OpenItemRow: View {
                 ListChip(title: list.title, color: isSelected ? .white : list.color, size: 12)
             }
             Spacer(minLength: 8)
-            if model.isPendingDone(item) {
+            if isDeleting {
+                // A deletion waits like a tick: the ring counts down, ⌘Z takes it back (row menu spec §6).
+                Text("Deleted")
+                    .font(NotesPanelStyle.font(12))
+                    .foregroundStyle(isSelected ? Color.white : NotesPanelStyle.secondary)
+                KeyHint(key: "⌘Z", label: "Undo")
+            } else if model.isPendingDone(item) {
                 KeyHint(key: "⌘Z", label: "Undo")
             } else if item.completed != nil {
                 Text(model.doneDetail(of: item))
@@ -185,6 +192,43 @@ struct OpenItemRow: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: select)
         .onHover { isHovered = $0 }
+        .contextMenu {
+            if model.allowsMenu(for: item) {
+                menu
+            }
+        }
+    }
+
+    /// Right-click: Edit, Move to List, Copy, Delete (row menu spec §2).
+    @ViewBuilder
+    private var menu: some View {
+        Button("Edit") {
+            select()
+            model.startEdit(item)
+        }
+        .keyboardShortcut("e")
+        Menu("Move to List") {
+            ForEach(model.controller.lists) { list in
+                Button {
+                    Task { await model.move(item, to: list) }
+                } label: {
+                    if list.id == item.listID {
+                        Label(list.title, systemImage: "checkmark")
+                    } else {
+                        Text(list.title)
+                    }
+                }
+                .disabled(list.id == item.listID)
+            }
+        }
+        Button("Copy") {
+            model.copy(item)
+        }
+        Divider()
+        Button("Delete", role: .destructive) {
+            model.delete(item)
+        }
+        .keyboardShortcut(.delete)
     }
 
     @ViewBuilder

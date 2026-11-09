@@ -5,6 +5,8 @@ import Observation
 /// A key the note field hands to the panel instead of handling it itself.
 nonisolated enum PanelKey: Equatable, Sendable {
     case tab, space, returnKey, commandReturn, commandShiftReturn, up, down, commandD, commandZ, escape, backspace
+    /// ⌘E and ⌘⌫ on the selected open row: edit, delete (row menu spec §2).
+    case commandE, commandBackspace
 }
 
 /// What the panel shows: the note, the agent picker (spec §3.5), the folder prompt (§3.6) or a confirmation (§3.4).
@@ -89,6 +91,10 @@ final class NotesPanelModel {
     private(set) var pendingDone: [ReminderItem] = []
     /// The Done section under the open items is expanded; kept while Workdeck runs.
     var isDoneShown = false
+    /// The open note being edited in the line (row menu spec §3); nil while typing a new one.
+    private(set) var editing: ReminderItem?
+    /// Open items just deleted, waiting `doneUndoDelay` like a tick before they leave Reminders (row menu spec §6).
+    private(set) var pendingDelete: [ReminderItem] = []
 
     /// The matches a chip came from: Tab after a commit moves to the next one.
     @ObservationIgnored private var cycleMatches: [ReminderListInfo] = []
@@ -101,6 +107,18 @@ final class NotesPanelModel {
     @ObservationIgnored private var pendingDoneTasks: [String: Task<Void, Never>] = [:]
     /// When each waiting tick was made, by the wall clock: the row's ring counts its undo time down.
     @ObservationIgnored private var pendingDoneSince: [String: Date] = [:]
+    @ObservationIgnored private var pendingDeleteTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var pendingDeleteSince: [String: Date] = [:]
+    /// The panel is on screen (between `opened()` and `closed()`).
+    @ObservationIgnored private var isShown = false
+    /// A failure that happened while the panel was closed, shown when it opens.
+    @ObservationIgnored private var noticeOnOpen: NotesConfirmation?
+    /// What the line held when Edit was chosen; it comes back when the edit ends.
+    @ObservationIgnored private var editKeptDraft: NoteDraft?
+    /// The line as Edit built it: a Return on it unchanged writes nothing.
+    @ObservationIgnored private var editBuiltDraft: NoteDraft?
+    /// The date phrase Edit appended; left as it is, the reminder keeps its exact due date.
+    @ObservationIgnored private var editPhrase: String?
 
     init(
         controller: NotesController,
@@ -128,6 +146,9 @@ final class NotesPanelModel {
         for task in pendingDoneTasks.values {
             task.cancel()
         }
+        for task in pendingDeleteTasks.values {
+            task.cancel()
+        }
     }
 
     // MARK: Opening and closing
@@ -135,6 +156,11 @@ final class NotesPanelModel {
     /// The panel opened: back to the note (kept from last time unless it was saved), lists and open items read again.
     func opened() async {
         resetTransientState()
+        isShown = true
+        if let notice = noticeOnOpen {
+            noticeOnOpen = nil
+            confirm(notice, closesPanel: false)
+        }
         // A refusal is remembered by Reminders: the hint shows again without another failed save.
         controller.updateAccess()
         needsAccess = controller.access == .denied
@@ -146,12 +172,20 @@ final class NotesPanelModel {
     /// The panel closed (Esc, a click outside, the key): whatever was in progress is dropped, the typed text stays.
     /// Ticks still waiting for their undo time are written now.
     func closed() {
+        isShown = false
         resetTransientState()
-        guard !pendingDone.isEmpty else { return }
-        let ids = pendingDone.map(\.id)
+        if isEditing {
+            endEdit()
+        }
+        let done = pendingDone.map(\.id)
+        let deleted = pendingDelete.map(\.id)
+        guard !done.isEmpty || !deleted.isEmpty else { return }
         Task { [weak self] in
-            for id in ids {
+            for id in done {
                 await self?.commitDone(id)
+            }
+            for id in deleted {
+                await self?.commitDelete(id)
             }
         }
     }
@@ -210,7 +244,7 @@ final class NotesPanelModel {
     private func refreshDerived() {
         let wasOpen = isListOpen
         let oldMatches = matches.map(\.id)
-        parsedDate = draft.text.isEmpty ? nil : draft.date(now: now(), calendar: calendar)
+        parsedDate = draft.text.isEmpty ? nil : lineDate()
         if let query = draft.query() {
             let found = ListMatcher.matches(query.text, in: controller.lists, recent: controller.settings.recentListIDs)
             matches = found
@@ -287,9 +321,9 @@ final class NotesPanelModel {
         }
         switch (mode, key) {
         case (.typing, .returnKey):
-            await perform { await self.saveTypedNote() }
+            await perform { self.isEditing ? await self.saveEdit(handingOff: false) : await self.saveTypedNote() }
         case (.typing, .commandReturn):
-            await perform { await self.handOffSelectionOrText() }
+            await perform { self.isEditing ? await self.saveEdit(handingOff: true) : await self.handOffSelectionOrText() }
         case (.typing, .commandD):
             if let item = selectedItem {
                 await toggleDone(item)
@@ -335,6 +369,9 @@ final class NotesPanelModel {
             draft.apply(.backspaceAfterChip)
             return true
         case .up, .down:
+            if isEditing, !isListOpen {
+                return true   // the rows are hidden while a note is edited
+            }
             if isListOpen {
                 move(key, rows: max(matches.count, 1), allowsNone: false)
             } else {
@@ -342,7 +379,11 @@ final class NotesPanelModel {
             }
             return true
         case .escape:
-            onClose?()
+            if isEditing {
+                endEdit()   // the panel stays: a second Esc closes it
+            } else {
+                onClose?()
+            }
             return true
         case .commandShiftReturn:
             if !isBusy {
@@ -352,9 +393,31 @@ final class NotesPanelModel {
         case .commandD:
             return isBusy || selectedItem == nil ? true : nil
         case .commandZ:
-            // The last tick, while it can still be taken back; otherwise the field undoes its typing.
-            guard let last = pendingDone.last else { return false }
-            cancelPendingDone(last.id)
+            // The last tick or deletion, while it can still be taken back; otherwise the field undoes its typing.
+            let tick = pendingDone.last.map { ($0.id, pendingDoneSince[$0.id] ?? .distantPast) }
+            let deletion = pendingDelete.last.map { ($0.id, pendingDeleteSince[$0.id] ?? .distantPast) }
+            switch (tick, deletion) {
+            case let (tick?, deletion?):
+                if deletion.1 >= tick.1 { cancelPendingDelete(deletion.0) } else { cancelPendingDone(tick.0) }
+            case let (tick?, nil):
+                cancelPendingDone(tick.0)
+            case let (nil, deletion?):
+                cancelPendingDelete(deletion.0)
+            case (nil, nil):
+                return false
+            }
+            return true
+        case .commandE:
+            if !isBusy, let item = selectedItem, allowsMenu(for: item) {
+                startEdit(item)
+            }
+            return true
+        case .commandBackspace:
+            // A selected row takes ⌘⌫ even when it cannot be deleted (done, crossed out): the typed text is not wiped.
+            guard let item = selectedItem else { return false }
+            if allowsMenu(for: item) {
+                delete(item)
+            }
             return true
         case .returnKey:
             // While the `#` list is open, ↩ takes the selected row and the note stays: the next ↩ saves it (a new
@@ -512,11 +575,11 @@ final class NotesPanelModel {
 
     /// The open items show under an empty field, and under typed text while some match it.
     var showsOpenItems: Bool {
-        mode == .typing && !isListOpen && (draft.text.isEmpty || !visibleItems.isEmpty || !visibleDoneItems.isEmpty)
+        mode == .typing && !isListOpen && !isEditing && (draft.text.isEmpty || !visibleItems.isEmpty || !visibleDoneItems.isEmpty)
     }
 
     var selectedItem: ReminderItem? {
-        guard mode == .typing, !isListOpen, let row = selectedRow else { return nil }
+        guard mode == .typing, !isListOpen, !isEditing, let row = selectedRow else { return nil }
         let items = rows
         return items.indices.contains(row) ? items[row] : nil
     }
@@ -524,6 +587,11 @@ final class NotesPanelModel {
     /// ⌘D or the circle: an open item is ticked after `doneUndoDelay` (crossed out meanwhile, see `pendingDone`); a
     /// tick still waiting is taken back; a done item is open again at once.
     func toggleDone(_ item: ReminderItem) async {
+        // The ring of a waiting deletion takes it back, as it does for a waiting tick.
+        if isPendingDelete(item) {
+            cancelPendingDelete(item.id)
+            return
+        }
         if isPendingDone(item) {
             cancelPendingDone(item.id)
             return
@@ -589,6 +657,197 @@ final class NotesPanelModel {
         guard let completed = item.completed else { return "" }
         let age = NotesDateText.age(since: completed, now: now())
         return age == "now" ? "Done now" : "Done \(age) ago"
+    }
+
+    // MARK: Row menu
+
+    var isEditing: Bool {
+        editing != nil
+    }
+
+    /// The row menu, ⌘E and ⌘⌫ are for open notes only: not done ones, not ones waiting to be ticked or deleted, and
+    /// not while another is edited (row menu spec §2).
+    func allowsMenu(for item: ReminderItem) -> Bool {
+        mode == .typing && !isBusy && !isEditing && item.completed == nil && !isPendingDone(item) && !isPendingDelete(item)
+    }
+
+    /// Puts the note back in the line: its title, its list as the chip, its due date as text (row menu spec §3). The
+    /// line typed so far is kept aside.
+    func startEdit(_ item: ReminderItem) {
+        guard allowsMenu(for: item) else { return }
+        var text = item.title
+        var chip: (Int, Int, String)?
+        if let list = list(withID: item.listID) {
+            text += " "
+            let start = text.utf8.count
+            text += list.title
+            chip = (start, text.utf8.count, list.id)
+        }
+        var phrase: String?
+        if let due = item.due, !item.repeats {
+            let written = EditDatePhrase.phrase(for: due, hasTime: item.hasDueTime, now: now(), calendar: calendar)
+            text += " " + written
+            phrase = written
+        }
+        var built = NoteDraft(text: text, project: nil)
+        if let (start, end, listID) = chip {
+            let lower = text.utf8.index(text.startIndex, offsetBy: start)
+            let upper = text.utf8.index(text.startIndex, offsetBy: end)
+            built.project = ProjectToken(range: lower..<upper, listID: listID, newListTitle: nil)
+        }
+        built.ignoredDatePhrases = NoteDateParser.phrases(in: item.title, now: now(), calendar: calendar)
+        editKeptDraft = draft
+        editBuiltDraft = built
+        editPhrase = phrase
+        editing = item
+        cycleMatches = []
+        selectedRow = nil
+        draft = built
+    }
+
+    /// The line's date. While editing, the phrase Edit appended, still as written, is the reminder's own due date at
+    /// its exact place: the parser would move an overdue date forward or join it with title words (row menu spec §3).
+    private func lineDate() -> ParsedDate? {
+        // A repeating reminder keeps its dates: a typed one would not be saved, so it is not shown either.
+        if editing?.repeats == true {
+            return nil
+        }
+        if let item = editing, let phrase = editPhrase, let due = item.due,
+           let range = draft.text.range(of: phrase, options: .backwards) {
+            return ParsedDate(range: range, date: due, hasTime: item.hasDueTime)
+        }
+        return draft.date(now: now(), calendar: calendar)
+    }
+
+    /// The edit ends, saved or not: the line typed before it comes back.
+    private func endEdit() {
+        guard editing != nil else { return }
+        editing = nil
+        editPhrase = nil
+        editBuiltDraft = nil
+        let kept = editKeptDraft ?? NoteDraft(text: "", project: nil)
+        editKeptDraft = nil
+        cycleMatches = []
+        selectedRow = nil
+        draft = kept
+    }
+
+    /// ↩ (or ⌘↩, then the hand-off) during an edit: the same reminder takes the line's title, date and list. An
+    /// untouched line writes nothing.
+    private func saveEdit(handingOff: Bool) async {
+        guard let item = editing else { return }
+        if let built = editBuiltDraft, draft.text == built.text, draft.project == built.project {
+            endEdit()
+            if handingOff {
+                await start(item, savedNow: false)
+            } else {
+                // Nothing to write, but it reads as a save: a second ↩ must not save the line that came back.
+                let listTitle = list(withID: item.listID)?.title ?? NotesController.inboxTitle
+                confirm(NotesConfirmation(symbol: "checkmark", title: "Saved · \(listTitle)", subtitle: remindsText(item)), closesPanel: true)
+            }
+            return
+        }
+        guard hasText else { return }
+        commitOpenList()
+        let date = lineDate()
+        let title = draft.title(removing: date?.range)
+        let due: ReminderDueChange
+        if item.repeats {
+            due = .keep
+        } else if let date {
+            let untouched = editPhrase.map { String(draft.text[date.range]) == $0 } == true && date.date == item.due
+            due = untouched ? .keep : .set(date)
+        } else {
+            due = item.due == nil ? .keep : .remove
+        }
+        switch await controller.saveEdit(item, title: title, due: due, project: draft.project) {
+        case let .saved(saved, listTitle):
+            needsAccess = false
+            // The panel may have closed meanwhile and ended the edit already.
+            if editing?.id == item.id {
+                endEdit()
+            }
+            if handingOff {
+                await start(saved, savedNow: true)
+            } else {
+                confirm(NotesConfirmation(symbol: "checkmark", title: "Saved · \(listTitle)", subtitle: remindsText(saved)), closesPanel: true)
+            }
+        case .needsAccess:
+            needsAccess = true
+        case let .failed(reason):
+            if reason == NotesController.goneReason, editing?.id == item.id {
+                // Deleted or completed elsewhere: the line stays as a new note, and what was typed before comes back
+                // once that one is saved (nothing lost, spec §3).
+                editing = nil
+                editPhrase = nil
+                editBuiltDraft = nil
+            }
+            confirm(NotesConfirmation(symbol: "exclamationmark", title: "Couldn't save", subtitle: reason), closesPanel: false)
+        }
+    }
+
+    /// Copy: the note's title on the clipboard (row menu spec §5).
+    func copy(_ item: ReminderItem) {
+        copy(item.title)
+        confirm(NotesConfirmation(symbol: "doc.on.doc", title: "Copied", subtitle: ""), closesPanel: false)
+    }
+
+    /// Move to List (row menu spec §4).
+    func move(_ item: ReminderItem, to list: ReminderListInfo) async {
+        guard allowsMenu(for: item), list.id != item.listID else { return }
+        await perform {
+            switch await controller.move(item, to: list.id) {
+            case let .moved(listTitle):
+                confirm(NotesConfirmation(symbol: "arrow.turn.down.right", title: "Moved · \(listTitle)", subtitle: ""), closesPanel: false)
+            case let .failed(reason):
+                confirm(NotesConfirmation(symbol: "exclamationmark", title: reason, subtitle: ""), closesPanel: false)
+            }
+        }
+    }
+
+    /// Delete: the row waits crossed out like a tick, ⌘Z takes it back, then the reminder goes (row menu spec §6).
+    func delete(_ item: ReminderItem) {
+        guard allowsMenu(for: item) else { return }
+        pendingDelete.append(item)
+        pendingDeleteSince[item.id] = Date()
+        let delay = doneUndoDelay
+        pendingDeleteTasks[item.id] = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            await self?.commitDelete(item.id)
+        }
+    }
+
+    func isPendingDelete(_ item: ReminderItem) -> Bool {
+        pendingDelete.contains { $0.id == item.id }
+    }
+
+    /// When a waiting deletion was made; nil for any other item.
+    func pendingDeleteStart(of item: ReminderItem) -> Date? {
+        isPendingDelete(item) ? pendingDeleteSince[item.id] : nil
+    }
+
+    private func cancelPendingDelete(_ id: String) {
+        pendingDeleteTasks.removeValue(forKey: id)?.cancel()
+        pendingDeleteSince[id] = nil
+        pendingDelete.removeAll { $0.id == id }
+    }
+
+    private func commitDelete(_ id: String) async {
+        guard let index = pendingDelete.firstIndex(where: { $0.id == id }) else { return }
+        let item = pendingDelete.remove(at: index)
+        pendingDeleteTasks.removeValue(forKey: id)?.cancel()
+        pendingDeleteSince[id] = nil
+        if await !controller.delete(item) {
+            let failure = NotesConfirmation(symbol: "exclamationmark", title: "Couldn't delete", subtitle: "")
+            // Closing the panel commits waiting deletions: a failure then shows on the next opening.
+            if isShown {
+                confirm(failure, closesPanel: false)
+            } else {
+                noticeOnOpen = failure
+            }
+        }
+        clampSelection()
     }
 
     /// "Give to agent" on a row.
@@ -705,7 +964,9 @@ final class NotesPanelModel {
 
     private func resetDraft() {
         cycleMatches = []
-        draft = NoteDraft(text: "", project: nil)
+        // A line typed before an edit whose note was gone comes back after the saved line.
+        draft = editKeptDraft ?? NoteDraft(text: "", project: nil)
+        editKeptDraft = nil
         selectedRow = nil
     }
 
@@ -950,6 +1211,20 @@ nonisolated enum NotesDateText {
     /// "Reminds tomorrow at 16:00", "Reminds on Friday at 11:00", "Reminds on Nov 10 at 09:00" (an all-day date
     /// reminds at 09:00).
     static func reminds(_ date: Date, hasTime: Bool, now: Date, calendar: Calendar) -> String {
+        let at = hasTime ? time(date, calendar) : allDayAlarmTime
+        let moment = hasTime ? date : calendar.date(bySettingHour: 9, minute: 0, second: 0, of: date) ?? date
+        if moment < now {
+            // An edited overdue note keeps its date: say it is past instead of "Reminds" (row menu review).
+            let past: String
+            switch dayOffset(of: date, from: now, calendar: calendar) {
+            case 0: past = "today"
+            case -1: past = "yesterday"
+            default:
+                let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: now)
+                past = formatter(sameYear ? "MMM d" : "MMM d, yyyy", calendar).string(from: date)
+            }
+            return "Overdue since \(past) at \(at)"
+        }
         let day: String
         switch dayOffset(of: date, from: now, calendar: calendar) {
         case 0: day = "today"
@@ -959,7 +1234,6 @@ nonisolated enum NotesDateText {
             let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: now)
             day = "on " + formatter(sameYear ? "MMM d" : "MMM d, yyyy", calendar).string(from: date)
         }
-        let at = hasTime ? time(date, calendar) : allDayAlarmTime
         return "Reminds \(day) at \(at)"
     }
 

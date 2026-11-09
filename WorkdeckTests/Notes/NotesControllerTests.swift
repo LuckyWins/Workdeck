@@ -82,6 +82,66 @@ struct NotesControllerTests {
         return workdeck
     }
 
+    // MARK: Row menu
+
+    /// "Workdeck" and "Wordle-bot" in the store, a note in "Workdeck".
+    private func menuSetup() -> (NotesController, ReminderItem) {
+        store.listInfos = [list("work", "Workdeck"), list("wb", "Wordle-bot")]
+        let note = item("r1")
+        store.items = [note]
+        settings.markUsed("work")
+        return (makeController(), note)
+    }
+
+    private func chip(to listID: String) -> ProjectToken {
+        let text = "x"
+        return ProjectToken(range: text.startIndex..<text.endIndex, listID: listID, newListTitle: nil)
+    }
+
+    @Test func anEditUpdatesTheSameReminder() async {
+        let (controller, note) = menuSetup()
+        let result = await controller.saveEdit(note, title: "Fixed", due: .keep, project: chip(to: "wb"))
+        #expect(store.calls.contains(.update(id: "r1", title: "Fixed", due: .keep, listID: "wb")))
+        #expect(store.added.isEmpty)
+        #expect(settings.usedListIDs.contains("wb"))
+        guard case let .saved(saved, listTitle) = result else {
+            Issue.record("expected a save")
+            return
+        }
+        #expect(saved.id == "r1")
+        #expect(listTitle == "Wordle-bot")
+    }
+
+    @Test func anEditInTheSameListDoesNotMoveIt() async {
+        let (controller, note) = menuSetup()
+        _ = await controller.saveEdit(note, title: "Fixed", due: .remove, project: chip(to: "work"))
+        #expect(store.calls.contains(.update(id: "r1", title: "Fixed", due: .remove, listID: nil)))
+    }
+
+    @Test func editingAGoneNoteSaysSo() async {
+        let (controller, note) = menuSetup()
+        store.updateError = RemindersStoreError.reminderNotFound
+        #expect(await controller.saveEdit(note, title: "x", due: .keep, project: chip(to: "work")) == .failed("The note is gone from Reminders"))
+    }
+
+    @Test func moveMarksTheListUsedAndRefusalSaysCouldntMove() async {
+        let (controller, note) = menuSetup()
+        #expect(await controller.move(note, to: "wb") == .moved(listTitle: "Wordle-bot"))
+        #expect(settings.usedListIDs.contains("wb"))
+        store.updateError = RemindersStoreError.cannotMove
+        #expect(await controller.move(note, to: "work") == .failed("Couldn't move"))
+    }
+
+    @Test func deleteRemovesAndAGoneNoteCountsAsDeleted() async {
+        let (controller, note) = menuSetup()
+        #expect(await controller.delete(note))
+        #expect(store.calls.contains(.remove("r1")))
+        store.removeError = RemindersStoreError.reminderNotFound
+        #expect(await controller.delete(item("r2")))
+        store.removeError = RemindersStoreError.noAccess
+        #expect(await controller.delete(item("r3")) == false)
+    }
+
     // MARK: Saving
 
     @Test func saveGoesToDefaultInboxCreatedOnce() async throws {
@@ -198,7 +258,7 @@ struct NotesControllerTests {
     @Test func saveSetsTitleAndDate() async {
         let workdeck = list("work", "Workdeck")
         store.listInfos = [workdeck]
-        var chipped = draft("Проверить миграцию на staging завтра в 16 #Workdeck")
+        var chipped = draft("Check the staging migration tomorrow at 4pm #Workdeck")
         chipped.apply(.pick(workdeck))
         let controller = makeController()
 
@@ -206,7 +266,7 @@ struct NotesControllerTests {
             Issue.record("expected .saved")
             return
         }
-        #expect(saved.title == "Проверить миграцию на staging")
+        #expect(saved.title == "Check the staging migration")
         #expect(saved.due == moment(7, 16))
         #expect(saved.hasDueTime)
         #expect(saved.listID == "work")
@@ -215,7 +275,7 @@ struct NotesControllerTests {
             Issue.record("expected an add call")
             return
         }
-        #expect(title == "Проверить миграцию на staging")
+        #expect(title == "Check the staging migration")
         #expect(due?.date == moment(7, 16))
         #expect(due?.hasTime == true)
         #expect(listID == "work")
@@ -237,9 +297,9 @@ struct NotesControllerTests {
     }
 
     @Test func aChipNamedLikeADateLeavesTheTypedDate() async {
-        let today = list("today", "Сегодня")
+        let today = list("today", "Today")
         store.listInfos = [today]
-        var chipped = draft("Позвонить завтра в 16 #Сегодня")
+        var chipped = draft("Call tomorrow at 4pm #Today")
         chipped.apply(.pick(today))
         let controller = makeController()
 
@@ -247,7 +307,7 @@ struct NotesControllerTests {
             Issue.record("expected .saved")
             return
         }
-        #expect(saved.title == "Позвонить")
+        #expect(saved.title == "Call")
         #expect(saved.due == moment(7, 16))
         #expect(saved.hasDueTime)
     }
@@ -256,11 +316,11 @@ struct NotesControllerTests {
         store.listInfos = [list("inbox", "Inbox")]
         let controller = makeController()
 
-        guard case let .saved(saved, _) = await controller.save(draft("Заплатить за аренду 10 ноября")) else {
+        guard case let .saved(saved, _) = await controller.save(draft("Pay the rent Nov 10")) else {
             Issue.record("expected .saved")
             return
         }
-        #expect(saved.title == "Заплатить за аренду")
+        #expect(saved.title == "Pay the rent")
         #expect(saved.due == moment(10))
         #expect(!saved.hasDueTime)
     }
@@ -280,11 +340,11 @@ struct NotesControllerTests {
         store.listInfos = [list("inbox", "Inbox")]
         let controller = makeController()
 
-        guard case let .saved(saved, _) = await controller.save(draft("завтра в 16")) else {
+        guard case let .saved(saved, _) = await controller.save(draft("tomorrow at 4pm")) else {
             Issue.record("expected .saved")
             return
         }
-        #expect(saved.title == "завтра в 16")
+        #expect(saved.title == "tomorrow at 4pm")
         #expect(saved.due == moment(7, 16))
     }
 
@@ -451,14 +511,14 @@ struct NotesControllerTests {
 
     @Test func handOffStartsClaudeMainByDefault() async throws {
         _ = listWithFolder()
-        let reminder = item("r1", title: "Проверить миграцию на staging")
+        let reminder = item("r1", title: "Check the staging migration")
         store.items = [reminder]
         let controller = makeController()
 
         let result = await controller.handOff(reminder)
 
         #expect(result == .started(label: "Claude · main", listTitle: "Workdeck"))
-        #expect(commands() == [ShellCommand.claude(.main(home: home), in: URL(filePath: folder.path), prompt: "Проверить миграцию на staging")])
+        #expect(commands() == [ShellCommand.claude(.main(home: home), in: URL(filePath: folder.path), prompt: "Check the staging migration")])
         #expect(store.items.first?.notes == "Given to Claude · main, Nov 6, 14:32")
         let recorded = try #require(settings.handOff(of: "r1"))
         #expect(recorded.label == "Claude · main")
@@ -986,7 +1046,7 @@ struct NotesControllerTests {
 
     @Test func noteTextNeverReachesUserDefaults() async {
         _ = listWithFolder()
-        let text = "Проверить SECRETMARKER на staging"
+        let text = "Check SECRETMARKER on staging"
         var chipped = draft(text + " #Work")
         chipped.apply(.pick(list("work", "Workdeck")))
         let controller = makeController()

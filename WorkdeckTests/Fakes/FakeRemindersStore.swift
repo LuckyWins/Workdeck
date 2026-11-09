@@ -9,6 +9,7 @@ final class FakeRemindersStore: RemindersStoring {
         case requestAccess
         case createList(String)
         case add(title: String, due: ParsedDate?, listID: String)
+        case update(id: String, title: String?, due: ReminderDueChange, listID: String?)
         case openItems(Set<String>)
         case completedItems(Set<String>)
         case completedItemsSince(Set<String>, Date)
@@ -32,6 +33,7 @@ final class FakeRemindersStore: RemindersStoring {
 
     var createListError: (any Error)?
     var addError: (any Error)?
+    var updateError: (any Error)?
     var markDoneError: (any Error)?
     var markUndoneError: (any Error)?
     var appendNoteError: (any Error)?
@@ -98,6 +100,30 @@ final class FakeRemindersStore: RemindersStoring {
         nextID += 1
         items.append(item)
         return item
+    }
+
+    func update(_ id: String, title: String?, due: ReminderDueChange, listID: String?) throws -> ReminderItem {
+        calls.append(.update(id: id, title: title, due: due, listID: listID))
+        try requireAccess()
+        if let updateError { throw updateError }
+        let index = try index(of: id)
+        if let title {
+            items[index].title = title
+        }
+        switch due {
+        case .keep: break
+        case .remove:
+            items[index].due = nil
+            items[index].hasDueTime = false
+        case let .set(date):
+            items[index].due = date.date
+            items[index].hasDueTime = date.hasTime
+        }
+        if let listID {
+            guard listInfos.contains(where: { $0.id == listID }) else { throw RemindersStoreError.listNotFound }
+            items[index].listID = listID
+        }
+        return items[index]
     }
 
     func openItems(in listIDs: Set<String>) async -> [ReminderItem] {
