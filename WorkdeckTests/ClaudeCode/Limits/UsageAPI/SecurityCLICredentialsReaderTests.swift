@@ -70,7 +70,7 @@ struct SecurityCLICredentialsReaderTests {
 /// Runs harmless system binaries only; never `security`.
 struct SystemProcessRunnerTests {
     @Test func capturesStdoutAndExitCode() {
-        let result = SystemProcessRunner().run(URL(filePath: "/bin/sh"), arguments: ["-c", "printf hello; echo oops >&2; exit 3"], timeout: 5)
+        let result = SystemProcessRunner().run(URL(filePath: "/bin/sh"), arguments: ["-c", "printf hello; echo oops >&2; exit 3"], timeout: 30)
         #expect(result.exitCode == 3)
         #expect(String(decoding: result.stdout, as: UTF8.self) == "hello")
         #expect(!result.timedOut)

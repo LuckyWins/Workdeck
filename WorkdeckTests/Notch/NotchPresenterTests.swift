@@ -187,19 +187,19 @@ struct NotchPresenterTests {
         #expect(presenter.appliedTarget == .hidden)
     }
 
-    @Test func flashesInARowMerge() async throws {
-        let (presenter, _) = makePresenter(flashDuration: .seconds(5))
+    @Test(.timeLimit(.minutes(1)))
+    func flashesInARowMerge() async throws {
+        let (presenter, _) = makePresenter(flashDuration: .seconds(30))
         presenter.show(state(.notch(.normal)))
+        let queuedAt = Date()
         presenter.flash([.threshold(window(.fiveHour, 96), threshold: 95)])
         presenter.flash([.sessionFinished(project: "a", worked: 60)])
-        let deadline = Date().addingTimeInterval(2)
-        while presenter.model.flash == nil, Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(5))
-        }
+        await waitFor { presenter.model.flash != nil }
         let flash = try #require(presenter.model.flash)
         #expect(flash.ring == .red)
         #expect(flash.dot == .green)
-        #expect(NotchFlash.isFresh(flash, now: Date()))
+        // It starts when it plays, after the alerts, not when it was merged (a late poll must not fail it).
+        #expect(flash.startedAt >= queuedAt)
     }
 
     @Test(.timeLimit(.minutes(1)))
@@ -253,15 +253,13 @@ struct NotchPresenterTests {
         #expect(created() == 0)
     }
 
-    @Test func alertsTogetherMakeOneFlash() async throws {
-        let (presenter, _) = makePresenter(flashDuration: .seconds(5))
+    @Test(.timeLimit(.minutes(1)))
+    func alertsTogetherMakeOneFlash() async throws {
+        let (presenter, _) = makePresenter(flashDuration: .seconds(30))
         presenter.show(state(.notch(.normal)))
         await settle(presenter)
         presenter.flash([.sessionFinished(project: "a", worked: 60), .threshold(window(.fiveHour, 96), threshold: 95)])
-        let deadline = Date().addingTimeInterval(2)
-        while presenter.model.flash == nil, Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(5))
-        }
+        await waitFor { presenter.model.flash != nil }
         let flash = try #require(presenter.model.flash)
         #expect(flash.ring == .red)
         #expect(flash.dot == .green)
@@ -398,7 +396,7 @@ struct NotchPresenterTests {
         presenter.show(state(.notch(.normal)))
         await settle(presenter)
         presenter.flash([.sessionNeedsYou(project: "vitastir")])
-        try? await Task.sleep(for: .milliseconds(100))
+        await waitFor { presenter.model.alerts == [.sessionNeedsYou(project: "vitastir")] }
         // Joins the alert on screen: no second tap; hovering the open alert, and staying when it ends, add none.
         presenter.flash([.sessionFinished(project: "a", worked: 60)])
         surface.onHoverChange?(true)
@@ -432,10 +430,16 @@ struct NotchPresenterTests {
         presenter.showRecap(WeeklyRecapSummary(weekStart: fixedNow), for: .milliseconds(300))
         await waitFor { presenter.appliedTarget == .expanded }
         presenter.flash([.sessionFinished(project: "a", worked: 60)])
-        try? await Task.sleep(for: .milliseconds(50))
-        #expect(haptics.performed.isEmpty)
-        // The recap's expansion carries the alert on: it may come up without a new expand.
-        await waitFor { presenter.model.alerts == [.sessionFinished(project: "a", worked: 60)] }
+        // Nothing taps while the recap is up; the recap's expansion carries the alert on: it may come up without a new
+        // expand.
+        var tappedDuringRecap = false
+        await waitFor {
+            if presenter.isRecapExpanded, !haptics.performed.isEmpty {
+                tappedDuringRecap = true
+            }
+            return presenter.model.alerts == [.sessionFinished(project: "a", worked: 60)]
+        }
+        #expect(!tappedDuringRecap)
         await settle(presenter)
         #expect(haptics.performed == [.alert])
     }
@@ -764,16 +768,14 @@ struct NotchPresenterTests {
         #expect(surface.calls.isEmpty)
     }
 
-    @Test func hoverFlipsDuringAnExpandNeverOverlapCalls() async {
+    @Test(.timeLimit(.minutes(1)))
+    func hoverFlipsDuringAnExpandNeverOverlapCalls() async {
         let (presenter, _) = makePresenter()
         presenter.show(state(.notch(.normal)))
         await settle(presenter)
         surface.onHoverChange?(true)
         // Flip the hover while the fake expand (30 ms) is running: it records the call when it starts.
-        let deadline = Date().addingTimeInterval(2)
-        while !surface.calls.contains("expand"), Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(2))
-        }
+        await waitFor { surface.calls.contains("expand") }
         surface.onHoverChange?(false)
         surface.onHoverChange?(true)
         surface.onHoverChange?(false)
@@ -841,6 +843,9 @@ struct NotchPresenterTests {
         #expect(opened == ["vitastir"])
     }
 
+    /// Polls until `condition` holds; the test's time limit bounds it. The full suite keeps the main actor busy for
+    /// seconds at a time, so these tests wait for what happens and check the order of events, never a short deadline
+    /// or a fixed sleep that a presenter that is right but late would fail.
     private func waitFor(_ condition: () -> Bool) async {
         while !condition() {
             try? await Task.sleep(for: .milliseconds(5))
@@ -901,10 +906,10 @@ struct NotchPresenterTests {
         let (presenter, _) = makePresenter()
         presenter.show(state(.notch(.normal)))
         await settle(presenter)
-        presenter.showRecap(WeeklyRecapSummary(weekStart: fixedNow), for: .milliseconds(300))
+        presenter.showRecap(WeeklyRecapSummary(weekStart: fixedNow), for: .seconds(2))
         await waitFor { presenter.appliedTarget == .expanded }
         let countdown = try #require(presenter.model.countdown)
-        #expect(abs(countdown.end.timeIntervalSince(countdown.start) - 0.3) < 0.001)
+        #expect(abs(countdown.end.timeIntervalSince(countdown.start) - 2) < 0.001)
         await waitFor { presenter.appliedTarget == .compact }
         #expect(presenter.model.recap != nil)
     }
@@ -1078,17 +1083,19 @@ struct NotchPresenterTests {
             try? await Task.sleep(for: .milliseconds(5))
         }
         presenter.flash([.threshold(window(.fiveHour, 81), threshold: 80)])
-        try? await Task.sleep(for: .milliseconds(100))
-        #expect(presenter.model.alerts.isEmpty)
-        // Once the recap's time is up, the alert shows; the notch may stay expanded in between, so watch the model.
+        // The alert never shows while the recap is expanded, and shows once its time is up. The notch may stay expanded
+        // in between, so watch the model; no fixed sleep, which a busy main actor turns into "the recap already ended".
         var shown = false
+        var shownDuringRecap = false
         while presenter.isBusy {
             if presenter.model.alerts == [.threshold(window(.fiveHour, 81), threshold: 80)] {
                 shown = true
+                shownDuringRecap = shownDuringRecap || presenter.isRecapExpanded
             }
             try? await Task.sleep(for: .milliseconds(5))
         }
         #expect(shown)
+        #expect(!shownDuringRecap)
     }
 
     @Test(.timeLimit(.minutes(1)))
@@ -1123,10 +1130,7 @@ struct NotchPresenterTests {
             try? await Task.sleep(for: .milliseconds(5))
         }
         presenter.show(state(.hidden))
-        let deadline = Date().addingTimeInterval(2)
-        while presenter.appliedTarget != .hidden, Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(5))
-        }
+        await waitFor { presenter.appliedTarget == .hidden }
         #expect(presenter.appliedTarget == .hidden)
     }
 
