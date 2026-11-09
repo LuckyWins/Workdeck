@@ -92,4 +92,11 @@ struct NotesPanelTabsTests {
         #expect(PanelTabRules.tabsModel(notch, hasNotchScreen: false) == nil)
         #expect(PanelTabRules.tabsModel(nil, hasNotchScreen: true) == nil)
     }
+
+    @Test func theHandOverStartsOnTheNotchsTab() {
+        // The panel takes over at the notch's own size, then animates to Notes.
+        #expect(PanelTabRules.handOverStart(notchTab: .sessions) == .sessions)
+        #expect(PanelTabRules.handOverStart(notchTab: .stats) == .stats)
+        #expect(PanelTabRules.handOverStart(notchTab: .notes) == .sessions)
+    }
 }

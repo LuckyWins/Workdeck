@@ -8,8 +8,10 @@ nonisolated enum NotesPanelStyle {
     static let confirmationWidth: CGFloat = 400
     /// Sessions and Stats in the panel: the expanded notch's 300 pt content inside the shape's flares (notch tabs spec §1).
     static let notchTabWidth: CGFloat = 300 + 2 * topRadius
-    /// A tab switch animates the panel's size over this long.
-    static let tabSwitchDuration: Duration = .milliseconds(280)
+    /// A tab switch grows or shrinks the panel as DynamicNotchKit opens the notch on hover.
+    static let tabSwitchAnimation = Animation.bouncy(duration: 0.4)
+    /// How long the window keeps the larger of both sizes during a switch: the bounce settles within it.
+    static let tabSwitchDuration: Duration = .milliseconds(450)
     /// DynamicNotchKit's `.notch` style: the flare where the notch meets the screen's top edge, and the bottom corners.
     static let topRadius: CGFloat = 15
     static let bottomRadius: CGFloat = 20
@@ -74,16 +76,21 @@ struct NotesPanelView: View {
     var topInset: CGFloat
     /// Which opening of the panel this is: each one grows out of the notch again.
     var opening = 0
+    /// False when the panel takes over from the expanded notch at its size: no growing out of the compact notch.
+    var grows = true
     /// A click on a tab icon.
     var onSelectTab: (NotchTab) -> Void = { _ in }
     /// The pointer entered or left the panel.
     var onHover: (Bool) -> Void = { _ in }
     /// The content's size changed: the window follows it.
     var onSize: (CGSize) -> Void = { _ in }
+    /// The black shape's size: the content's, reached with the notch's animation after a tab switch.
+    @State private var shapeSize: CGSize?
+    @State private var shapeTab: NotchTab?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        GrowFromNotch {
+        GrowFromNotch(grows: grows) {
             panel
         }
         .id(opening)
@@ -92,7 +99,9 @@ struct NotesPanelView: View {
     }
 
     private var panel: some View {
-        Group {
+        // One container under one shape: a tab switch resizes that shape (a `Group` would give each tab its own and
+        // only cross-fade them).
+        ZStack(alignment: .top) {
             if let notchModel, tab != .notes {
                 // The expanded notch's width: its 300 pt content inside the shape's flares.
                 VStack(alignment: .leading, spacing: 0) {
@@ -124,12 +133,25 @@ struct NotesPanelView: View {
             }
         }
         .foregroundStyle(NotesPanelStyle.text)
-        .background(.black, in: NotesPanelShape())
-        .clipShape(NotesPanelShape())
         .fixedSize(horizontal: false, vertical: true)
-        .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: tab)
+        .onGeometryChange(for: CGSize.self, of: \.size) { size in
+            // A tab switch grows or shrinks the shape around the centre, as the notch opens on hover. Only the shape
+            // animates: animating the content's layout made the note field relayout on every frame and AppKit gave up
+            // on the window's constraints (a crash).
+            let animates = shapeTab != nil && shapeTab != tab && shapeSize != nil
+            shapeTab = tab
+            withAnimation(animates && !reduceMotion ? NotesPanelStyle.tabSwitchAnimation : nil) {
+                shapeSize = size
+            }
+            onSize(size)
+        }
+        .mask(alignment: .top) {
+            NotesPanelShape().frame(width: shapeSize?.width, height: shapeSize?.height)
+        }
+        .background(alignment: .top) {
+            NotesPanelShape().fill(.black).frame(width: shapeSize?.width, height: shapeSize?.height)
+        }
         .onHover(perform: onHover)
-        .onGeometryChange(for: CGSize.self, of: \.size) { onSize($0) }
     }
 
     /// The notch's tabs, where a notch shows (without its model, as with the menu bar text, Notes stands alone).
@@ -172,8 +194,13 @@ struct NotesPanelView: View {
 
 /// The panel opens like the notch growing down: from a narrow strip at the top to its size.
 private struct GrowFromNotch<Content: View>: View {
-    @ViewBuilder var content: () -> Content
-    @State private var isGrown = false
+    var content: () -> Content
+    @State private var isGrown: Bool
+
+    init(grows: Bool = true, @ViewBuilder content: @escaping () -> Content) {
+        self.content = content
+        _isGrown = State(initialValue: !grows)
+    }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {

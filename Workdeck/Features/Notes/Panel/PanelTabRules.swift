@@ -37,6 +37,11 @@ nonisolated enum PanelTabRules {
         tab != .notes && workdeckIsActive
     }
 
+    /// The Notes icon in the hover notch: the panel takes over on the notch's tab, at its size, then animates to Notes.
+    static func handOverStart(notchTab: NotchTab) -> NotchTab {
+        notchTab == .notes ? .sessions : notchTab
+    }
+
     /// The notch's model for the Sessions and Stats tabs, only where a notch shows: with the menu bar text instead
     /// there are no tabs (notch tabs spec §1, non-goals).
     static func tabsModel(_ model: LimitsNotchModel?, hasNotchScreen: Bool) -> LimitsNotchModel? {

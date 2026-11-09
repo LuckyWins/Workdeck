@@ -222,7 +222,7 @@ struct LimitsExpandedView: View {
         if tab == .notes {
             model.onOpenNotes?()
         } else {
-            withAnimation(reduceMotion ? nil : .smooth(duration: 0.28)) {
+            withAnimation(reduceMotion ? nil : NotesPanelStyle.tabSwitchAnimation) {
                 model.tab = tab
             }
         }

@@ -48,7 +48,7 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
     let model: NotesPanelModel
     private weak var composer: NotchComposer?
     private var panel: NotesPanel?
-    private var host: NSHostingView<NotesPanelView>?
+    private var host: NSHostingView<NotesPanelHost>?
     private var screen: NSScreen?
     /// The folder chooser is up: the panel resigning key does not close it.
     private var isChoosingFolder = false
@@ -64,7 +64,11 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
     private var activationObserver: (any NSObjectProtocol)?
     private(set) var isOpen = false
     /// The tab the panel shows (notch tabs spec §2); Notes on every opening by the key.
-    private(set) var tab: NotchTab = .notes
+    private(set) var tab: NotchTab {
+        get { tabState.tab }
+        set { tabState.tab = newValue }
+    }
+    private let tabState = PanelTabState()
     /// The notch's model, for the Sessions and Stats tabs.
     private let notchModel: LimitsNotchModel?
     /// Closes Sessions or Stats after the pointer left, as the notch collapses (notch tabs spec §1).
@@ -73,6 +77,8 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
     /// The notch's model while tabs show: only where a notch is (not with the menu bar text).
     private var tabsModel: LimitsNotchModel?
     private var isSwitching = false
+    /// Whether this opening grows out of the compact notch (not when it takes over from the expanded one).
+    private var grows = true
     private var switchTask: Task<Void, Never>?
     /// The content's last reported size, fitted once a tab switch's animation is over.
     private var lastSize = CGSize.zero
@@ -129,7 +135,7 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
 
     /// `takingKeyboard` false shows the panel without making it key: the demo plays in it while the user keeps typing
     /// where they were.
-    func open(tab: NotchTab = .notes, takingKeyboard: Bool = true) {
+    func open(tab: NotchTab = .notes, takingKeyboard: Bool = true, grows: Bool = true) {
         // No display at all (Closed-Lid Mode without an external screen): there is nowhere to show the panel.
         guard !isOpen, let screen = Self.screenUnderPointer() else { return }
         self.screen = screen
@@ -144,6 +150,7 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
         self.tab = tabsModel == nil ? .notes : tab
         panel.acceptsKey = PanelTabRules.acceptsKey(self.tab)
         pointerWatch.opened(on: self.tab)
+        self.grows = grows
         let view = makeView(on: screen)
         if let host {
             host.rootView = view
@@ -169,25 +176,41 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
         Task { await model.opened() }
     }
 
-    private func makeView(on screen: NSScreen) -> NotesPanelView {
-        NotesPanelView(
-            model: model, notchModel: tabsModel, tab: tab, topInset: Self.topInset(of: screen), opening: openings,
+    private func makeView(on screen: NSScreen) -> NotesPanelHost {
+        NotesPanelHost(
+            state: tabState, model: model, notchModel: tabsModel, topInset: Self.topInset(of: screen), opening: openings, grows: grows,
             onSelectTab: { [weak self] tab in self?.select(tab) },
-            onHover: { [weak self] inside in self?.pointerInside(inside) }
-        ) { [weak self] size in
-            self?.fit(size)
+            onHover: { [weak self] inside in self?.pointerInside(inside) },
+            onSize: { [weak self] size in self?.fit(size) }
+        )
+    }
+
+    /// The Notes icon in the hover notch (notch tabs spec §4): the panel takes the notch's place on the same tab and
+    /// size, without growing, then switches to Notes with the usual size animation once that first frame is up.
+    func openFromNotch() {
+        guard !isOpen else { return }
+        open(tab: PanelTabRules.handOverStart(notchTab: notchModel?.tab ?? .sessions), takingKeyboard: false, grows: false)
+        guard isOpen else { return }
+        guard tab != .notes else {
+            // No tabs here (no notch screen): Notes straight away.
+            panel?.makeKey()
+            return
+        }
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(30))
+            self?.select(.notes)
         }
     }
 
     /// A click on a tab icon. Notes takes the keyboard again with the note as it was; Sessions and Stats give it back
     /// and close when the pointer leaves, and alerts that waited for the note show now (notch tabs spec §4, §6).
     func select(_ tab: NotchTab) {
-        guard isOpen, tab != self.tab, tabsModel != nil, let screen else { return }
-        self.tab = tab
+        guard isOpen, tab != self.tab, tabsModel != nil else { return }
         perform(pointerWatch.selected(tab))
         panel?.acceptsKey = PanelTabRules.acceptsKey(tab)
         beginSwitch()
-        host?.rootView = makeView(on: screen)
+        // The view animates the shape to the new tab's size (`NotesPanelView`); the content switches at once.
+        self.tab = tab
         if tab == .notes {
             guard let panel else { return }
             panel.makeKey()
@@ -206,10 +229,16 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
         }
     }
 
-    /// While the content animates to the new tab's size the window keeps the larger of both, so nothing is clipped;
-    /// it fits the final size once the animation is over.
+    /// Before the content animates to the new tab's size the window widens to the widest tab, centred, so the shape
+    /// grows on both sides (a window that widens with the switch made it grow to the right only); it keeps the larger
+    /// size until the animation is over, then fits the content again.
     private func beginSwitch() {
         isSwitching = true
+        if let panel, let screen, panel.frame.width < NotesPanelStyle.width {
+            let width = NotesPanelStyle.width
+            let wide = CGRect(x: (screen.frame.midX - width / 2).rounded(), y: panel.frame.minY, width: width, height: panel.frame.height)
+            panel.setFrame(wide, display: true)
+        }
         switchTask?.cancel()
         switchTask = Task { [weak self] in
             try? await Task.sleep(for: NotesPanelStyle.tabSwitchDuration + .milliseconds(50))

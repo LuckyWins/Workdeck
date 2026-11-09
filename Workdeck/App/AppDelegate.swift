@@ -260,8 +260,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // The Notes icon in the expanded notch (notch tabs spec §4).
         notch.onOpenNotes = { [unowned self] in
-            guard !notesPanel.isOpen else { return }
-            toggleNotesPanel()
+            guard !notesPanel.isOpen, !notesDemo.isShowing else { return }
+            notesFolders.refresh()
+            notesPanel.openFromNotch()
         }
         // Cleanup needs Reminders access; it does nothing until then, and runs once when the first save gets it.
         notes.onAccessGranted = { [unowned self] in Task { await notesCleanup.run() } }
