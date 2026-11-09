@@ -173,7 +173,7 @@ struct NotesAnimationView: View {
                 .opacity(state.keycap)
                 .padding(.top, compactSize.height + Self.keycapGap)
             if state.isPanelShown {
-                NotesPanelView(model: panelModel, topInset: NotchGeometry.housing.height)
+                NotesPanelView(model: panelModel, notchModel: LimitsNotchModel(), topInset: NotchGeometry.housing.height)
                     .frame(width: NotesPanelStyle.width)
                     .scaleEffect(x: 1 - 0.4 * state.closing, y: 1 - 0.8 * state.closing, anchor: .top)
                     .opacity(1 - state.closing)
@@ -203,7 +203,7 @@ struct NotesAnimation {
         var size = CGSize.zero
         for step in 0 ... Int(NotesDemoScript.length * 10) {
             show(script: Double(step) / 10, in: model)
-            let fitting = NSHostingView(rootView: NotesPanelView(model: model, topInset: NotchGeometry.housing.height)
+            let fitting = NSHostingView(rootView: NotesPanelView(model: model, notchModel: LimitsNotchModel(), topInset: NotchGeometry.housing.height)
                 .frame(width: NotesPanelStyle.width)).fittingSize
             size = CGSize(width: max(size.width, fitting.width), height: max(size.height, fitting.height))
         }

@@ -17,6 +17,11 @@ final class LimitsNotchModel {
     var countdown: NotchCountdown?
     /// The pointer is on the notch, after the hover delays; the countdown bar hides meanwhile.
     var isHovering = false
+    /// The tab the expanded notch shows; back to Sessions whenever the notch collapses or an alert comes (notch tabs
+    /// spec §1).
+    var tab: NotchTab = .sessions
+    /// The current week for the Stats tab; nil until the recap has read its days.
+    var weekStats: WeeklyRecapSummary?
     @ObservationIgnored var onRefresh: (() -> Void)?
     @ObservationIgnored var onActivateSession: ((String) -> Void)?
     @ObservationIgnored var onActivateProject: ((String, AgentKind) -> Void)?
@@ -26,6 +31,10 @@ final class LimitsNotchModel {
     @ObservationIgnored var onToggleAccounts: (() -> Void)?
     @ObservationIgnored var onDismissRecap: (() -> Void)?
     @ObservationIgnored var onRecapDetails: (() -> Void)?
+    /// The Notes icon: the quick notes panel takes over, on Notes (notch tabs spec §4).
+    @ObservationIgnored var onOpenNotes: (() -> Void)?
+    /// `Details…` on the Stats tab: the Statistics window on the current week.
+    @ObservationIgnored var onStatsDetails: (() -> Void)?
 }
 
 extension LimitsLevel {
@@ -130,6 +139,9 @@ struct LimitsCompactTrailing: View {
 
 struct LimitsExpandedView: View {
     let model: LimitsNotchModel
+    /// Set when the quick notes panel draws a tab with this view: only that tab's content, without the tab bar, the
+    /// alerts, the recap card, the wash or the countdown (notch tabs spec §7).
+    var embeddedTab: NotchTab?
 
     @State private var hoveredRefresh: String?
     @State private var isToggleHovered = false
@@ -141,6 +153,19 @@ struct LimitsExpandedView: View {
     static let barWidth = 16
 
     var body: some View {
+        if let embeddedTab {
+            tabContent(embeddedTab)
+                .font(Terminal.font())
+                .foregroundStyle(Terminal.text)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .frame(width: 300, alignment: .leading)
+        } else {
+            notch
+        }
+    }
+
+    private var notch: some View {
         Group {
             if model.alerts.count > 1 {
                 batchView(model.alerts)
@@ -154,13 +179,18 @@ struct LimitsExpandedView: View {
                     onDismiss: { model.onDismissRecap?() }
                 )
             } else {
-                details
+                VStack(alignment: .leading, spacing: 8) {
+                    NotchTabBar(selected: model.tab, onSelect: select)
+                    tabContent(model.tab)
+                }
             }
         }
         .font(Terminal.font())
         .foregroundStyle(Terminal.text)
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        // The tab bar sits right under the notch's top edge (notch tabs spec §2).
+        .padding(.top, showsTabs ? 2 : 10)
+        .padding(.bottom, 10)
         .background {
             // The animation stays on the wash: content swaps follow DynamicNotchKit's own resizing.
             ZStack {
@@ -180,6 +210,32 @@ struct LimitsExpandedView: View {
             }
         }
         .frame(width: 300, alignment: .leading)
+    }
+
+    /// The tabs show unless an alert or the recap card takes the notch.
+    private var showsTabs: Bool {
+        model.alerts.isEmpty && model.recap == nil
+    }
+
+    /// Notes hands over to the quick notes panel; the other tabs switch here, the notch resizing smoothly.
+    private func select(_ tab: NotchTab) {
+        if tab == .notes {
+            model.onOpenNotes?()
+        } else {
+            withAnimation(reduceMotion ? nil : .smooth(duration: 0.28)) {
+                model.tab = tab
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func tabContent(_ tab: NotchTab) -> some View {
+        switch tab {
+        case .sessions, .notes:
+            details
+        case .stats:
+            WeekStatsView(summary: model.weekStats, thresholds: model.state.thresholds, onDetails: { model.onStatsDetails?() })
+        }
     }
 
     /// The wash under an expanded alert, a batch or the recap; none in the usual view (notch polish spec §2).
@@ -309,7 +365,17 @@ struct LimitsExpandedView: View {
         model.flash?.accounts.contains(account.name) == true ? model.flash?.ring : nil
     }
 
+    @ViewBuilder
     private var details: some View {
+        if model.state.showsNothing {
+            // Opened from the quick notes panel with nothing to show (notch tabs spec §3).
+            Text("No sessions").foregroundStyle(Terminal.dim)
+        } else {
+            limitsAndSessions
+        }
+    }
+
+    private var limitsAndSessions: some View {
         VStack(alignment: .leading, spacing: 4) {
             if model.state.showsLimits {
                 let blocks = model.state.limitBlocks

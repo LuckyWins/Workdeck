@@ -53,6 +53,46 @@ struct RecapControllerTests {
         try store.save([RecapDay(date: "2026-10-07", projects: ["Workdeck": RecapProjectDay(seconds: seconds, sessionIDs: ["s"])])], now: monday, calendar: calendar)
     }
 
+    @Test func eachRefreshShowsTheCurrentWeek() throws {
+        try store.save([RecapDay(date: "2026-10-12", projects: ["Workdeck": RecapProjectDay(seconds: 1800, sessionIDs: ["s"])])], now: monday, calendar: calendar)
+        let (controller, composer) = makeController()
+        controller.start()
+        composer.refresh()
+        let week = try #require(presenter.weekStats.last ?? nil)
+        #expect(RecapCalendar.dayKey(week.weekStart, calendar: calendar) == "2026-10-12")
+        #expect(week.seconds == 1800)
+    }
+
+    @Test func currentWeekBeforeAnythingIsEmpty() throws {
+        let (controller, composer) = makeController()
+        controller.start()
+        composer.refresh()
+        let week = try #require(presenter.weekStats.last ?? nil)
+        #expect(week.seconds == 0)
+        #expect(!week.isWorthShowing)
+    }
+
+    @Test func demoReplacesTheCurrentWeek() throws {
+        let (controller, composer) = makeController()
+        controller.start()
+        controller.demoDidStart()
+        composer.refresh()
+        #expect(((presenter.weekStats.last ?? nil)?.seconds ?? 0) > 0)
+        controller.demoDidStop()
+        composer.refresh()
+        #expect((presenter.weekStats.last ?? nil)?.seconds == 0)
+    }
+
+    @Test func statsDetailsOpenTheCurrentWeek() {
+        let (controller, composer) = makeController()
+        var opened = 0
+        controller.onOpenStatistics = { opened += 1 }
+        controller.start()
+        composer.onStatsDetails?()
+        #expect(opened == 1)
+        #expect(controller.statistics.weekStart == RecapCalendar.weekStart(of: monday, calendar: calendar))
+    }
+
     @Test func launchShowsLastWeeksRecap() throws {
         try saveLastWeek(seconds: 3600)
         let (controller, _) = makeController()

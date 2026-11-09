@@ -157,7 +157,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }()
 
-    private(set) lazy var notesPanel = NotesPanelPresenter(model: NotesPanelModel(controller: notes, now: { Date() }), composer: notch)
+    private(set) lazy var notesPanel = NotesPanelPresenter(
+        model: NotesPanelModel(controller: notes, now: { Date() }),
+        composer: notch,
+        notchModel: (notch.presenter as? NotchPresenter)?.model
+    )
 
     /// The key: a tap of right Option or right Command, or a recorded combination (spec §2).
     private(set) lazy var notesShortcuts = NotesShortcutMonitor(
@@ -251,6 +255,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         codex.start()
         recap.start()
         notes.onOpenPanel = { [unowned self] in
+            guard !notesPanel.isOpen else { return }
+            toggleNotesPanel()
+        }
+        // The Notes icon in the expanded notch (notch tabs spec §4).
+        notch.onOpenNotes = { [unowned self] in
             guard !notesPanel.isOpen else { return }
             toggleNotesPanel()
         }

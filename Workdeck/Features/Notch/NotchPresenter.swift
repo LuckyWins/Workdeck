@@ -36,6 +36,12 @@ protocol LimitsPresenting: AnyObject {
     func setRecapDismissAction(_ action: @escaping () -> Void)
     /// What `Details…` on the recap does (statistics spec §4).
     func setRecapDetailsAction(_ action: @escaping () -> Void)
+    /// The current week for the Stats tab (notch tabs spec §5).
+    func showWeekStats(_ summary: WeeklyRecapSummary?)
+    /// What `Details…` on the Stats tab does.
+    func setStatsDetailsAction(_ action: @escaping () -> Void)
+    /// What the Notes icon in the expanded notch does: the quick notes panel opens on Notes (notch tabs spec §4).
+    func setOpenNotesAction(_ action: @escaping () -> Void)
     /// Called with true when the pointer has rested on the hidden notch's place, false when it has left (spec §5).
     func setPeekAction(_ action: @escaping (Bool) -> Void)
     /// Whether the pointer is on the notch or at its place right now.
@@ -288,6 +294,8 @@ final class NotchPresenter: LimitsPresenting {
     /// Expands the notch with alerts for `alertDuration`; alerts arriving meanwhile join them and keep them up a while
     /// longer.
     private func present(_ alerts: [LimitsAlert]) {
+        // An alert shows on Sessions: when it ends under the pointer, the notch is back on Sessions (notch tabs spec §6).
+        model.tab = .sessions
         // "Needs you" waits for nothing: an expanded recap steps back to its mark (recap spec §3.2).
         if isShowingRecap, alerts.contains(where: { if case .sessionNeedsYou = $0 { true } else { false } }) {
             endRecapExpansion()
@@ -428,6 +436,20 @@ final class NotchPresenter: LimitsPresenting {
 
     func setRecapDetailsAction(_ action: @escaping () -> Void) {
         model.onRecapDetails = action
+    }
+
+    func showWeekStats(_ summary: WeeklyRecapSummary?) {
+        if model.weekStats != summary {
+            model.weekStats = summary
+        }
+    }
+
+    func setStatsDetailsAction(_ action: @escaping () -> Void) {
+        model.onStatsDetails = action
+    }
+
+    func setOpenNotesAction(_ action: @escaping () -> Void) {
+        model.onOpenNotes = action
     }
 
     private func endRecapExpansion() {
@@ -618,6 +640,10 @@ final class NotchPresenter: LimitsPresenting {
             hasScreen: screen != nil,
             hidesResting: mayRest && screen.map { $0.isVirtual && fullScreen.isFullScreen($0.screen) } ?? false
         )
+        // Hover always opens on Sessions (notch tabs spec §1); a collapsing notch keeps its content while it shrinks.
+        if target == .expanded, appliedTarget != .expanded {
+            model.tab = .sessions
+        }
         let rebuild = needsRebuild
         needsRebuild = false
         guard target != appliedTarget || rebuild else {

@@ -4,6 +4,9 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 
 ## Unreleased
 
+### New
+- The expanded notch has tabs: Sessions, Notes and this week's Stats. Hovering opens it on Sessions; the right Option opens it on Notes.
+
 ### Fixed
 - Quick notes: Return in the `#` list now picks the selected list, or the new one on the "Create list" row, and the next Return saves the note; before, it saved at once, and a new list's note went to Inbox with `#name` in its text.
 - Quick notes: a `#` followed by more words, as in "#1 check staging", now reads as plain text once no list matches, instead of staying blue.

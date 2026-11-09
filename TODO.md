@@ -34,6 +34,10 @@ Agreed on 2026-11-06, from [Lumio](https://lumiomac.com/).
 
 12. ~~**Quick notes.**~~ Done (`7c25269`). A tap of the right Option opens a panel from the notch: one line, Return, and it is a reminder in Apple Reminders. `#` picks a project (a Reminders list) with terminal-style Tab completion, a date in the text sets the reminder, ⌘↩ hands the note to Claude Code or Codex in Terminal in the project's folder, completed notes are removed after a week with a copy in an archive. Spec: `specs/2026-11-06-quick-notes-design.md`. Later: resurface notes when an agent finishes in the project, `workdeck-note` for agents, notes in the recap, a note to `TODO.md` or a GitHub issue.
 
+Agreed on 2026-11-09, from [Lumio](https://lumiomac.com/).
+
+13. **Notch tabs.** The expanded notch gets Sessions, Notes and Stats tabs; hover opens on Sessions, the right Option on Notes, Stats shows this week. Spec: `specs/2026-11-09-notch-tabs-design.md`. Later: remember the last tab if Sessions-first proves inconvenient.
+
 ## Distribution
 
 - **README media.** Screenshots done: `make screenshots` (spec `specs/2026-11-04-screenshots-design.md`). Still open: a demo GIF or MP4 of the notch in motion for the README header and the page, recorded from the demo on the MacBook notch (`screencapture` needs Screen Recording for the app that runs it; Terminal works without restarting VS Code).

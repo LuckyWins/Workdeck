@@ -6,6 +6,10 @@ import SwiftUI
 nonisolated enum NotesPanelStyle {
     static let width: CGFloat = 580
     static let confirmationWidth: CGFloat = 400
+    /// Sessions and Stats in the panel: the expanded notch's 300 pt content inside the shape's flares (notch tabs spec §1).
+    static let notchTabWidth: CGFloat = 300 + 2 * topRadius
+    /// A tab switch animates the panel's size over this long.
+    static let tabSwitchDuration: Duration = .milliseconds(280)
     /// DynamicNotchKit's `.notch` style: the flare where the notch meets the screen's top edge, and the bottom corners.
     static let topRadius: CGFloat = 15
     static let bottomRadius: CGFloat = 20
@@ -59,15 +63,24 @@ nonisolated struct NotesPanelShape: Shape {
     }
 }
 
-/// The panel's content: the note, the `#` list, open items, the picker, the folder prompt or a confirmation.
+/// The panel's content under the notch's tab bar (notch tabs spec §2): on Notes the note, the `#` list, open items,
+/// the picker, the folder prompt or a confirmation; on Sessions and Stats the expanded notch's own views.
 struct NotesPanelView: View {
     let model: NotesPanelModel
+    /// The notch's model, for Sessions and Stats; without it only Notes shows.
+    var notchModel: LimitsNotchModel?
+    var tab: NotchTab = .notes
     /// The notch's (or the menu bar's) height on this screen: the content starts below it.
     var topInset: CGFloat
     /// Which opening of the panel this is: each one grows out of the notch again.
     var opening = 0
+    /// A click on a tab icon.
+    var onSelectTab: (NotchTab) -> Void = { _ in }
+    /// The pointer entered or left the panel.
+    var onHover: (Bool) -> Void = { _ in }
     /// The content's size changed: the window follows it.
     var onSize: (CGSize) -> Void = { _ in }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GrowFromNotch {
@@ -80,25 +93,51 @@ struct NotesPanelView: View {
 
     private var panel: some View {
         Group {
-            if case let .confirmation(confirmation) = model.mode {
-                NotesConfirmationView(model: model, confirmation: confirmation)
-                    .padding(.top, topInset + 10)
-                    .padding(.bottom, 18)
-                    .padding(.horizontal, NotesPanelStyle.topRadius + 24)
-                    .frame(width: NotesPanelStyle.confirmationWidth, alignment: .leading)
+            if let notchModel, tab != .notes {
+                // The expanded notch's width: its 300 pt content inside the shape's flares.
+                VStack(alignment: .leading, spacing: 0) {
+                    tabBar.padding(.horizontal, 16)
+                    LimitsExpandedView(model: notchModel, embeddedTab: tab)
+                }
+                .padding(.top, topInset + 4)
+                .padding(.bottom, 6)
+                .padding(.horizontal, NotesPanelStyle.topRadius)
+                .frame(width: NotesPanelStyle.notchTabWidth, alignment: .leading)
+            } else if case let .confirmation(confirmation) = model.mode {
+                VStack(alignment: .leading, spacing: 10) {
+                    tabBar
+                    NotesConfirmationView(model: model, confirmation: confirmation)
+                }
+                .padding(.top, topInset + 4)
+                .padding(.bottom, 18)
+                .padding(.horizontal, NotesPanelStyle.topRadius + 24)
+                .frame(width: NotesPanelStyle.confirmationWidth, alignment: .leading)
             } else {
-                main
-                    .padding(.top, topInset + 12)
-                    .padding(.bottom, 14)
-                    .padding(.horizontal, NotesPanelStyle.topRadius + NotesPanelStyle.inset)
-                    .frame(width: NotesPanelStyle.width, alignment: .leading)
+                VStack(alignment: .leading, spacing: 10) {
+                    tabBar
+                    main
+                }
+                .padding(.top, topInset + 4)
+                .padding(.bottom, 14)
+                .padding(.horizontal, NotesPanelStyle.topRadius + NotesPanelStyle.inset)
+                .frame(width: NotesPanelStyle.width, alignment: .leading)
             }
         }
         .foregroundStyle(NotesPanelStyle.text)
         .background(.black, in: NotesPanelShape())
         .clipShape(NotesPanelShape())
         .fixedSize(horizontal: false, vertical: true)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: tab)
+        .onHover(perform: onHover)
         .onGeometryChange(for: CGSize.self, of: \.size) { onSize($0) }
+    }
+
+    /// The notch's tabs, where a notch shows (without its model, as with the menu bar text, Notes stands alone).
+    @ViewBuilder
+    private var tabBar: some View {
+        if notchModel != nil {
+            NotchTabBar(selected: tab, onSelect: onSelectTab)
+        }
     }
 
     @ViewBuilder

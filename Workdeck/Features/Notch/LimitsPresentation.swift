@@ -111,6 +111,16 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
     var collapsesOtherAccounts = false
     /// More than one agent is on: blocks, sessions and alerts carry their agent's mark (Codex spec §3.1).
     var showsAgentMarks = false
+    /// An agent tool is on (or the demo plays). With every tool off the composer still describes them for the
+    /// popover, but the notch's Sessions tab has nothing to show (notch tabs spec §3).
+    var hasEnabledAgent = true
+
+    /// Sessions shows only "No sessions": every agent off, or no session and no limit figures yet.
+    var showsNothing: Bool {
+        guard hasEnabledAgent else { return true }
+        guard sessions.rows.isEmpty else { return false }
+        return !showsLimits || !limitBlocks.contains { !$0.windows.isEmpty || $0.problem != nil || $0.isWaiting }
+    }
 
     /// Claude alerts name their account only when Claude has more than one; Codex's block does not count.
     var showsClaudeAccounts: Bool {

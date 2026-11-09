@@ -80,6 +80,21 @@ struct ScreenshotTests {
     }
 
     @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func notchStats() throws {
+        // A Thursday: the week so far has four days of the demo's made-up work (notch tabs spec §5).
+        let thursday = try #require(fixtures.calendar.date(byAdding: .day, value: 3, to: fixtures.monday))
+        let model = fixtures.notchModel()
+        model.tab = .stats
+        model.weekStats = WeeklyRecap.summary(
+            days: RecapDemoScript.days(now: thursday, calendar: fixtures.calendar),
+            weekStart: RecapCalendar.weekStart(of: thursday, calendar: fixtures.calendar),
+            calendar: fixtures.calendar
+        )
+        let url = try ScreenshotRenderer.write(notchFrame(LimitsExpandedView(model: model)), name: "notch-stats", dark: true, width: nil)
+        #expect(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
     func statistics() throws {
         let controller = fixtures.statistics()
         for dark in [false, true] {
@@ -109,7 +124,7 @@ struct ScreenshotTests {
         #expect(model.isListOpen)
         #expect(model.parsedDate != nil)
         // The panel hangs from the top edge below a notch's height, as the notch shots do; a margin on the other sides.
-        let panel = NotesPanelView(model: model, topInset: NotchGeometry.housing.height)
+        let panel = NotesPanelView(model: model, notchModel: LimitsNotchModel(), topInset: NotchGeometry.housing.height)
             .frame(width: NotesPanelStyle.width)
             .padding([.horizontal, .bottom], 24)
         let width = NotesPanelStyle.width + 48

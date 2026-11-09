@@ -24,7 +24,10 @@ final class NotesPanel: NSPanel {
         animationBehavior = .none
     }
 
-    override var canBecomeKey: Bool { true }
+    /// Only Notes takes the keyboard: a click in Sessions or Stats leaves it where the user typed (notch tabs spec §4).
+    var acceptsKey = true
+
+    override var canBecomeKey: Bool { acceptsKey }
     override var canBecomeMain: Bool { false }
 
     /// Above the menu bar and its status items, so the panel covers the menu bar under the notch.
@@ -60,11 +63,35 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
     private var lastOtherApp: NSRunningApplication?
     private var activationObserver: (any NSObjectProtocol)?
     private(set) var isOpen = false
+    /// The tab the panel shows (notch tabs spec §2); Notes on every opening by the key.
+    private(set) var tab: NotchTab = .notes
+    /// The notch's model, for the Sessions and Stats tabs.
+    private let notchModel: LimitsNotchModel?
+    /// Closes Sessions or Stats after the pointer left, as the notch collapses (notch tabs spec §1).
+    private var pointerExitTask: Task<Void, Never>?
+    private var pointerWatch = PanelPointerWatch()
+    /// The notch's model while tabs show: only where a notch is (not with the menu bar text).
+    private var tabsModel: LimitsNotchModel?
+    private var isSwitching = false
+    private var switchTask: Task<Void, Never>?
+    /// The content's last reported size, fitted once a tab switch's animation is over.
+    private var lastSize = CGSize.zero
+    /// Clicks in other apps while the panel is open: Sessions and Stats close on them (the panel is not key there, so
+    /// resigning key cannot tell).
+    private var clickMonitor: Any?
+    /// The notch's hover exit delay.
+    static let pointerExitDelay: Duration = .milliseconds(500)
 
-    init(model: NotesPanelModel, composer: NotchComposer?) {
+    init(model: NotesPanelModel, composer: NotchComposer?, notchModel: LimitsNotchModel? = nil) {
         self.model = model
         self.composer = composer
+        self.notchModel = notchModel
         super.init()
+        // While Notes has the keyboard alerts wait; on the other tabs the panel steps aside for them (spec §6).
+        composer?.onSuspendedAlert = { [weak self] in
+            guard let self, PanelTabRules.closesForAlert(isOpen: isOpen, tab: tab) else { return }
+            close()
+        }
         if let front = NSWorkspace.shared.frontmostApplication, front != NSRunningApplication.current {
             lastOtherApp = front
         }
@@ -79,7 +106,10 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
                 self?.lastOtherApp = app
             }
         }
-        model.onClose = { [weak self] in self?.close() }
+        model.onClose = { [weak self] in
+            guard let self, PanelTabRules.noteClosesPanel(tab: tab) else { return }
+            close()
+        }
         model.chooseFolderWithPanel = { [weak self] in await self?.chooseFolder() }
         model.onConfirm = { [weak self] closesPanel in
             if closesPanel {
@@ -90,12 +120,16 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
 
     /// The key: opens the panel, or closes it when open (spec §2.1).
     func toggle() {
-        isOpen ? close() : open()
+        switch PanelTabRules.toggle(isOpen: isOpen, tab: tab) {
+        case .open: open()
+        case .close: close()
+        case .showNotes: select(.notes)
+        }
     }
 
     /// `takingKeyboard` false shows the panel without making it key: the demo plays in it while the user keeps typing
     /// where they were.
-    func open(takingKeyboard: Bool = true) {
+    func open(tab: NotchTab = .notes, takingKeyboard: Bool = true) {
         // No display at all (Closed-Lid Mode without an external screen): there is nowhere to show the panel.
         guard !isOpen, let screen = Self.screenUnderPointer() else { return }
         self.screen = screen
@@ -106,9 +140,11 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
         )
         let panel = panel ?? makePanel()
         openings += 1
-        let view = NotesPanelView(model: model, topInset: Self.topInset(of: screen), opening: openings) { [weak self] size in
-            self?.fit(size)
-        }
+        tabsModel = PanelTabRules.tabsModel(notchModel, hasNotchScreen: composer?.hasNotchScreen ?? false)
+        self.tab = tabsModel == nil ? .notes : tab
+        panel.acceptsKey = PanelTabRules.acceptsKey(self.tab)
+        pointerWatch.opened(on: self.tab)
+        let view = makeView(on: screen)
         if let host {
             host.rootView = view
         } else {
@@ -121,15 +157,103 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
         composer?.setSuspended(true)
         fit(host?.fittingSize ?? CGSize(width: NotesPanelStyle.width, height: 120))
         panel.orderFrontRegardless()
-        if takingKeyboard {
+        if takingKeyboard, self.tab == .notes {
             panel.makeKey()
         }
+        clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isOpen else { return }
+                self.perform(self.pointerWatch.clickOutside())
+            }
+        }
         Task { await model.opened() }
+    }
+
+    private func makeView(on screen: NSScreen) -> NotesPanelView {
+        NotesPanelView(
+            model: model, notchModel: tabsModel, tab: tab, topInset: Self.topInset(of: screen), opening: openings,
+            onSelectTab: { [weak self] tab in self?.select(tab) },
+            onHover: { [weak self] inside in self?.pointerInside(inside) }
+        ) { [weak self] size in
+            self?.fit(size)
+        }
+    }
+
+    /// A click on a tab icon. Notes takes the keyboard again with the note as it was; Sessions and Stats give it back
+    /// and close when the pointer leaves, and alerts that waited for the note show now (notch tabs spec §4, §6).
+    func select(_ tab: NotchTab) {
+        guard isOpen, tab != self.tab, tabsModel != nil, let screen else { return }
+        self.tab = tab
+        perform(pointerWatch.selected(tab))
+        panel?.acceptsKey = PanelTabRules.acceptsKey(tab)
+        beginSwitch()
+        host?.rootView = makeView(on: screen)
+        if tab == .notes {
+            guard let panel else { return }
+            panel.makeKey()
+            if let field = Self.noteField(in: panel.contentView) {
+                panel.makeFirstResponder(field)
+            }
+        } else {
+            releaseKeyboard()
+            if PanelTabRules.reactivatesPreviousApp(switchingTo: tab, workdeckIsActive: NSApp.isActive),
+               let previousApp, previousApp != NSRunningApplication.current {
+                previousApp.activate()
+            }
+            if composer?.hasWaitingAlerts == true {
+                close()
+            }
+        }
+    }
+
+    /// While the content animates to the new tab's size the window keeps the larger of both, so nothing is clipped;
+    /// it fits the final size once the animation is over.
+    private func beginSwitch() {
+        isSwitching = true
+        switchTask?.cancel()
+        switchTask = Task { [weak self] in
+            try? await Task.sleep(for: NotesPanelStyle.tabSwitchDuration + .milliseconds(50))
+            guard let self, !Task.isCancelled else { return }
+            isSwitching = false
+            fit(lastSize)
+        }
+    }
+
+    /// Away from Notes, the panel closes once the pointer has been off it for the notch's exit delay.
+    private func pointerInside(_ inside: Bool) {
+        guard isOpen else { return }
+        perform(pointerWatch.pointer(inside: inside))
+    }
+
+    private func perform(_ action: PanelPointerWatch.Action) {
+        switch action {
+        case .none:
+            break
+        case .cancelExit:
+            pointerExitTask?.cancel()
+            pointerExitTask = nil
+        case .armExit:
+            pointerExitTask?.cancel()
+            pointerExitTask = Task { [weak self] in
+                try? await Task.sleep(for: Self.pointerExitDelay)
+                guard let self, !Task.isCancelled, isOpen, !tab.waitsForAlerts else { return }
+                close()
+            }
+        case .close:
+            close()
+        }
     }
 
     func close() {
         guard isOpen else { return }
         isOpen = false
+        tab = .notes
+        pointerExitTask?.cancel()
+        pointerExitTask = nil
+        if let clickMonitor {
+            NSEvent.removeMonitor(clickMonitor)
+        }
+        clickMonitor = nil
         panel?.orderOut(nil)
         model.closed()
         composer?.setSuspended(false)
@@ -149,7 +273,12 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
 
     /// The window takes the content's size, centered at the top of its screen.
     private func fit(_ size: CGSize) {
+        lastSize = size
         guard let panel, let screen, size.width > 0, size.height > 0 else { return }
+        var size = size
+        if isSwitching {
+            size = CGSize(width: max(size.width, panel.frame.width), height: max(size.height, panel.frame.height))
+        }
         let frame = screen.frame
         let target = CGRect(x: (frame.midX - size.width / 2).rounded(), y: frame.maxY - size.height, width: size.width, height: size.height)
         if panel.frame != target {
@@ -187,8 +316,9 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
     // MARK: NSWindowDelegate
 
     func windowDidResignKey(_ notification: Notification) {
-        // A save in flight may have brought up the Reminders access prompt: the panel waits for it.
-        guard !isChoosingFolder, !isReleasingKey, !model.isBusy else { return }
+        // A save in flight may have brought up the Reminders access prompt: the panel waits for it. Sessions and Stats
+        // do not hold the keyboard: the pointer leaving closes them.
+        guard tab == .notes, !isChoosingFolder, !isReleasingKey, !model.isBusy else { return }
         // A confirmation that closes the panel goes on its own when its time is up.
         if case .confirmation = model.mode, model.confirmationClosesPanel {
             return

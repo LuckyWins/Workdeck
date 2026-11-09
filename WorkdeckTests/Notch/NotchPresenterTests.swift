@@ -354,6 +354,35 @@ struct NotchPresenterTests {
         #expect(haptics.performed == [.hover])
     }
 
+    @Test func hoverReopensOnSessions() async {
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        surface.onHoverChange?(true)
+        await settle(presenter)
+        presenter.model.tab = .stats
+        surface.onHoverChange?(false)
+        await settle(presenter)
+        #expect(presenter.appliedTarget == .compact)
+        // The collapsing notch keeps its content: no swap to Sessions while it shrinks.
+        #expect(presenter.model.tab == .stats)
+        surface.onHoverChange?(true)
+        await settle(presenter)
+        #expect(presenter.appliedTarget == .expanded)
+        #expect(presenter.model.tab == .sessions)
+    }
+
+    @Test func anAlertResetsTheTabToSessions() async {
+        let (presenter, _) = makePresenter()
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        surface.onHoverChange?(true)
+        await settle(presenter)
+        presenter.model.tab = .stats
+        presenter.flash([.sessionNeedsYou(project: "vitastir")])
+        #expect(presenter.model.tab == .sessions)
+    }
+
     @Test func hoveringAHiddenNotchDoesNotTap() async {
         let (presenter, _) = makePresenter()
         presenter.show(state(.hidden))

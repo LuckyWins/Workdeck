@@ -143,6 +143,21 @@ final class FakePresenter: LimitsPresenting {
     func setRecapDetailsAction(_ action: @escaping () -> Void) {
         recapDetailsAction = action
     }
+
+    private(set) var weekStats: [WeeklyRecapSummary?] = []
+    func showWeekStats(_ summary: WeeklyRecapSummary?) {
+        weekStats.append(summary)
+    }
+
+    private(set) var openNotesAction: (() -> Void)?
+    func setOpenNotesAction(_ action: @escaping () -> Void) {
+        openNotesAction = action
+    }
+
+    private(set) var statsDetailsAction: (() -> Void)?
+    func setStatsDetailsAction(_ action: @escaping () -> Void) {
+        statsDetailsAction = action
+    }
 }
 
 @MainActor

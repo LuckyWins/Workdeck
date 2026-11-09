@@ -1,17 +1,20 @@
 import SwiftUI
 
-/// Last week's recap in the expanded notch (weekly recap spec §3, statistics spec §4).
+/// Last week's recap in the expanded notch (weekly recap spec §3, statistics spec §4), and the current week on the
+/// Stats tab (notch tabs spec §5): another title and no Got it.
 struct RecapView: View {
     let recap: WeeklyRecapSummary
     let thresholds: [Int]
+    var title = RecapText.title
     let onDetails: () -> Void
-    let onDismiss: () -> Void
+    /// Got it; nil leaves the button out.
+    let onDismiss: (() -> Void)?
 
     private let calendar = RecapCalendar.calendar()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            header("\(RecapText.title) · \(RecapText.weekRange(recap.weekStart, calendar: calendar))")
+            header("\(title) · \(RecapText.weekRange(recap.weekStart, calendar: calendar))")
             HStack(alignment: .bottom, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(RecapText.duration(recap.seconds))
@@ -68,7 +71,9 @@ struct RecapView: View {
             HStack(spacing: 6) {
                 Spacer()
                 button("Details…", action: onDetails)
-                button(RecapText.dismiss, action: onDismiss)
+                if let onDismiss {
+                    button(RecapText.dismiss, action: onDismiss)
+                }
             }
             .padding(.top, 4)
         }
@@ -96,6 +101,24 @@ struct RecapView: View {
     }
 
     private func button(_ title: String, action: @escaping () -> Void) -> some View {
+        RecapCardParts.button(title, action: action)
+    }
+
+    private func header(_ title: String) -> some View {
+        RecapCardParts.header(title)
+    }
+
+    private func row(_ label: String, _ value: Text) -> some View {
+        HStack(spacing: 0) {
+            Text(label.padding(toLength: 10, withPad: " ", startingAt: 0)).foregroundStyle(Terminal.dim)
+            value.lineLimit(1).truncationMode(.tail)
+        }
+    }
+}
+
+/// The card's header rule and its buttons, shared by the recap and the Stats tab's empty week.
+enum RecapCardParts {
+    static func button(_ title: String, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
             .buttonStyle(.plain)
             .padding(.horizontal, 8)
@@ -104,7 +127,7 @@ struct RecapView: View {
             .pointerStyle(.link)
     }
 
-    private func header(_ title: String) -> some View {
+    static func header(_ title: String) -> some View {
         HStack(spacing: 6) {
             // The rule takes what is left; the title never wraps.
             Text("─ \(title)").fixedSize()
@@ -112,13 +135,6 @@ struct RecapView: View {
         }
         .foregroundStyle(Terminal.dim)
         .padding(.top, 2)
-    }
-
-    private func row(_ label: String, _ value: Text) -> some View {
-        HStack(spacing: 0) {
-            Text(label.padding(toLength: 10, withPad: " ", startingAt: 0)).foregroundStyle(Terminal.dim)
-            value.lineLimit(1).truncationMode(.tail)
-        }
     }
 }
 

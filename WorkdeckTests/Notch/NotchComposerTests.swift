@@ -229,6 +229,39 @@ struct NotchComposerTests {
         #expect(presenter.flashes == [[.sessionNeedsYou(project: "a")]])
     }
 
+    @Test func everyAgentOffIsInTheState() {
+        let composer = makeComposer()
+        add(part(.claudeCode, enabled: false), to: composer)
+        composer.refresh()
+        #expect(!composer.state.hasEnabledAgent)
+        let on = makeComposer()
+        add(part(.claudeCode), to: on)
+        on.refresh()
+        #expect(on.state.hasEnabledAgent)
+    }
+
+    @Test func aSuspendedAlertIsReported() {
+        let composer = makeComposer()
+        add(part(.claudeCode), to: composer)
+        var reported = 0
+        composer.onSuspendedAlert = { reported += 1 }
+        composer.setSuspended(true)
+        composer.flash([.updateAvailable(version: "9.9")])
+        #expect(reported == 1)
+        #expect(presenter.flashes.isEmpty)
+        composer.setSuspended(false)
+        #expect(presenter.flashes.last == [.updateAvailable(version: "9.9")])
+    }
+
+    @Test func openNotesReachesTheComposer() {
+        let composer = makeComposer()
+        var opened = 0
+        composer.onOpenNotes = { opened += 1 }
+        composer.start()
+        presenter.openNotesAction?()
+        #expect(opened == 1)
+    }
+
     @Test func suspendingCollapsesAnExpandedAlertAndShowsItAgainAfter() throws {
         let composer = makeComposer()
         add(part(.claudeCode), to: composer)

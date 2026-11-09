@@ -55,6 +55,7 @@ final class RecapController {
         composer.onRefresh = { [weak self] in self?.record() }
         composer.onRecapDismiss = { [weak self] in self?.dismissRecap() }
         composer.onRecapDetails = { [weak self] in self?.openRecapDetails() }
+        composer.onStatsDetails = { [weak self] in self?.openStatistics(week: nil) }
         // The first unlock of a week shows last week's card (recap spec §3.1).
         activity.onChange = { [weak self] active in
             if active {
@@ -153,6 +154,20 @@ final class RecapController {
         updateStatistics()
     }
 
+    /// This week so far, for the notch's Stats tab (notch tabs spec §5): the demo's days while it runs; nil before
+    /// the days are read.
+    func currentWeek() -> WeeklyRecapSummary? {
+        let days: [RecapDay]
+        if isDemoActive {
+            days = demoDays
+        } else if let recorder {
+            days = recorder.days
+        } else {
+            return nil
+        }
+        return WeeklyRecap.summary(days: days, weekStart: RecapCalendar.weekStart(of: clock(), calendar: calendar), calendar: calendar)
+    }
+
     private func write() {
         guard let recorder, let store else { return }
         let now = clock()
@@ -166,6 +181,7 @@ final class RecapController {
     }
 
     private func updateStatistics() {
+        composer.presenter.showWeekStats(currentWeek())
         statistics.update(
             days: isDemoActive ? demoDays : recorder?.days ?? [],
             connectedAgents: isDemoActive ? Set(AgentKind.allCases) : connectedAgents,

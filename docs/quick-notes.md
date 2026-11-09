@@ -13,7 +13,7 @@ Tap the right Option key, type a line, press Return: the note is a reminder in A
 
 ## The Panel
 
-The panel grows out of the notch on the screen with the pointer. On a display without a notch it draws the notch's shape at the top center, whatever the "Without a notch" setting says. What the notch was showing comes back when the panel closes.
+The panel grows out of the notch on the screen with the pointer. On a display without a notch it draws the notch's shape at the top center, whatever the "Without a notch" setting says. What the notch was showing comes back when the panel closes. The Notes icon in the expanded notch opens the same panel, and its tab bar switches to Sessions and Stats: there the panel gives the keyboard back and closes when the pointer leaves, and the note you were typing is still there when you come back to Notes. Alerts wait while you type a note and show once the panel closes.
 
 - One line; long text wraps to at most three lines. Return saves, and the panel says "Saved · Workdeck" with when it will remind you.
 - Under the text, the summary line shows what will be saved (the reminder's time and the list), and the destination line shows where ⌘↩ goes (the agent, the account and the folder). A recognized date is tinted orange in the text, so a wrong reading shows before you press Return.

@@ -26,6 +26,19 @@ struct LimitsPresentationTests {
         )
     }
 
+    @Test func sessionsShowNothingWithEveryAgentOffOrNoFigures() {
+        var state = LimitsViewState(display: .hidden, windows: [], now: fixedNow, age: nil, thresholds: [80, 95])
+        // Limits connected but no figures yet, no sessions.
+        #expect(state.showsNothing)
+        state.windows = [UsageWindow(kind: .fiveHour, usedPercent: 40, resetsAt: fixedNow.addingTimeInterval(3600))]
+        #expect(!state.showsNothing)
+        state.hasEnabledAgent = false
+        #expect(state.showsNothing)
+        state.hasEnabledAgent = true
+        state.showsLimits = false
+        #expect(state.showsNothing)
+    }
+
     @Test func whenActiveShowsTheNotchWhileSomethingHappens() {
         let normal = window(.fiveHour, 10)
         #expect(display(mode: .whenActive, pressing: normal) == .hidden)

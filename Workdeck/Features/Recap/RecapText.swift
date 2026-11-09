@@ -4,6 +4,9 @@ import Foundation
 nonisolated enum RecapText {
     static let title = "last week"
     static let dismiss = "Got it"
+    /// The Stats tab's header and its line before anything was recorded (notch tabs spec §5).
+    static let thisWeekTitle = "this week"
+    static let nothingThisWeek = "Nothing recorded this week yet"
 
     /// "<1m", "42m", "2h 14m", "9h 03m".
     static func duration(_ seconds: Double) -> String {

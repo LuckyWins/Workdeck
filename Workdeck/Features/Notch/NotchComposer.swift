@@ -28,6 +28,13 @@ final class NotchComposer {
     @ObservationIgnored var onRefresh: (() -> Void)?
     @ObservationIgnored var onRecapDismiss: (() -> Void)?
     @ObservationIgnored var onRecapDetails: (() -> Void)?
+    /// `Details…` on the Stats tab (notch tabs spec §5).
+    @ObservationIgnored var onStatsDetails: (() -> Void)?
+    /// The Notes icon in the expanded notch (notch tabs spec §4).
+    @ObservationIgnored var onOpenNotes: (() -> Void)?
+    /// An alert came while the quick notes panel holds the notch: the panel closes for it unless Notes has the
+    /// keyboard (notch tabs spec §6).
+    @ObservationIgnored var onSuspendedAlert: (() -> Void)?
     /// A click on the update alert: open Release Notes on that version (in-app updates spec §2.3).
     @ObservationIgnored var onOpenReleaseNotes: ((String) -> Void)?
     /// A recap card waits for Got it: the notch stays up whatever the mode.
@@ -35,6 +42,11 @@ final class NotchComposer {
     /// The quick notes panel is open where the notch is: the notch hides and alerts wait (quick notes spec §3).
     @ObservationIgnored private(set) var isSuspended = false
     @ObservationIgnored private var suspendedAlerts: [LimitsAlert] = []
+
+    /// Alerts wait for the quick notes panel to close.
+    var hasWaitingAlerts: Bool {
+        !suspendedAlerts.isEmpty
+    }
 
     init(
         settings: NotchSettings,
@@ -120,6 +132,12 @@ final class NotchComposer {
         presenter.setRecapDetailsAction { [weak self] in
             self?.onRecapDetails?()
         }
+        presenter.setStatsDetailsAction { [weak self] in
+            self?.onStatsDetails?()
+        }
+        presenter.setOpenNotesAction { [weak self] in
+            self?.onOpenNotes?()
+        }
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil,
@@ -144,6 +162,7 @@ final class NotchComposer {
         }
         guard !isSuspended else {
             suspendedAlerts += alerts
+            onSuspendedAlert?()
             return
         }
         presenter.flash(alerts)
@@ -252,6 +271,7 @@ final class NotchComposer {
             collapsesOtherAccounts: settings.collapsesOtherAccounts,
             showsAgentMarks: showsMarks
         )
+        state.hasEnabledAgent = isEnabled || isDemo
         if isSuspended {
             var hidden = state
             hidden.display = .hidden
