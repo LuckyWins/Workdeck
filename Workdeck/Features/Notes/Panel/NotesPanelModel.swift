@@ -566,11 +566,20 @@ final class NotesPanelModel {
             cursor = range.upperBound
         }
         remaining += draft.text[cursor...]
-        let filter = remaining.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        // Each typed word must appear in the note's title or in its list's title (`workdeck staging`).
+        let words = remaining.split(whereSeparator: \.isWhitespace).map(String.init)
+        let listTitles = Dictionary(controller.lists.map { ($0.id, $0.title) }, uniquingKeysWith: { first, _ in first })
         return items.filter { item in
-            (listID == nil || item.listID == listID)
-                && (filter.isEmpty || item.title.range(of: filter, options: [.caseInsensitive, .diacriticInsensitive]) != nil)
+            guard listID == nil || item.listID == listID else { return false }
+            let listTitle = listTitles[item.listID] ?? ""
+            return words.allSatisfy { word in
+                Self.contains(item.title, word) || Self.contains(listTitle, word)
+            }
         }
+    }
+
+    private static func contains(_ text: String, _ word: String) -> Bool {
+        text.range(of: word, options: [.caseInsensitive, .diacriticInsensitive]) != nil
     }
 
     /// The open items show under an empty field, and under typed text while some match it.

@@ -4,6 +4,9 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 
 ## Unreleased
 
+### Fixed
+- Quick notes: typing a list's name, without `#`, now filters the open notes by that list; before, only the notes' own text was searched.
+
 ## 1.4.0 — 2026-11-09
 
 ### New

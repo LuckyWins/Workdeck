@@ -385,6 +385,20 @@ struct NotesPanelModelTests {
         #expect(model.visibleItems.map(\.id) == ["limits"])
     }
 
+    @Test func typingAListNameWithoutHashFiltersByList() async {
+        addOpenItems()
+        let (model, _) = await makeModel()
+        await model.opened()
+
+        model.textChanged("wordle")
+        #expect(model.visibleItems.map(\.id) == ["letters"])
+        #expect(model.showsOpenItems)
+
+        // Each word matches the title or the list: the list's notes, narrowed by the rest.
+        model.textChanged("workdeck sasha")
+        #expect(model.visibleItems.map(\.id) == ["limits"])
+    }
+
     @Test func returnNeverActsOnARow() async {
         addOpenItems()
         let (model, _) = await makeModel()

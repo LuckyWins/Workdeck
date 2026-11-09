@@ -47,7 +47,7 @@ How a few phrases read:
 
 With the field empty, the panel lists the open notes of the lists you used here (the default list and every list a note went to): overdue first, then by due date, then undated ones from the oldest. The right column shows the due date (orange when it is today or overdue), the agent a note was given to and when, or its age.
 
-- Typing filters the list; `#name` limits it to one project. Return always saves what you typed as a new note.
+- Typing filters the list by the notes' text and their list's name (`workdeck staging` finds the Workdeck notes about staging); `#name` limits it to one project. Return always saves what you typed as a new note.
 - ↑↓ select a note, **⌘↩** gives it to its project's agent, **⌘D** marks it done. With the mouse: the circle marks it done, a row's **Give to agent** button hands it over.
 - A note marked done stays in the list crossed out for 4 seconds before it is ticked in Reminders: **⌘Z** or another click on its circle takes it back. Closing the panel ticks it at once.
 - **Done** under the open notes folds out what was ticked lately (up to 20, the last 30 days, until the cleanup removes them). ⌘D or the circle on one of them makes it open again.
