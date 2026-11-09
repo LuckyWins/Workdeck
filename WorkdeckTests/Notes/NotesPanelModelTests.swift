@@ -93,6 +93,21 @@ struct NotesPanelModelTests {
 
     // MARK: Saving
 
+    /// The panel freezes what it showed when it starts closing (notes polish spec §5): a confirmation that closes the
+    /// panel asks to close while it still shows, not after going back to the note.
+    @Test func aClosingConfirmationAsksToCloseBeforeGoingBackToTheNote() async {
+        let (model, _) = await makeModel()
+        await typeWithProject(model, "Check the staging migration #Workdeck")
+        #expect(await model.handle(.returnKey))
+        var modeAtClose: PanelMode?
+        model.onClose = { modeAtClose = model.mode }
+
+        model.finishConfirmation()
+
+        #expect(modeAtClose == .confirmation(NotesConfirmation(symbol: "checkmark", title: "Saved · Workdeck", subtitle: "No reminder")))
+        #expect(model.mode == .typing)
+    }
+
     @Test func returnSavesAndShowsNeutralConfirmation() async {
         let (model, _) = await makeModel()
         await typeWithProject(model, "Check the staging migration tomorrow at 4pm #Workdeck")
@@ -760,18 +775,19 @@ struct NotesPanelModelTests {
         #expect(remembered.folder == folder.path)
     }
 
-    @Test func pickerOnAnUnsavedNoteWithoutProjectSavesFirst() async throws {
+    @Test func pickerOnAnUnsavedNoteWithoutProjectSavesFirst() async {
+        store.listInfos.append(ReminderListInfo(id: "r", title: "Reminders", red: 0.5, green: 0.5, blue: 0.5, openCount: 0))
+        store.defaultListID = "r"
         let (model, controller) = await makeModel()
         model.textChanged("Buy milk")
         #expect(await model.handle(.commandShiftReturn))
         #expect(await model.handle(.down))
         #expect(await model.handle(.returnKey))
 
-        let inbox = try #require(store.listInfos.first { $0.title == "Inbox" })
         #expect(addedTitles == ["Buy milk"])
-        #expect(model.mode == .folder(listID: inbox.id, listTitle: "Inbox"))
+        #expect(model.mode == .folder(listID: "r", listTitle: "Reminders"))
         #expect(!model.folderIsChange)
-        #expect(controller.destination(for: inbox.id).instance == "work")
+        #expect(controller.destination(for: "r").instance == "work")
     }
 
     @Test func pickerRowOfAnOpenItemChoosesForItsList() async {
@@ -824,6 +840,57 @@ struct NotesPanelModelTests {
         #expect(store.items.contains { $0.title == "Play with letter weights" })
         #expect(!store.calls.contains { if case .remove = $0 { true } else { false } })
         #expect(model.draft.text.isEmpty)
+    }
+
+    /// "Later" closes the panel as the folder prompt it shows, not as the empty note (notes polish spec §5).
+    @Test func laterInTheFolderPromptAsksToCloseWhileItStillShows() async {
+        let (model, _) = await makeModel()
+        await typeWithProject(model, "Play with letter weights #Wordle-bot")
+        #expect(await model.handle(.commandReturn))
+        var modeAtClose: PanelMode?
+        model.onClose = { modeAtClose = model.mode }
+
+        #expect(await model.handle(.escape))
+
+        #expect(modeAtClose == .folder(listID: "wb", listTitle: "Wordle-bot"))
+        #expect(model.mode == .typing)
+    }
+
+    /// While the panel draws back into the notch, the model keeps what it shows (the prompt's text, the
+    /// confirmation); `closed()` resets it once the window is gone (notes polish spec §5).
+    @Test func aClosingPanelKeepsWhatItShowsUntilItIsClosed() async {
+        let (model, _) = await makeModel()
+        await typeWithProject(model, "Play with letter weights #Wordle-bot")
+        #expect(await model.handle(.commandReturn))
+        model.onClose = { model.willClose() }
+
+        #expect(await model.handle(.escape))
+
+        #expect(model.mode == .folder(listID: "wb", listTitle: "Wordle-bot"))
+        #expect(model.folderPrompt == "Wordle-bot has no folder yet. Where should the agent start?")
+        model.closed()
+        #expect(model.mode == .typing)
+    }
+
+    @Test func aClosingConfirmationKeepsShowingUntilItIsClosed() async {
+        let (model, _) = await makeModel()
+        await typeWithProject(model, "Check the staging migration #Workdeck")
+        #expect(await model.handle(.returnKey))
+        model.onClose = { model.willClose() }
+
+        model.finishConfirmation()
+
+        #expect(model.mode == .confirmation(NotesConfirmation(symbol: "checkmark", title: "Saved · Workdeck", subtitle: "No reminder")))
+        model.closed()
+        #expect(model.mode == .typing)
+    }
+
+    @Test func withNoListInRemindersTheSummarySaysSo() async {
+        store.listInfos = []
+        let (model, _) = await makeModel()
+        model.textChanged("Buy milk")
+
+        #expect(model.summaryListTitle == "No list in Reminders")
     }
 
     @Test func pickedFolderIsRememberedAndStarts() async {
@@ -1253,6 +1320,29 @@ struct NotesPanelModelTests {
         await model.toggleDone(item)
         #expect(!model.isPendingDelete(item))
         #expect(!model.isPendingDone(item))
+    }
+
+    /// The notice is up before the panel's first frame, so the panel grows into it instead of morphing (notes polish
+    /// spec §4).
+    @Test func aNoticeShowsAsSoonAsThePanelIsShown() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        store.removeError = RemindersStoreError.noAccess
+        model.delete(item)
+        model.closed()
+        #expect(await eventually { store.calls.contains(.remove("migration")) })
+        try? await Task.sleep(for: .milliseconds(50))
+
+        model.willOpen()
+
+        guard case let .confirmation(confirmation) = model.mode else {
+            Issue.record("expected the failure before the first frame")
+            return
+        }
+        #expect(confirmation.title == "Couldn't delete")
+        await model.opened()
+        #expect(model.mode == .confirmation(confirmation))
     }
 
     @Test func aDeletionThatFailedWhileClosedShowsOnTheNextOpening() async {

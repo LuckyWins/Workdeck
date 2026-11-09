@@ -34,6 +34,8 @@ nonisolated enum RemindersStoreError: Error, Equatable, Sendable {
     case listNotFound
     case reminderNotFound
     case noSourceForNewList
+    /// Reminders has no list a note can be saved to.
+    case noWritableList
     /// Reminders refused to move the reminder to that list (another account).
     case cannotMove
 }
@@ -46,6 +48,8 @@ protocol RemindersStoring: AnyObject {
     func requestAccess() async -> RemindersAccess
     /// The lists notes can be saved to. Empty without access.
     func lists() -> [ReminderListInfo]
+    /// Reminders' default list for new reminders, when it allows changes; nil without access.
+    var defaultListID: String? { get }
     func createList(titled: String) throws -> ReminderListInfo
     /// Saves a reminder. With a date and a time the alarm is at that time; with a date only, the due date is all-day
     /// and the alarm is at 09:00 that day.
@@ -138,12 +142,21 @@ final class EventKitRemindersStore: RemindersStoring {
             .map { info(of: $0) }
     }
 
+    var defaultListID: String? {
+        guard access == .granted, let list = eventStore.defaultCalendarForNewReminders(),
+              list.allowsContentModifications else { return nil }
+        return list.calendarIdentifier
+    }
+
     func createList(titled title: String) throws -> ReminderListInfo {
         guard access == .granted else { throw RemindersStoreError.noAccess }
         guard let source = eventStore.defaultCalendarForNewReminders()?.source else { throw RemindersStoreError.noSourceForNewList }
         let list = EKCalendar(for: .reminder, eventStore: eventStore)
         list.title = title
         list.source = source
+        let existing = eventStore.calendars(for: .reminder).map { Self.rgb(of: $0.cgColor) }
+        let color = ListColorPicker.palette[ListColorPicker.next(existing: existing.map { (red: $0.0, green: $0.1, blue: $0.2) })]
+        list.cgColor = CGColor(srgbRed: color.red, green: color.green, blue: color.blue, alpha: 1)
         try eventStore.saveCalendar(list, commit: true)
         return info(of: list)
     }

@@ -22,6 +22,34 @@ struct NotesPanelTabsTests {
         return reported
     }
 
+    /// What triggers the shape's spring (notes polish spec §4): a tab switch, or the note becoming a confirmation.
+    @Test func contentKindFollowsTheViewsBranches() {
+        let confirmation = PanelMode.confirmation(NotesConfirmation(symbol: "checkmark", title: "Saved · Workdeck", subtitle: ""))
+        #expect(PanelContentKind.of(tab: .sessions, mode: .typing, hasNotchModel: true) == .notchTab(.sessions))
+        #expect(PanelContentKind.of(tab: .sessions, mode: .typing, hasNotchModel: false) == .note)
+        #expect(PanelContentKind.of(tab: .notes, mode: confirmation, hasNotchModel: true) == .confirmation)
+        #expect(PanelContentKind.of(tab: .notes, mode: confirmation, hasNotchModel: false) == .confirmation)
+        #expect(PanelContentKind.of(tab: .notes, mode: .picker, hasNotchModel: true) == .note)
+        #expect(PanelContentKind.of(tab: .notes, mode: .folder(listID: "a", listTitle: "A"), hasNotchModel: true) == .note)
+        #expect(PanelContentKind.of(tab: .stats, mode: confirmation, hasNotchModel: true) == .notchTab(.stats))
+    }
+
+    /// Each opening starts without a spring: what the last opening showed (a confirmation, Stats) is not a change.
+    @Test func theFirstLayoutOfAnOpeningDoesNotMorph() {
+        var tracker = ShapeTracker()
+        let layouts: [(PanelContentKind, Int)] = [
+            (.note, 1), (.confirmation, 1), (.confirmation, 1), (.note, 2), (.notchTab(.stats), 2), (.note, 3),
+        ]
+        let springs = layouts.map { tracker.update(kind: $0.0, opening: $0.1) }
+        #expect(springs == [false, true, false, false, true, false])
+    }
+
+    /// Closing springs the shape back to the notch: the notch's width inside the shape's flares, the notch's height
+    /// (notes polish spec §5).
+    @Test func closingDrawsBackToTheNotchsSize() {
+        #expect(NotesPanelStyle.closedShapeSize(notchWidth: 200, topInset: 32) == CGSize(width: 230, height: 32))
+    }
+
     @Test func sessionsAndStatsKeepTheNotchWidth() async {
         let notch = 300 + 2 * NotesPanelStyle.topRadius
         #expect(await reportedSize(on: .sessions).width == notch)

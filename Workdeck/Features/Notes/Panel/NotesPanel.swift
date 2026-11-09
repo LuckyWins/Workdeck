@@ -80,6 +80,10 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
     /// Whether this opening grows out of the compact notch (not when it takes over from the expanded one).
     private var grows = true
     private var switchTask: Task<Void, Never>?
+    /// Orders the window out once the panel has drawn back into the notch (notes polish spec §5).
+    private lazy var closing = ClosingSequence(
+        delay: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : NotesPanelStyle.closeDuration
+    )
     /// The content's last reported size, fitted once a tab switch's animation is over.
     private var lastSize = CGSize.zero
     /// Clicks in other apps while the panel is open: Sessions and Stats close on them (the panel is not key there, so
@@ -138,6 +142,8 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
     func open(tab: NotchTab = .notes, takingKeyboard: Bool = true, grows: Bool = true) {
         // No display at all (Closed-Lid Mode without an external screen): there is nowhere to show the panel.
         guard !isOpen, let screen = Self.screenUnderPointer() else { return }
+        // Opened again while drawing back: gone at once, then it grows afresh; the notch stays hidden.
+        closing.cutShort()
         self.screen = screen
         let current = NSRunningApplication.current
         previousApp = Self.returnApp(
@@ -151,6 +157,7 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
         panel.acceptsKey = PanelTabRules.acceptsKey(self.tab)
         pointerWatch.opened(on: self.tab)
         self.grows = grows
+        model.willOpen()
         let view = makeView(on: screen)
         if let host {
             host.rootView = view
@@ -178,10 +185,13 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
 
     private func makeView(on screen: NSScreen) -> NotesPanelHost {
         NotesPanelHost(
-            state: tabState, model: model, notchModel: tabsModel, topInset: Self.topInset(of: screen), opening: openings, grows: grows,
+            state: tabState, model: model, notchModel: tabsModel, topInset: Self.topInset(of: screen),
+            closedSize: NotesPanelStyle.closedShapeSize(notchWidth: Self.notchWidth(of: screen), topInset: Self.topInset(of: screen)),
+            opening: openings, grows: grows,
             onSelectTab: { [weak self] tab in self?.select(tab) },
             onHover: { [weak self] inside in self?.pointerInside(inside) },
-            onSize: { [weak self] size in self?.fit(size) }
+            onSize: { [weak self] size in self?.fit(size) },
+            onMorph: { [weak self] in self?.beginSwitch() }
         )
     }
 
@@ -233,6 +243,7 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
     /// grows on both sides (a window that widens with the switch made it grow to the right only); it keeps the larger
     /// size until the animation is over, then fits the content again.
     private func beginSwitch() {
+        guard isOpen else { return }
         isSwitching = true
         if let panel, let screen, panel.frame.width < NotesPanelStyle.width {
             let width = NotesPanelStyle.width
@@ -273,23 +284,51 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
         }
     }
 
+    /// Closes at once for the rest of the app (the keyboard goes back) while the panel draws back into the notch as it
+    /// looked (notes polish spec §5); the window goes, the note's state resets and the notch shows again after that.
     func close() {
         guard isOpen else { return }
+        // First, before the resets below change what the view would draw.
+        tabState.closingLook = PanelLook(tab: tab, mode: model.mode)
         isOpen = false
         tab = .notes
         pointerExitTask?.cancel()
         pointerExitTask = nil
+        switchTask?.cancel()
+        switchTask = nil
+        isSwitching = false
         if let clickMonitor {
             NSEvent.removeMonitor(clickMonitor)
         }
         clickMonitor = nil
-        panel?.orderOut(nil)
-        model.closed()
-        composer?.setSuspended(false)
+        if let panel {
+            panel.ignoresMouseEvents = true
+            panel.acceptsKey = false
+            if panel.isKeyWindow {
+                // Out and in again: the keyboard goes back to the app the user typed in while the panel shrinks.
+                isReleasingKey = true
+                panel.orderOut(nil)
+                panel.orderFrontRegardless()
+                isReleasingKey = false
+            }
+        }
+        model.willClose()
         if NSApp.isActive, let previousApp, previousApp != NSRunningApplication.current {
             previousApp.activate()
         }
         previousApp = nil
+        closing.start { [weak self] showsNotch in self?.finishClose(showsNotch: showsNotch) }
+    }
+
+    /// The window goes and the note's state resets; the notch shows again unless the panel is opening anew.
+    private func finishClose(showsNotch: Bool) {
+        panel?.orderOut(nil)
+        panel?.ignoresMouseEvents = false
+        tabState.closingLook = nil
+        model.closed()
+        if showsNotch {
+            composer?.setSuspended(false)
+        }
     }
 
     private func makePanel() -> NotesPanel {
@@ -421,6 +460,14 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
     static func screenUnderPointer() -> NSScreen? {
         let pointer = NSEvent.mouseLocation
         return NSScreen.screens.first { NSMouseInRect(pointer, $0.frame, false) } ?? NSScreen.main ?? NSScreen.screens.first
+    }
+
+    /// The camera housing's width, else the virtual notch DynamicNotchKit draws: where the closing panel goes.
+    static func notchWidth(of screen: NSScreen) -> CGFloat {
+        if screen.safeAreaInsets.top > 0, let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea {
+            return screen.frame.width - left.width - right.width
+        }
+        return NotchPeekZone.virtualNotchWidth
     }
 
     /// The notch's height on a screen with a camera housing, else the menu bar's: the content starts below it.

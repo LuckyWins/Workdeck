@@ -8,6 +8,17 @@ nonisolated enum NotesPanelStyle {
     static let confirmationWidth: CGFloat = 400
     /// Sessions and Stats in the panel: the expanded notch's 300 pt content inside the shape's flares (notch tabs spec §1).
     static let notchTabWidth: CGFloat = 300 + 2 * topRadius
+    /// Closing springs the shape back into the notch, as a tab switch springs it (notes polish spec §5).
+    static let closeAnimation = Animation.spring(duration: 0.35, bounce: 0)
+    /// The content fades first, so the shape flows back empty.
+    static let closeFade = Animation.easeOut(duration: 0.12)
+    /// When the window is ordered out after closing started: the shape is in the notch by then.
+    static let closeDuration: Duration = .milliseconds(380)
+
+    /// The shape closed into the notch: the notch's width inside the flares, the notch's height.
+    static func closedShapeSize(notchWidth: CGFloat, topInset: CGFloat) -> CGSize {
+        CGSize(width: notchWidth + 2 * topRadius, height: topInset)
+    }
     /// A tab switch grows or shrinks the panel as DynamicNotchKit opens the notch on hover.
     static let tabSwitchAnimation = Animation.bouncy(duration: 0.4)
     /// How long the window keeps the larger of both sizes during a switch: the bounce settles within it.
@@ -78,15 +89,27 @@ struct NotesPanelView: View {
     var opening = 0
     /// False when the panel takes over from the expanded notch at its size: no growing out of the compact notch.
     var grows = true
+    /// While closing: the mode the panel showed, drawn instead of the model's (closing resets it).
+    var frozenMode: PanelMode? = nil
+    /// The panel draws back into the notch: the shape springs to `closedSize`, the content fades.
+    var isClosing = false
+    /// The shape's size in the notch (`NotesPanelStyle.closedShapeSize`).
+    var closedSize: CGSize = .zero
     /// A click on a tab icon.
     var onSelectTab: (NotchTab) -> Void = { _ in }
     /// The pointer entered or left the panel.
     var onHover: (Bool) -> Void = { _ in }
     /// The content's size changed: the window follows it.
     var onSize: (CGSize) -> Void = { _ in }
-    /// The black shape's size: the content's, reached with the notch's animation after a tab switch.
+    /// The shape is about to spring to a new size: the window keeps the larger of both meanwhile. Called before
+    /// `onSize`.
+    var onMorph: () -> Void = {}
+    /// The black shape's size: the content's, reached with the notch's animation after a tab switch or when the note
+    /// becomes a confirmation and back (notes polish spec §4).
     @State private var shapeSize: CGSize?
-    @State private var shapeTab: NotchTab?
+    @State private var shapeTracker = ShapeTracker()
+    /// The content fades as the panel closes; shown again once the window is gone (this state outlives openings).
+    @State private var isContentHidden = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -112,7 +135,7 @@ struct NotesPanelView: View {
                 .padding(.bottom, 6)
                 .padding(.horizontal, NotesPanelStyle.topRadius)
                 .frame(width: NotesPanelStyle.notchTabWidth, alignment: .leading)
-            } else if case let .confirmation(confirmation) = model.mode {
+            } else if case let .confirmation(confirmation) = mode {
                 VStack(alignment: .leading, spacing: 10) {
                     tabBar
                     NotesConfirmationView(model: model, confirmation: confirmation)
@@ -135,21 +158,43 @@ struct NotesPanelView: View {
         .foregroundStyle(NotesPanelStyle.text)
         .fixedSize(horizontal: false, vertical: true)
         .onGeometryChange(for: CGSize.self, of: \.size) { size in
-            // A tab switch grows or shrinks the shape around the centre, as the notch opens on hover. Only the shape
-            // animates: animating the content's layout made the note field relayout on every frame and AppKit gave up
-            // on the window's constraints (a crash).
-            let animates = shapeTab != nil && shapeTab != tab && shapeSize != nil
-            shapeTab = tab
-            withAnimation(animates && !reduceMotion ? NotesPanelStyle.tabSwitchAnimation : nil) {
+            // Closing springs the shape into the notch (below); the content's size no longer leads it.
+            guard !isClosing else { return }
+            // A tab switch, or the note becoming a confirmation and back, grows or shrinks the shape around the
+            // centre, as the notch opens on hover. Only the shape animates: animating the content's layout made the
+            // note field relayout on every frame and AppKit gave up on the window's constraints (a crash).
+            let kind = PanelContentKind.of(tab: tab, mode: mode, hasNotchModel: notchModel != nil)
+            let changed = shapeTracker.update(kind: kind, opening: opening)
+            let animates = changed && shapeSize != nil && !reduceMotion
+            if animates {
+                onMorph()
+            }
+            withAnimation(animates ? NotesPanelStyle.tabSwitchAnimation : nil) {
                 shapeSize = size
             }
             onSize(size)
         }
+        .opacity(isContentHidden ? 0 : 1)
         .mask(alignment: .top) {
             NotesPanelShape().frame(width: shapeSize?.width, height: shapeSize?.height)
         }
         .background(alignment: .top) {
             NotesPanelShape().fill(.black).frame(width: shapeSize?.width, height: shapeSize?.height)
+        }
+        .onChange(of: isClosing) { _, closing in
+            // The block flows back into the notch, as on a tab switch (notes polish spec §5).
+            guard closing else {
+                // The window is gone: the next opening starts with its content shown.
+                isContentHidden = false
+                return
+            }
+            // Only the opacity and the shape animate, never the content's layout (see above).
+            withAnimation(reduceMotion ? nil : NotesPanelStyle.closeFade) {
+                isContentHidden = true
+            }
+            withAnimation(reduceMotion ? nil : NotesPanelStyle.closeAnimation) {
+                shapeSize = closedSize
+            }
         }
         .onHover(perform: onHover)
     }
@@ -162,10 +207,15 @@ struct NotesPanelView: View {
         }
     }
 
+    /// What the note shows: the model's mode, or the one frozen while closing.
+    private var mode: PanelMode {
+        frozenMode ?? model.mode
+    }
+
     @ViewBuilder
     private var main: some View {
         VStack(alignment: .leading, spacing: 0) {
-            switch model.mode {
+            switch mode {
             case .folder:
                 FolderPromptView(model: model)
             case .picker:

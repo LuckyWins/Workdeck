@@ -265,7 +265,7 @@ One section, **Notes**, in the Settings form after the Codex section (`SettingsH
 |---|---|
 | Quick notes | Toggle, on by default (off stops the key polling) |
 | Shortcut | Picker: Right Option ⌥ (default), Right Command ⌘, Custom… (records a combination) |
-| Default list | Picker of Reminders lists; default "Inbox", created on first save if missing |
+| Default list | Picker of Reminders lists; default "Reminders default", the list Reminders uses for new reminders (notes polish spec §2; "Inbox" is no longer created) |
 | Reminders | Status: "Access granted" (green dot), "Not asked yet", or "Denied" with an "Open System Settings" button |
 | Remove completed notes | Picker "After N days" and a toggle in one row |
 | Removed notes | Button "Show Archive" (reveals the folder in Finder) |

@@ -134,9 +134,62 @@ struct NotesSettingsTests {
         #expect(settings.recentListIDs.first == "groceries")
         #expect(reloaded().usedListIDs == ["a", "groceries"])
 
-        // Back to "Inbox" before it exists: nothing new to mark, and the list picked before stays used.
+        // Back to Reminders' default: nothing new to mark, and the list picked before stays used.
         settings.defaultListID = nil
         #expect(settings.usedListIDs == ["a", "groceries"])
+    }
+
+    // MARK: The stored "Inbox" (notes polish spec §2.2)
+
+    private func list(_ id: String, _ title: String) -> ReminderListInfo {
+        ReminderListInfo(id: id, title: title, red: 0.5, green: 0.5, blue: 0.5, openCount: 0)
+    }
+
+    @Test func aStoredInboxIsClearedOnlyOnce() {
+        let settings = NotesSettings(defaults: defaults)
+        settings.defaultListID = "i"
+        settings.clearLegacyInboxDefault(lists: [list("i", "inbox")])
+        #expect(settings.defaultListID == nil)
+
+        // Picked again by hand afterwards: it stays, also after a relaunch.
+        settings.defaultListID = "i"
+        settings.clearLegacyInboxDefault(lists: [list("i", "inbox")])
+        #expect(settings.defaultListID == "i")
+        let again = reloaded()
+        again.clearLegacyInboxDefault(lists: [list("i", "inbox")])
+        #expect(again.defaultListID == "i")
+    }
+
+    @Test func anotherStoredListStays() {
+        let settings = NotesSettings(defaults: defaults)
+        settings.defaultListID = "g"
+        settings.clearLegacyInboxDefault(lists: [list("g", "Groceries")])
+        #expect(settings.defaultListID == "g")
+
+        // The migration ran: a list renamed to Inbox later is the user's choice.
+        settings.clearLegacyInboxDefault(lists: [list("g", "Inbox")])
+        #expect(settings.defaultListID == "g")
+    }
+
+    @Test func withoutListsTheMigrationWaits() {
+        let settings = NotesSettings(defaults: defaults)
+        settings.defaultListID = "i"
+        settings.clearLegacyInboxDefault(lists: [])
+        #expect(settings.defaultListID == "i")
+
+        settings.clearLegacyInboxDefault(lists: [list("i", "Inbox")])
+        #expect(settings.defaultListID == nil)
+    }
+
+    /// A stored list missing from the lists may be an account still loading: the migration waits for it.
+    @Test func aStoredListNotLoadedYetWaits() {
+        let settings = NotesSettings(defaults: defaults)
+        settings.defaultListID = "x"
+        settings.clearLegacyInboxDefault(lists: [list("a", "Groceries")])
+        #expect(settings.defaultListID == "x")
+
+        settings.clearLegacyInboxDefault(lists: [list("a", "Groceries"), list("x", "Inbox")])
+        #expect(settings.defaultListID == nil)
     }
 
     @Test func handOffIsRecordedWithoutText() throws {

@@ -144,46 +144,40 @@ struct NotesControllerTests {
 
     // MARK: Saving
 
-    @Test func saveGoesToDefaultInboxCreatedOnce() async throws {
-        let controller = makeController()
-
-        guard case let .saved(first, listTitle) = await controller.save(draft("Buy milk")) else {
-            Issue.record("expected .saved")
-            return
-        }
-        #expect(listTitle == "Inbox")
-        let inbox = try #require(store.listInfos.first)
-        #expect(inbox.title == "Inbox")
-        #expect(first.listID == inbox.id)
-        #expect(first.title == "Buy milk")
-        #expect(settings.usedListIDs == [inbox.id])
-        #expect(settings.defaultListID == inbox.id)
-
-        guard case let .saved(second, _) = await controller.save(draft("Call the bank")) else {
-            Issue.record("expected .saved")
-            return
-        }
-        #expect(second.listID == inbox.id)
-        #expect(store.calls.filter { if case .createList = $0 { true } else { false } } == [.createList("Inbox")])
-        #expect(store.listInfos.count == 1)
-    }
-
-    @Test func saveReusesAnExistingInboxAndRemembersItAsTheDefault() async {
-        store.listInfos = [list("a", "Groceries"), list("inbox", "inbox")]
+    @Test func saveGoesToRemindersDefaultWithoutCreatingAList() async {
+        store.listInfos = [list("a", "Groceries"), list("r", "Reminders")]
+        store.defaultListID = "r"
         let controller = makeController()
 
         guard case let .saved(saved, listTitle) = await controller.save(draft("Buy milk")) else {
             Issue.record("expected .saved")
             return
         }
-        #expect(saved.listID == "inbox")
-        #expect(listTitle == "inbox")
-        #expect(settings.defaultListID == "inbox")
+        #expect(saved.listID == "r")
+        #expect(listTitle == "Reminders")
         #expect(store.calls.allSatisfy { if case .createList = $0 { false } else { true } })
+        // Reminders' default is followed, not remembered.
+        #expect(settings.defaultListID == nil)
+        #expect(settings.usedListIDs == ["r"])
     }
 
-    @Test func saveUsesTheChosenDefaultListAndFallsBackToInboxWhenItIsGone() async {
-        store.listInfos = [list("a", "Groceries")]
+    @Test func saveFollowsRemindersDefaultWhenItChanges() async {
+        store.listInfos = [list("a", "Groceries"), list("r", "Reminders")]
+        store.defaultListID = "r"
+        let controller = makeController()
+        _ = await controller.save(draft("Buy milk"))
+
+        store.defaultListID = "a"
+        guard case let .saved(second, _) = await controller.save(draft("Call the bank")) else {
+            Issue.record("expected .saved")
+            return
+        }
+        #expect(second.listID == "a")
+    }
+
+    @Test func aPickedListWinsAndAGoneOneFallsBackToRemindersDefault() async {
+        store.listInfos = [list("a", "Groceries"), list("r", "Reminders")]
+        store.defaultListID = "r"
         settings.defaultListID = "a"
         let controller = makeController()
         guard case let .saved(first, _) = await controller.save(draft("Buy milk")) else {
@@ -192,14 +186,67 @@ struct NotesControllerTests {
         }
         #expect(first.listID == "a")
 
-        store.listInfos = [list("b", "Other")]   // "a" was deleted in Reminders
+        store.listInfos = [list("r", "Reminders")]   // "a" was deleted in Reminders
         guard case let .saved(second, listTitle) = await controller.save(draft("Call the bank")) else {
             Issue.record("expected .saved")
             return
         }
-        #expect(listTitle == "Inbox")
-        #expect(second.listID != "a")
-        #expect(settings.defaultListID == second.listID)
+        #expect(second.listID == "r")
+        #expect(listTitle == "Reminders")
+        #expect(settings.defaultListID == "a")
+    }
+
+    @Test func aReadOnlyRemindersDefaultFallsBackToTheFirstWritableList() async {
+        // `lists()` leaves out lists that do not allow changes, so a shared default is not among them.
+        store.listInfos = [list("a", "Groceries"), list("b", "Work")]
+        store.defaultListID = "shared"
+        let controller = makeController()
+
+        guard case let .saved(saved, _) = await controller.save(draft("Buy milk")) else {
+            Issue.record("expected .saved")
+            return
+        }
+        #expect(saved.listID == "a")
+        await controller.reload()
+        #expect(controller.defaultList?.id == "a")
+    }
+
+    @Test func withNoWritableListTheSaveFails() async {
+        let controller = makeController()
+
+        #expect(await controller.save(draft("Buy milk")) == .failed("Reminders has no list to save to"))
+        #expect(store.calls.allSatisfy { if case .createList = $0 { false } else { true } })
+        #expect(store.added.isEmpty)
+    }
+
+    @Test func reloadClearsAStoredInbox() async {
+        settings.defaultListID = "i"
+        store.listInfos = [list("i", "Inbox"), list("r", "Reminders")]
+        let controller = makeController()
+
+        await controller.reload()
+
+        #expect(settings.defaultListID == nil)
+    }
+
+    @Test func resolveDefaultListOrder() {
+        let lists = [list("a", "Groceries"), list("r", "Reminders")]
+        #expect(NotesController.resolveDefaultList(picked: "a", remindersDefault: "r", lists: lists)?.id == "a")
+        #expect(NotesController.resolveDefaultList(picked: "gone", remindersDefault: "r", lists: lists)?.id == "r")
+        #expect(NotesController.resolveDefaultList(picked: nil, remindersDefault: "shared", lists: lists)?.id == "a")
+        #expect(NotesController.resolveDefaultList(picked: nil, remindersDefault: nil, lists: lists)?.id == "a")
+        #expect(NotesController.resolveDefaultList(picked: "a", remindersDefault: "r", lists: []) == nil)
+    }
+
+    @Test func remindersDefaultListIgnoresThePick() async {
+        store.listInfos = [list("a", "Groceries"), list("r", "Reminders")]
+        store.defaultListID = "r"
+        settings.defaultListID = "a"
+        let controller = makeController()
+        await controller.reload()
+
+        #expect(controller.remindersDefaultList?.id == "r")
+        #expect(controller.defaultList?.id == "a")
     }
 
     @Test func saveCreatesNewListFromChip() async throws {
@@ -218,9 +265,23 @@ struct NotesControllerTests {
         #expect(saved.listID == created.id)
         #expect(saved.title == "Fix deploy")
         #expect(settings.usedListIDs == [created.id])
-        // The default list is not touched, and no Inbox is made for a note that has a project.
+        // The default list is not touched for a note that has a project.
         #expect(settings.defaultListID == nil)
         #expect(store.listInfos.count == 1)
+    }
+
+    @Test func twoCreatedListsGetDifferentColors() async throws {
+        let controller = makeController()
+        for name in ["alpha", "beta"] {
+            var chipped = draft("Fix deploy #\(name)")
+            chipped.apply(.createList(name))
+            _ = await controller.save(chipped)
+        }
+
+        let created = store.listInfos
+        #expect(created.count == 2)
+        let first = try #require(created.first), second = try #require(created.last)
+        #expect([first.red, first.green, first.blue] != [second.red, second.green, second.blue])
     }
 
     @Test func aChipForAListThatAppearedInTheMeantimeReusesIt() async {
@@ -349,6 +410,8 @@ struct NotesControllerTests {
     }
 
     @Test func savingRefreshesTheOpenNotes() async {
+        store.listInfos = [list("r", "Reminders")]
+        store.defaultListID = "r"
         let controller = makeController()
         #expect(controller.openCount == 0)
 
@@ -356,7 +419,7 @@ struct NotesControllerTests {
 
         #expect(controller.openItems.map(\.title) == ["Buy milk"])
         #expect(controller.openCount == 1)
-        #expect(controller.lists.map(\.title) == ["Inbox"])
+        #expect(controller.lists.map(\.title) == ["Reminders"])
         #expect(controller.lists.first?.openCount == 1)
     }
 
@@ -434,6 +497,7 @@ struct NotesControllerTests {
     @Test func theFirstSaveAsksForAccess() async {
         store.access = .notDetermined
         store.accessAfterRequest = .granted
+        store.listInfos = [list("r", "Reminders")]
         let controller = makeController()
 
         guard case .saved = await controller.save(draft("Buy milk")) else {
@@ -788,6 +852,8 @@ struct NotesControllerTests {
         store.listInfos = [list("a", "Groceries")]
         settings.defaultListID = "a"
         let controller = makeController(codex: codexURL)
+        // The default list is resolved among the loaded lists.
+        await controller.reload()
 
         controller.choose(controller.agents().last!, for: nil)
         controller.chooseFolder("/Users/test/Notes", for: nil)
@@ -797,14 +863,15 @@ struct NotesControllerTests {
         #expect(controller.destination(for: "other") == AgentDestination(agent: .claude, instance: "main", folder: nil))
     }
 
-    @Test func theDefaultListIsFoundByTheNameInboxBeforeAnyNoteIsSaved() async {
-        store.listInfos = [list("inbox", "Inbox")]
+    @Test func theDefaultListBeforeAnyNoteIsSavedIsRemindersDefault() async {
+        store.listInfos = [list("a", "Groceries"), list("r", "Reminders")]
+        store.defaultListID = "r"
         let controller = makeController()
         await controller.reload()
 
         controller.chooseFolder("/Users/test/Notes", for: nil)
 
-        #expect(controller.destination(for: "inbox").folder == "/Users/test/Notes")
+        #expect(controller.destination(for: "r").folder == "/Users/test/Notes")
     }
 
     @Test func choosingForTheDefaultListBeforeItExistsChangesNothing() {

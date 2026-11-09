@@ -26,6 +26,8 @@ final class FakeRemindersStore: RemindersStoring {
     /// What `requestAccess()` leaves `access` at when it was `.notDetermined`.
     var accessAfterRequest: RemindersAccess = .granted
     var listInfos: [ReminderListInfo]
+    /// Reminders' default list; it may name a list missing from `listInfos` (a read-only one `lists()` leaves out).
+    var defaultListID: String?
     var items: [ReminderItem]
     var onChange: (() -> Void)?
     /// The time of `markDone` and the creation time of an added item.
@@ -82,7 +84,11 @@ final class FakeRemindersStore: RemindersStoring {
         calls.append(.createList(title))
         try requireAccess()
         if let createListError { throw createListError }
-        let list = ReminderListInfo(id: "list-\(nextID)", title: title, red: 0.2, green: 0.5, blue: 1, openCount: 0)
+        // Colored as the real store colors a new list (notes polish spec §3).
+        let color = ListColorPicker.palette[ListColorPicker.next(existing: listInfos.map { ($0.red, $0.green, $0.blue) })]
+        let list = ReminderListInfo(
+            id: "list-\(nextID)", title: title, red: color.red, green: color.green, blue: color.blue, openCount: 0
+        )
         nextID += 1
         listInfos.append(list)
         return list

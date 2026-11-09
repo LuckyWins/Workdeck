@@ -115,6 +115,8 @@ final class NotesPanelModel {
     @ObservationIgnored private var pendingDeleteSince: [String: Date] = [:]
     /// The panel is on screen (between `opened()` and `closed()`).
     @ObservationIgnored private var isShown = false
+    /// Between `willClose()` and `closed()`: what the panel shows stays as it is.
+    @ObservationIgnored private var isClosing = false
     /// A failure that happened while the panel was closed, shown when it opens.
     @ObservationIgnored private var noticeOnOpen: NotesConfirmation?
     /// What the line held when Edit was chosen; it comes back when the edit ends.
@@ -166,13 +168,21 @@ final class NotesPanelModel {
 
     // MARK: Opening and closing
 
-    /// The panel opened: back to the note (kept from last time unless it was saved), lists and open items read again.
-    func opened() async {
+    /// The panel is about to show, before its first frame: back to the note, or to a notice from while it was closed,
+    /// so the panel grows into it instead of morphing (notes polish spec §4).
+    func willOpen() {
         resetTransientState()
         isShown = true
         if let notice = noticeOnOpen {
             noticeOnOpen = nil
             confirm(notice, closesPanel: false)
+        }
+    }
+
+    /// The panel opened: back to the note (kept from last time unless it was saved), lists and open items read again.
+    func opened() async {
+        if !isShown {
+            willOpen()
         }
         // A refusal is remembered by Reminders: the hint shows again without another failed save.
         controller.updateAccess()
@@ -182,10 +192,18 @@ final class NotesPanelModel {
         refreshDerived()
     }
 
+    /// The panel started drawing back into the notch: it keeps showing what it shows until `closed()`, once the
+    /// window is gone (notes polish spec §5). A failure meanwhile waits for the next opening.
+    func willClose() {
+        isShown = false
+        isClosing = true
+    }
+
     /// The panel closed (Esc, a click outside, the key): whatever was in progress is dropped, the typed text stays.
     /// Ticks still waiting for their undo time are written now.
     func closed() {
         isShown = false
+        isClosing = false
         resetTransientState()
         if isEditing {
             endEdit()
@@ -313,11 +331,12 @@ final class NotesPanelModel {
         case .folder:
             switch key {
             case .escape:
-                // "Later": the note stays saved.
+                // "Later": the note stays saved. The panel closes as the prompt it shows (notes polish spec §5).
+                onClose?()
+                guard !isClosing else { return true }
                 folderItem = nil
                 mode = .typing
                 selectedRow = nil
-                onClose?()
             case .up, .down:
                 move(key, rows: folderSuggestions.count + 1, allowsNone: false)
             case .returnKey, .commandReturn:
@@ -818,7 +837,7 @@ final class NotesPanelModel {
                 await start(item, savedNow: false)
             } else {
                 // Nothing to write, but it reads as a save: a second ↩ must not save the line that came back.
-                let listTitle = list(withID: item.listID)?.title ?? NotesController.inboxTitle
+                let listTitle = list(withID: item.listID)?.title ?? NotesController.unknownListTitle
                 confirm(NotesConfirmation(symbol: "checkmark", title: "Saved · \(listTitle)", subtitle: remindsText(item)), closesPanel: true)
             }
             return
@@ -974,12 +993,17 @@ final class NotesPanelModel {
                 return "\(title) (new)"
             }
         }
-        return defaultList?.title ?? NotesController.inboxTitle
+        if let defaultList {
+            return defaultList.title
+        }
+        // Reminders answered and has no list: the save will fail, say so before it.
+        return controller.access == .granted && controller.hasLoadedLists ? Self.noListTitle : NotesController.unknownListTitle
     }
 
+    static let noListTitle = "No list in Reminders"
+
     private var defaultList: ReminderListInfo? {
-        list(withID: controller.settings.defaultListID)
-            ?? controller.lists.first { $0.title.caseInsensitiveCompare(NotesController.inboxTitle) == .orderedSame }
+        controller.defaultList
     }
 
     /// Where ⌘↩ sends the typed note. A list still to create has nothing remembered: Claude Code on main, no folder.
@@ -1150,7 +1174,7 @@ final class NotesPanelModel {
                 savedNow = true
             }
             pickerItem = nil
-            let title = list(withID: item.listID)?.title ?? NotesController.inboxTitle
+            let title = list(withID: item.listID)?.title ?? NotesController.unknownListTitle
             showFolderPrompt(for: item, listID: item.listID, listTitle: title, savedNow: savedNow, isChange: true)
         }
     }
@@ -1212,11 +1236,15 @@ final class NotesPanelModel {
         confirmationTask = nil
         controller.failedCommand = nil
         confirmationStays = false
-        mode = .typing
-        refreshDerived()
+        // The panel freezes what it shows when it starts closing (notes polish spec §5): ask while the confirmation
+        // still shows, so it draws into the notch as it is.
         if confirmationClosesPanel {
             onClose?()
+            // Closing: the confirmation stays until `closed()`.
+            guard !isClosing else { return }
         }
+        mode = .typing
+        refreshDerived()
     }
 
     /// The demo's "Saved" (spec §9): shown as after a save, though nothing was saved; the demo closes the panel itself.

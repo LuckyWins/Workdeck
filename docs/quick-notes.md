@@ -17,7 +17,7 @@ The panel grows out of the notch on the screen with the pointer. On a display wi
 
 - One line; long text wraps to at most three lines. Return saves, and the panel says "Saved · Workdeck" with when it will remind you.
 - Under the text, the summary line shows what will be saved (the reminder's time and the list), and the destination line shows where ⌘↩ goes (the agent, the account and the folder). A recognized date is tinted orange in the text, so a wrong reading shows before you press Return.
-- Notes without a project go to the default list (Settings → Notes → **Default list**): "Inbox", created on the first save if Reminders has none.
+- Notes without a project go to the default list (Settings → Notes → **Default list**): **Reminders default**, the list Reminders itself uses for new reminders, unless you pick another. If Reminders' default list cannot be changed (a shared one), notes go to your first list.
 
 ### Projects with `#`
 
@@ -26,7 +26,7 @@ A project is a Reminders list. Type `#` and a few letters: the matching lists op
 - **Tab works like a terminal.** When the matches share a longer start than you typed, Tab completes to it (shown in gray beforehand). Otherwise Tab takes the selected list, and Tab again moves to the next match. ↑↓ select, a click takes a row.
 - A taken list becomes a chip in its color; it is not part of the reminder's title, and its name is never read as a date (a list called "Today" sets no reminder). Backspace right after the chip turns it back into `#name` text. A note has one project; taking another replaces the chip.
 - Space takes a list only when the text after `#` is exactly its name and no other list starts with that name and a space, so names with spaces ("Shopping list") type naturally. Return takes the selected list without saving; the next Return saves.
-- When nothing matches, the only row is **Create list "name" in Reminders**; Tab, Return or a click turns it into the project, and the list is created when you save the note with the next Return. Type on past the row and the text stays in the title as written: `fix issue #123 today`, `C#`.
+- When nothing matches, the only row is **Create list "name" in Reminders**; Tab, Return or a click turns it into the project, and the list is created when you save the note with the next Return, in the color of Reminders' palette your lists use least. Type on past the row and the text stays in the title as written: `fix issue #123 today`, `C#`.
 
 ### Dates
 
@@ -67,7 +67,7 @@ With the field empty, the panel lists the open notes of the lists you used here 
 ## Cleanup and the Archive
 
 - **Remove completed notes** in Settings → Notes is on by default, after 7 days (1, 3, 7, 14 or 30). It runs at launch, then every 6 hours, and once more when the first save gets access to Reminders.
-- Only the lists you used here are cleaned: the default list (once it is picked in Settings or created by the first save) and every list a note was saved to or created in through the panel. In those lists every completed item goes, also ones added on the iPhone or in Reminders. No other list is touched.
+- Only the lists you used here are cleaned: the default list (once a note went there or it is picked in Settings) and every list a note was saved to or created in through the panel. In those lists every completed item goes, also ones added on the iPhone or in Reminders. No other list is touched.
 - Before a reminder is removed, a line is added to `~/Library/Application Support/Workdeck/Notes Archive/YYYY-MM.md`: `- [x] Check the staging migration — Workdeck · created 2026-11-06 · done 2026-11-07`. Only once the line is written is the reminder removed; if the archive cannot be written, nothing is removed. **Show Archive** in Settings → Notes opens the folder.
 - The removal syncs to all your devices. The archive is plain text for you; Workdeck never reads it back.
 

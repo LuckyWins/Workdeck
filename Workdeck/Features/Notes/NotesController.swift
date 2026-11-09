@@ -32,13 +32,11 @@ nonisolated enum HandOffResult: Equatable, Sendable {
 /// could not run, offered for copying as Chats does.
 @Observable
 final class NotesController {
-    /// The list notes without a project go to unless the user picked another.
-    static let inboxTitle = "Inbox"
     /// A second hand-off of the same item sooner than this is a double press, not a request.
     static let repeatHandOffInterval: TimeInterval = 5
     static let terminalFailure = "Couldn't open Terminal"
     /// Stands in for a list the store no longer knows when a result names one.
-    private static let unknownListTitle = "Reminders"
+    static let unknownListTitle = "Reminders"
 
     @ObservationIgnored let settings: NotesSettings
     @ObservationIgnored private let store: any RemindersStoring
@@ -58,6 +56,8 @@ final class NotesController {
 
     /// Every Reminders list a note can go to, with its open count.
     private(set) var lists: [ReminderListInfo] = []
+    /// A reload with access finished: `lists` is what Reminders has, not "not read yet".
+    private(set) var hasLoadedLists = false
     /// The open items of the lists used through Workdeck: overdue first, then by due date, then undated oldest first.
     private(set) var openItems: [ReminderItem] = []
     /// What was completed lately in those lists, most recent first: the panel's Done section, where a tick can be
@@ -129,6 +129,7 @@ final class NotesController {
             // An empty answer is never taken as "every list is gone": it may be a hiccup, and forgetting would drop
             // the user's remembered agents.
             settings.forgetLists(notIn: Set(all.map(\.id)))
+            settings.clearLegacyInboxDefault(lists: all)
             // One fetch for every list: the `#` picker shows each list's open count, not only the used lists'.
             items = await store.openItems(in: Set(all.map(\.id)))
         }
@@ -143,6 +144,7 @@ final class NotesController {
             list.openCount = counts[list.id] ?? 0
             return list
         }
+        hasLoadedLists = true
         let used = settings.usedListIDs
         let usedHere = used.intersection(all.map(\.id))
         let done = usedHere.isEmpty ? [] : await store.completedItems(in: usedHere, since: now().addingTimeInterval(-Self.doneWindow))
@@ -215,14 +217,11 @@ final class NotesController {
         }
         do {
             let target = try listForSaving(draft.project)
-            let saved = try store.add(title: title, due: date, listID: target.list.id)
-            settings.markUsed(target.list.id)
-            if target.becomesDefault {
-                settings.defaultListID = target.list.id
-            }
-            WorkdeckLog.notes.notice("Saved a note to the list \(target.list.title, privacy: .private)")
+            let saved = try store.add(title: title, due: date, listID: target.id)
+            settings.markUsed(target.id)
+            WorkdeckLog.notes.notice("Saved a note to the list \(target.title, privacy: .private)")
             await reload()
-            return .saved(saved, listTitle: target.list.title)
+            return .saved(saved, listTitle: target.title)
         } catch RemindersStoreError.noAccess {
             return .needsAccess
         } catch let error as RemindersStoreError {
@@ -230,6 +229,7 @@ final class NotesController {
             switch error {
             case .listNotFound: return .failed("The list is gone from Reminders")
             case .noSourceForNewList: return .failed("Reminders has no account to create the list in")
+            case .noWritableList: return .failed("Reminders has no list to save to")
             case .reminderNotFound, .noAccess, .cannotMove: return .failed("Reminders could not save the note")
             }
         } catch {
@@ -240,28 +240,55 @@ final class NotesController {
 
     /// The list a draft goes to. Nothing is marked or remembered here: a save that fails after this leaves the
     /// settings as they were (a list that was just created stays in Reminders, and is found by name next time).
-    private func listForSaving(_ project: ProjectToken?) throws -> (list: ReminderListInfo, becomesDefault: Bool) {
+    private func listForSaving(_ project: ProjectToken?) throws -> ReminderListInfo {
         let available = store.lists()
         if let project {
             if let id = project.listID {
                 guard let list = available.first(where: { $0.id == id }) else { throw RemindersStoreError.listNotFound }
-                return (list, false)
+                return list
             }
             if let newTitle = project.newListTitle {
                 // A list of that name may have appeared since the "Create list" row was shown.
                 if let existing = available.first(where: { Self.sameName($0.title, newTitle) }) {
-                    return (existing, false)
+                    return existing
                 }
-                return (try store.createList(titled: newTitle), false)
+                return try store.createList(titled: newTitle)
             }
         }
-        if let id = settings.defaultListID, let list = available.first(where: { $0.id == id }) {
-            return (list, false)
+        guard let list = defaultList(in: available) else { throw RemindersStoreError.noWritableList }
+        return list
+    }
+
+    /// The list notes without a project go to (notes polish spec §2.1): the one picked in Settings while it exists,
+    /// else Reminders' default list, else the first list that can be written to (Reminders' default may be a
+    /// read-only shared list, which `lists` leaves out). Nil when there is no list at all.
+    nonisolated static func resolveDefaultList(
+        picked: String?, remindersDefault: String?, lists: [ReminderListInfo]
+    ) -> ReminderListInfo? {
+        if let picked, let list = lists.first(where: { $0.id == picked }) {
+            return list
         }
-        if let inbox = available.first(where: { Self.sameName($0.title, Self.inboxTitle) }) {
-            return (inbox, true)
+        if let remindersDefault, let list = lists.first(where: { $0.id == remindersDefault }) {
+            return list
         }
-        return (try store.createList(titled: Self.inboxTitle), true)
+        return lists.first
+    }
+
+    /// The default list among the loaded lists.
+    var defaultList: ReminderListInfo? { defaultList(in: lists) }
+
+    /// The list notes go to while nothing is picked in Settings: the Default list picker's first item.
+    var remindersDefaultList: ReminderListInfo? {
+        Self.resolveDefaultList(picked: nil, remindersDefault: remindersDefaultID, lists: lists)
+    }
+
+    private func defaultList(in lists: [ReminderListInfo]) -> ReminderListInfo? {
+        Self.resolveDefaultList(picked: settings.defaultListID, remindersDefault: remindersDefaultID, lists: lists)
+    }
+
+    /// Reminders' own default; the demo's made-up lists do not include it.
+    private var remindersDefaultID: String? {
+        isDemoActive ? nil : store.defaultListID
     }
 
     // MARK: Row menu
@@ -279,15 +306,12 @@ final class NotesController {
         }
         do {
             let target = try listForSaving(project)
-            let listID = target.list.id == item.listID ? nil : target.list.id
+            let listID = target.id == item.listID ? nil : target.id
             let saved = try store.update(item.id, title: title, due: due, listID: listID)
-            settings.markUsed(target.list.id)
-            if target.becomesDefault {
-                settings.defaultListID = target.list.id
-            }
-            WorkdeckLog.notes.notice("Edited a note in the list \(target.list.title, privacy: .private)")
+            settings.markUsed(target.id)
+            WorkdeckLog.notes.notice("Edited a note in the list \(target.title, privacy: .private)")
             await reload()
-            return .saved(saved, listTitle: target.list.title)
+            return .saved(saved, listTitle: target.title)
         } catch RemindersStoreError.noAccess {
             return .needsAccess
         } catch RemindersStoreError.reminderNotFound {
@@ -368,9 +392,8 @@ final class NotesController {
         return destination
     }
 
-    /// The default list: the one the user picked, else the one named "Inbox" when there is one.
     private var defaultListID: String? {
-        settings.defaultListID ?? lists.first(where: { Self.sameName($0.title, Self.inboxTitle) })?.id
+        defaultList?.id
     }
 
     /// Remembers the agent for the list, keeping its folder. Does nothing for the default list before it exists

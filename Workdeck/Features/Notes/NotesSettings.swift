@@ -29,6 +29,7 @@ final class NotesSettings {
         static let usedLists = "notes.usedLists"
         static let destinations = "notes.destinations"
         static let handOffs = "notes.handOffs"
+        static let defaultListMigrated = "notes.defaultListMigrated"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -42,8 +43,8 @@ final class NotesSettings {
         didSet { defaults.set(try? JSONEncoder().encode(shortcut), forKey: Keys.shortcut) }
     }
 
-    /// The Reminders list notes without a project go to; nil means "Inbox", created on the first save if missing.
-    /// The default list is a used list (spec §6.1): picking it in Settings, or creating it, marks it used.
+    /// The Reminders list notes without a project go to; nil means Reminders' own default list (notes polish spec §2).
+    /// The default list is a used list (spec §6.1): picking it in Settings marks it used, as a save to it does.
     var defaultListID: String? {
         didSet {
             defaults.set(defaultListID, forKey: Keys.defaultList)
@@ -113,6 +114,26 @@ final class NotesSettings {
         if remembered.count != destinations.count {
             destinations = remembered
         }
+    }
+
+    // MARK: The stored "Inbox"
+
+    /// The list Workdeck created, and stored as the default, before notes followed Reminders' default list.
+    static let legacyInboxTitle = "Inbox"
+
+    /// Once (notes polish spec §2.2): clears `defaultListID` when it names a list titled "Inbox". The first save used
+    /// to store that list on its own, so the stored ID cannot tell it from a pick, and picking "Inbox" meant the
+    /// default anyway. Waits while `lists` is empty (no access yet, or nothing loaded) or lacks the stored list.
+    func clearLegacyInboxDefault(lists: [ReminderListInfo]) {
+        guard !lists.isEmpty, !defaults.bool(forKey: Keys.defaultListMigrated) else { return }
+        if let id = defaultListID {
+            // A stored list not among the lists may be an account still loading: wait for it.
+            guard let list = lists.first(where: { $0.id == id }) else { return }
+            if list.title.caseInsensitiveCompare(Self.legacyInboxTitle) == .orderedSame {
+                defaultListID = nil
+            }
+        }
+        defaults.set(true, forKey: Keys.defaultListMigrated)
     }
 
     // MARK: Agent per list

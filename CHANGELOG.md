@@ -6,6 +6,9 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 
 ### Improved
 - Quick notes: long notes show in full when you hover or select them, and the list shows how many more notes are below.
+- Quick notes: notes without a project go to your default list in Reminders instead of a separate Inbox. A list picked in Settings → Notes stays as it is.
+- Quick notes: lists created from the notes panel get different colors from Reminders' palette.
+- Quick notes: after Return the panel turns smoothly into its confirmation, and it closes by drawing back into the notch.
 
 ### Fixed
 - Quick notes: typing a list's name, without `#`, now filters the open notes by that list; before, only the notes' own text was searched.

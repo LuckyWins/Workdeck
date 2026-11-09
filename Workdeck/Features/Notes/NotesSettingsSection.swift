@@ -24,9 +24,7 @@ struct NotesSettingsSection: View {
             Toggle("Quick notes", isOn: $settings.isEnabled)
             shortcutRow
             Picker("Default list", selection: defaultList) {
-                if inboxID == nil {
-                    Text(NotesController.inboxTitle).tag(String?.none)
-                }
+                Text(remindersDefaultTitle).tag(String?.none)
                 ForEach(controller.lists) { list in
                     Text(list.title).tag(Optional(list.id))
                 }
@@ -163,20 +161,19 @@ struct NotesSettingsSection: View {
 
     // MARK: Default list
 
-    /// The list named "Inbox", when Reminders has one.
-    private var inboxID: String? {
-        controller.lists.first { $0.title.caseInsensitiveCompare(NotesController.inboxTitle) == .orderedSame }?.id
+    /// The picker's first item: Reminders' own default list, followed while nothing is picked (notes polish spec §2.3).
+    private var remindersDefaultTitle: String {
+        controller.remindersDefaultList.map { "Reminders default (\($0.title))" } ?? "Reminders default"
     }
 
-    /// The chosen list while it exists, else "Inbox" (the existing list of that name, or the one created on the first
-    /// save).
+    /// The chosen list while it exists, else nil: Reminders' default list.
     private var defaultList: Binding<String?> {
         Binding(
             get: {
                 if let id = controller.settings.defaultListID, controller.lists.contains(where: { $0.id == id }) {
                     return id
                 }
-                return inboxID
+                return nil
             },
             set: { controller.settings.defaultListID = $0 }
         )
