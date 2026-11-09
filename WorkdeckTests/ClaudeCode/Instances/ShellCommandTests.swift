@@ -24,7 +24,23 @@ struct ShellCommandTests {
     }
 
     @Test func scriptRunsALoginShellAndDeletesItself() {
-        #expect(ShellCommand.script(running: "cd '/a b' && claude") == "#!/bin/zsh\nrm -f -- \"$0\"\nexec /bin/zsh -il -c 'cd '\\''/a b'\\'' && claude'\n")
+        #expect(ShellCommand.script(running: "cd '/a b' && claude") == "#!/bin/zsh\nrm -f -- \"$0\"\nunset -m 'CLAUDE*'\nexec /bin/zsh -il -c 'cd '\\''/a b'\\'' && claude'\n")
+    }
+
+    /// Terminal may carry a Claude Code session's variables; the main instance must not pick up its `CLAUDE_CONFIG_DIR`.
+    @Test func scriptDropsInheritedClaudeCodeVariables() throws {
+        let script = ShellCommand.script(running: "print -r -- ${CLAUDE_CONFIG_DIR-none} ${CLAUDECODE-none}")
+            .replacingOccurrences(of: "rm -f -- \"$0\"\n", with: "")
+            .replacingOccurrences(of: "/bin/zsh -il -c", with: "/bin/zsh -f -c")
+        let process = Process()
+        process.executableURL = URL(filePath: "/bin/zsh")
+        process.arguments = ["-f", "-c", script]
+        process.environment = ["PATH": "/usr/bin:/bin", "CLAUDE_CONFIG_DIR": "/Users/test/.claude-work", "CLAUDECODE": "1"]
+        let output = Pipe()
+        process.standardOutput = output
+        try process.run()
+        process.waitUntilExit()
+        #expect(String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self) == "none none\n")
     }
 }
 

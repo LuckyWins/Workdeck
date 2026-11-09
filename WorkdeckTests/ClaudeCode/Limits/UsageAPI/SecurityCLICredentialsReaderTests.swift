@@ -107,4 +107,18 @@ struct SystemProcessRunnerTests {
         #expect(result.exitCode == SIGKILL)
         #expect(Date().timeIntervalSince(start) < 2.5)
     }
+
+    /// Workdeck started from a Claude Code session inherits its variables; `open` would pass them on to Terminal.
+    @Test func childrenDoNotInheritClaudeCodeSessionVariables() {
+        let inherited = [
+            "PATH": "/usr/bin:/bin",
+            "HOME": "/Users/test",
+            "CLAUDE_CONFIG_DIR": "/Users/test/.claude-work",
+            "CLAUDECODE": "1",
+            "CLAUDE_CODE_SESSION_ID": "0b44e0cb",
+            "CLAUDE_CODE_ENTRYPOINT": "cli",
+            "CLAUDE_PID": "8114",
+        ]
+        #expect(SystemProcessRunner.childEnvironment(from: inherited) == ["PATH": "/usr/bin:/bin", "HOME": "/Users/test"])
+    }
 }

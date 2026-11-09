@@ -4,6 +4,9 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 
 ## Unreleased
 
+### Fixed
+- A chat started in Terminal or VS Code for the main Claude Code instance could open in another instance when Workdeck itself had been started from a Claude Code session.
+
 ## 1.3.0 — 2026-11-06
 
 ### New

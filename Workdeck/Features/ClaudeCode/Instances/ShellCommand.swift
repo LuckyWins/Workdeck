@@ -38,8 +38,10 @@ nonisolated enum ShellCommand {
     }
 
     /// A Terminal `.command` script: it deletes itself, then runs `command` in an interactive login zsh, so `PATH`
-    /// matches the user's terminal.
+    /// matches the user's terminal. It first drops Claude Code's session variables that Terminal may have inherited
+    /// (the main instance would otherwise run with another instance's `CLAUDE_CONFIG_DIR`); the login shell then
+    /// sets any the user exports in their own startup files.
     static func script(running command: String) -> String {
-        "#!/bin/zsh\nrm -f -- \"$0\"\nexec /bin/zsh -il -c \(quoted(command))\n"
+        "#!/bin/zsh\nrm -f -- \"$0\"\nunset -m 'CLAUDE*'\nexec /bin/zsh -il -c \(quoted(command))\n"
     }
 }

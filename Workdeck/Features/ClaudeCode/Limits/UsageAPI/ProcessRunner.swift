@@ -16,6 +16,7 @@ nonisolated struct SystemProcessRunner: ProcessRunning {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
+        process.environment = Self.childEnvironment(from: ProcessInfo.processInfo.environment)
         let output = Pipe()
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
@@ -38,6 +39,14 @@ nonisolated struct SystemProcessRunner: ProcessRunning {
             return ProcessResult(exitCode: process.terminationStatus, stdout: Data(), timedOut: true)
         }
         return ProcessResult(exitCode: process.terminationStatus, stdout: data, timedOut: false)
+    }
+
+    /// `environment` without Claude Code's session variables (`CLAUDE_CONFIG_DIR`, `CLAUDECODE`, `CLAUDE_CODE_*`, …).
+    /// Workdeck started from a Claude Code session (`make install`, `open`) inherits them, and `open` passes its
+    /// environment to the app it launches: Terminal or VS Code would then run the main instance with another
+    /// instance's `CLAUDE_CONFIG_DIR`.
+    static func childEnvironment(from environment: [String: String]) -> [String: String] {
+        environment.filter { !$0.key.hasPrefix("CLAUDE") }
     }
 
     /// SIGTERM, then SIGKILL if the child ignores it.
