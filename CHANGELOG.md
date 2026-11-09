@@ -4,6 +4,8 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 
 ## Unreleased
 
+## 1.4.1 — 2026-11-10
+
 ### Improved
 - Quick notes: long notes show in full when you hover or select them, and the list shows how many more notes are below.
 - Quick notes: notes without a project go to your default list in Reminders instead of a separate Inbox. A list picked in Settings → Notes stays as it is.
