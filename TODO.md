@@ -36,7 +36,7 @@ Agreed on 2026-11-06, from [Lumio](https://lumiomac.com/).
 
 Agreed on 2026-11-09, from [Lumio](https://lumiomac.com/).
 
-13. **Notch tabs.** The expanded notch gets Sessions, Notes and Stats tabs; hover opens on Sessions, the right Option on Notes, Stats shows this week. Spec: `specs/2026-11-09-notch-tabs-design.md`. Later: remember the last tab if Sessions-first proves inconvenient.
+13. ~~**Notch tabs.**~~ Done (`61cf66f`). The expanded notch gets Sessions, Notes and Stats tabs; hover opens on Sessions, the right Option on Notes, Stats shows this week. Spec: `specs/2026-11-09-notch-tabs-design.md`. Later: remember the last tab if Sessions-first proves inconvenient.
 
 ## Distribution
 
