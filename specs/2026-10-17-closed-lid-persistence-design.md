@@ -78,7 +78,7 @@ A new build replaces the helper too. The new Workdeck cannot talk to the old hel
 - The helper and the app are updated together (`make install` replaces both). The first install of this version still drops the mode once: the old helper has neither the grace period nor the handover. If Workdeck finds sleep already disabled at launch with no remembered choice, it takes over and remembers the choice (my call).
 - "An update" in the goals means `make install`, `pkill` and crashes. A future in-app updater (Sparkle) that quits Workdeck gracefully would restore sleep; it is out of scope (my call).
 - Root-level behavior cannot be unit tested: `docs/testing.md` gets manual checks (§6).
-- English only; Conventional Commits; one commit at the end on "коммить".
+- English only; Conventional Commits; one commit at the end when the user says to commit.
 
 ## 5. Left to the Builder
 

@@ -19,7 +19,7 @@
 - Usage string, verbatim: `Workdeck brings a Claude Code session's terminal tab to the front.`
 - Entitlement: `com.apple.security.automation.apple-events`, in a file outside the synchronized source folders.
 - Logs: the AppleScript error number only; no paths, TTYs or names.
-- Commits: none per task; the user commits after checking ("коммить"). Conventional Commits, no `Co-Authored-By`, no mention of AI tools.
+- Commits: none per task; the user commits after checking (when the user says to commit). Conventional Commits, no `Co-Authored-By`, no mention of AI tools.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite adds `-only-testing:WorkdeckTests/<SuiteName>` after `test`.
 
 ## Review Focus

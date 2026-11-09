@@ -20,7 +20,7 @@ struct FeedbackMailTests {
 
     @Test func mailtoKeepsEveryCharacter() throws {
         // Non-ASCII letters too: they are percent-encoded, not left raw.
-        let body = "a & b ? c # d + e = f % g\nsecond line — привет\n\nthird"
+        let body = "a & b ? c # d + e = f % g\nsecond line — café\n\nthird"
         let url = FeedbackMail.mailtoURL(body: body)
         #expect(url.scheme == "mailto")
         let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
@@ -30,7 +30,7 @@ struct FeedbackMailTests {
         #expect(items["body"] == body)
         // `+` must stay a plus for mail apps that decode the body as a form.
         #expect(!url.absoluteString.contains("+"))
-        #expect(!url.absoluteString.contains("привет"))
+        #expect(!url.absoluteString.contains("café"))
     }
 
     @Test func routesByTheDefaultMailApp() {

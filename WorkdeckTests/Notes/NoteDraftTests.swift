@@ -36,7 +36,7 @@ struct NoteDraftTests {
 
     @Test func tabCompletesPrefixThenPicksThenCycles() throws {
         let lists = ["Workdeck", "Workdeck-site", "Wordle-bot"].map { list($0) }
-        var draft = NoteDraft(text: "Спросить Сашу про лимиты #w")
+        var draft = NoteDraft(text: "Ask Sasha about limits #w")
 
         func matches() -> [ReminderListInfo] {
             ListMatcher.matches(draft.query()?.text ?? "", in: lists, recent: [])
@@ -46,7 +46,7 @@ struct NoteDraftTests {
         var shown = matches()
         #expect(shown.map(\.title) == ["Wordle-bot", "Workdeck", "Workdeck-site"])
         draft.apply(.tab(selected: shown.first, matches: shown))
-        #expect(draft.text == "Спросить Сашу про лимиты #Wor")
+        #expect(draft.text == "Ask Sasha about limits #Wor")
         #expect(draft.project == nil)
 
         // 2. The user types "k"; Tab completes in place and does not commit.
@@ -54,13 +54,13 @@ struct NoteDraftTests {
         shown = matches()
         #expect(shown.map(\.title) == ["Workdeck", "Workdeck-site"])
         draft.apply(.tab(selected: shown.first, matches: shown))
-        #expect(draft.text == "Спросить Сашу про лимиты #Workdeck")
+        #expect(draft.text == "Ask Sasha about limits #Workdeck")
         #expect(draft.project == nil)
 
         // 3. The name is complete, so Tab puts the selected list in place as a chip.
         shown = matches()
         draft.apply(.tab(selected: shown.first, matches: shown))
-        #expect(draft.text == "Спросить Сашу про лимиты Workdeck")
+        #expect(draft.text == "Ask Sasha about limits Workdeck")
         #expect(chipText(draft) == "Workdeck")
         #expect(draft.project?.listID == "Workdeck")
         #expect(draft.project?.newListTitle == nil)
@@ -68,12 +68,12 @@ struct NoteDraftTests {
 
         // 4. Tab again moves to the next match, and wraps around.
         draft.apply(.tab(selected: shown.first, matches: shown))
-        #expect(draft.text == "Спросить Сашу про лимиты Workdeck-site")
+        #expect(draft.text == "Ask Sasha about limits Workdeck-site")
         #expect(chipText(draft) == "Workdeck-site")
         #expect(draft.project?.listID == "Workdeck-site")
 
         draft.apply(.tab(selected: shown.first, matches: shown))
-        #expect(draft.text == "Спросить Сашу про лимиты Workdeck")
+        #expect(draft.text == "Ask Sasha about limits Workdeck")
         #expect(chipText(draft) == "Workdeck")
     }
 
@@ -258,10 +258,10 @@ struct NoteDraftTests {
     // MARK: - Title
 
     @Test func titleDropsChipAndDateAndCollapsesSpaces() throws {
-        var draft = NoteDraft(text: "Проверить миграцию на staging завтра в 16 #Workdeck")
+        var draft = NoteDraft(text: "Check the staging migration tomorrow at 4pm #Workdeck")
         draft.apply(.commitExact(lists: [list("Workdeck")]))
-        let date = try #require(draft.text.range(of: "завтра в 16"))
-        #expect(draft.title(removing: date) == "Проверить миграцию на staging")
+        let date = try #require(draft.text.range(of: "tomorrow at 4pm"))
+        #expect(draft.title(removing: date) == "Check the staging migration")
 
         var chipFirst = NoteDraft(text: "#Workdeck")
         chipFirst.apply(.commitExact(lists: [list("Workdeck")]))
@@ -271,13 +271,13 @@ struct NoteDraftTests {
     }
 
     @Test func titleWithNothingLeftIsTheOriginalText() throws {
-        var draft = NoteDraft(text: "завтра в 16 #Workdeck")
+        var draft = NoteDraft(text: "tomorrow at 4pm #Workdeck")
         draft.apply(.commitExact(lists: [list("Workdeck")]))
-        let date = try #require(draft.text.range(of: "завтра в 16"))
+        let date = try #require(draft.text.range(of: "tomorrow at 4pm"))
         #expect(draft.title(removing: date) == draft.text)
 
-        let onlyDate = NoteDraft(text: "завтра в 16")
-        #expect(onlyDate.title(removing: onlyDate.text.startIndex..<onlyDate.text.endIndex) == "завтра в 16")
+        let onlyDate = NoteDraft(text: "tomorrow at 4pm")
+        #expect(onlyDate.title(removing: onlyDate.text.startIndex..<onlyDate.text.endIndex) == "tomorrow at 4pm")
     }
 
     @Test func titleOfOnlySpacesIsEmpty() {
@@ -322,7 +322,7 @@ struct NoteDraftTests {
 
     @Test func aChipThatReadsAsADateIsNotTheDate() {
         let (now, calendar) = friday
-        for name in ["Today", "Сегодня", "Завтра", "Friday"] {
+        for name in ["Today", "Tomorrow", "Friday"] {
             var draft = NoteDraft(text: "Buy milk #\(name)")
             draft.apply(.commitExact(lists: [list(name)]))
             #expect(draft.project != nil)
@@ -332,13 +332,13 @@ struct NoteDraftTests {
 
     @Test func theDateBesideAChipKeepsItsPlaceInTheText() throws {
         let (now, calendar) = friday
-        var draft = NoteDraft(text: "#Сегодня")
-        draft.apply(.commitExact(lists: [list("Сегодня")]))
-        draft.text += " позвонить завтра в 16"
+        var draft = NoteDraft(text: "#Today")
+        draft.apply(.commitExact(lists: [list("Today")]))
+        draft.text += " call tomorrow at 4pm"
         let date = try #require(draft.date(now: now, calendar: calendar))
-        #expect(draft.text[date.range] == "завтра в 16")
+        #expect(draft.text[date.range] == "tomorrow at 4pm")
         #expect(date.date == calendar.date(from: DateComponents(year: 2026, month: 11, day: 7, hour: 16)))
-        #expect(draft.title(removing: date.range) == "позвонить")
+        #expect(draft.title(removing: date.range) == "call")
     }
 
     // MARK: - Edits to the text
@@ -370,39 +370,39 @@ struct NoteDraftTests {
     }
 
     @Test func editBeforeChipShiftsRange() {
-        var draft = committed("Спросить #Workdeck")
-        #expect(draft.text == "Спросить Workdeck")
+        var draft = committed("Ask #Workdeck")
+        #expect(draft.text == "Ask Workdeck")
 
-        draft.textChanged(to: "Спросить Сашу про лимиты Workdeck")
-        #expect(draft.text == "Спросить Сашу про лимиты Workdeck")
+        draft.textChanged(to: "Ask Sasha about limits Workdeck")
+        #expect(draft.text == "Ask Sasha about limits Workdeck")
         #expect(chipText(draft) == "Workdeck")
         #expect(draft.project?.listID == "Workdeck")
-        #expect(draft.title(removing: nil) == "Спросить Сашу про лимиты")
+        #expect(draft.title(removing: nil) == "Ask Sasha about limits")
         #expect(draft.query() == nil)
 
         // A deletion before the chip shifts it back; typing at the very start too.
-        draft.textChanged(to: "Спросить Workdeck")
+        draft.textChanged(to: "Ask Workdeck")
         #expect(chipText(draft) == "Workdeck")
-        draft.textChanged(to: "Эй, Спросить Workdeck")
+        draft.textChanged(to: "Hey, Ask Workdeck")
         #expect(chipText(draft) == "Workdeck")
-        #expect(draft.title(removing: nil) == "Эй, Спросить")
+        #expect(draft.title(removing: nil) == "Hey, Ask")
     }
 
     @Test func typingAfterChipKeepsIt() {
-        var draft = committed("Спросить #Workdeck")
+        var draft = committed("Ask #Workdeck")
         let chip = draft.project
         #expect(chip != nil)
 
-        draft.textChanged(to: "Спросить Workdeckx")   // right at the chip's end
+        draft.textChanged(to: "Ask Workdeckx")   // right at the chip's end
         #expect(chipText(draft) == "Workdeck")
         #expect(draft.project?.listID == "Workdeck")
 
-        draft.textChanged(to: "Спросить Workdeckx проверить завтра")
+        draft.textChanged(to: "Ask Workdeckx check tomorrow")
         #expect(chipText(draft) == "Workdeck")
 
-        draft.textChanged(to: "Спросить Workdeck")
+        draft.textChanged(to: "Ask Workdeck")
         #expect(draft.project == chip)
-        #expect(draft.title(removing: nil) == "Спросить")
+        #expect(draft.title(removing: nil) == "Ask")
     }
 
     @Test func aHashTypedAfterAChipIsAQueryAndTheChipStays() {

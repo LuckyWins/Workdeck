@@ -19,7 +19,7 @@
 - Leave: hand over when sleep is disabled and (a restart was announced within the handover window **or** a client still holds sleep / a grace is pending); otherwise restore sleep with reason `executable replaced`; exit 0. The SIGTERM handler and this path share one leave function; SIGTERM keeps its rule (announcement only).
 - App: reconnect pauses `[0.25, 0.5, 1, 2, 4, 4]` seconds (changed after the final review) (`LidSleepController.reconnectDelays`), a fresh connection (`helper.resetConnection()`) and a version check each; success = the app's version. Otherwise part A unchanged.
 - Helper sources are compiled into `WorkdeckTests` except `main.swift`, `HelperService.swift`, `HelperListenerDelegate.swift`: everything testable goes in other files.
-- No commits until the user says "коммить". Tests: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test -only-testing:WorkdeckTests/<Suite> 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`.
+- No commits until the user says to commit. Tests: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test -only-testing:WorkdeckTests/<Suite> 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`.
 
 ## Review Focus
 

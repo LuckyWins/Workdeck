@@ -16,7 +16,7 @@
 - Tooltip: `N free resets`, `1 free reset`; none when N is 0 or nil.
 - The `N free resets` line under the bars is removed; the `updated … ↻` line is unchanged.
 - The collapsed summaries and the dim quiet lines do not show free resets.
-- English only in code, comments and docs. No commits until the user says "коммить"; one commit then.
+- English only in code, comments and docs. No commits until the user says to commit; one commit then.
 
 ## Review Focus
 

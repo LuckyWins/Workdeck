@@ -17,7 +17,7 @@
 - An expired login makes no request; 401/403 with an unexpired or unknown expiry stays `loginExpired`.
 - Texts: Settings "Waiting for Claude Code to renew its login"; notch age line `updated just now`, `updated 4 min ago`, `updated 13h ago`; waiting `13h ago · waiting for Claude Code` with tooltip "Waiting for Claude Code to renew its login".
 - Tests never touch the real Keychain, network, `~/.claude*` or snapshots.
-- Commits: none per task; the user commits after checking ("коммить"). Plain imperative messages, no `Co-Authored-By`, no mention of AI tools.
+- Commits: none per task; the user commits after checking (when the user says to commit). Plain imperative messages, no `Co-Authored-By`, no mention of AI tools.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite adds `-only-testing:WorkdeckTests/<SuiteName>` after `test`.
 
 ## Review Focus
@@ -397,4 +397,4 @@ Only Claude Code renews its login: while every Claude Code window is closed the 
 
 - [ ] **Step 7: Hand over**
 
-Ask the user to `make install` and run L22. No commit until they say "коммить".
+Ask the user to `make install` and run L22. No commit until they say "commit".

@@ -19,7 +19,7 @@
 - Copy (English, exact): `9 day streak`, `67 active days`, `1 active day`, `No coding`, legend `Less` / `More`, legend help `Under 1h · 1–3h · 3–6h · 6h or more`, row labels `Mon`, `Wed`, `Fri`, `Sun`.
 - Days and weeks only through `RecapCalendar` (Monday-first ISO weeks, the Mac's time zone); dates stepped with `calendar.date(byAdding: .day…)`, never by adding 86 400 s.
 - Pure types are `nonisolated`. No new dependencies. English only in code, comments and docs.
-- No commits until the user says "коммить"; then one commit.
+- No commits until the user says to commit; then one commit.
 - Test command for a suite: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test -only-testing:WorkdeckTests/<Suite> 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`.
 
 ## Review Focus
@@ -378,4 +378,4 @@ Expected: `** TEST SUCCEEDED **`
 | R15 | Click and outline | Click a column months back, then ‹ and ›, then This Week, then a square of this week. | The week below switches to the clicked column; the outline follows every change; a square of this week returns to This Week. |
 | R16 | Filter, width, demo | Pick Codex, then All; shrink the window to its minimum; run Try Demo and open Details…. | The grid and the line follow the filter; at the minimum width every column fits without scrolling; the demo grid shows all five shades and a few empty weekdays. |
 
-- [ ] **Step 6: `make build`; expect a successful build. The user checks with `make install` before "коммить".**
+- [ ] **Step 6: `make build`; expect a successful build. The user checks with `make install` before the user says to commit.**

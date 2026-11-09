@@ -16,7 +16,7 @@
 - Taps: hover that expands the notch; needs-you, limit threshold and session finished alerts. Never: collapse, peek, recap card, limit reset, hover on an already expanded notch, alerts joining ones on screen.
 - Setting key `notch.hapticFeedback`, default `true`; toggle label "Haptic feedback", note "On a Force Touch trackpad, when the notch opens under the pointer and on alerts."
 - System services behind protocols so controllers can be tested with fakes (CLAUDE.md); tests never perform a real haptic.
-- English only in UI strings, comments and docs. No per-task commits: one commit at the end, only when the user says "коммить".
+- English only in UI strings, comments and docs. No per-task commits: one commit at the end, only when the user says to commit.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite: add `-only-testing:WorkdeckTests/<Suite>` after `test`.
 
 ## Review Focus
@@ -384,7 +384,7 @@ Expected: `** TEST SUCCEEDED **`, every suite passed.
 
 In `specs/2026-10-16-notch-haptics-design.md`, set `**Status:** Approved; implemented`; in `TODO.md`, strike item 7 as done (`7. ~~**Notch haptics.**~~ Done. …`), keeping the spec path.
 
-- [ ] **Step 6: Commit (only after the user says "коммить")**
+- [ ] **Step 6: Commit (only after the user says to commit)**
 
 ```bash
 git add Workdeck/Features/Notch/NotchHaptics.swift Workdeck/Features/Notch/NotchSettings.swift Workdeck/Features/Notch/NotchSettingsSection.swift Workdeck/Features/Notch/NotchPresenter.swift Workdeck/App/AppDelegate.swift WorkdeckTests/Notch/NotchSettingsTests.swift WorkdeckTests/Notch/NotchPresenterTests.swift docs/claude-code.md docs/testing.md specs/2026-10-16-notch-haptics-design.md plans/2026-10-16-notch-haptics.md TODO.md

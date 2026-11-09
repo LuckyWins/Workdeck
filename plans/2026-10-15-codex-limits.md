@@ -16,7 +16,7 @@
 - `app-server`: at launch, when the popover opens (at most once a minute) and from the notch's refresh button; one request at a time, 15 s timeout, the process ended after the answer.
 - Marks show only while more than one agent is enabled; with Codex off the notch looks exactly as before.
 - Tests never touch the real `~/.codex`, `~/.claude*`, Keychain or network. Process tests may run `/bin/cat` and `/bin/sleep` only.
-- English only; Conventional Commits; no `Co-Authored-By`, no AI mentions; commit only on the user's "коммить" (the commit step runs at the end). No `project.pbxproj` edits for sources.
+- English only; Conventional Commits; no `Co-Authored-By`, no AI mentions; commit only on the user's "commit" (the commit step runs at the end). No `project.pbxproj` edits for sources.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite adds `-only-testing:WorkdeckTests/<Suite>` after `test`.
 
 ## Review Focus
@@ -1843,7 +1843,7 @@ Workdeck shows [Codex](https://developers.openai.com/codex)'s plan limits in the
 ```
 
 - [ ] **Step 5: `TODO.md`** — under Claude Code Sessions add: "**Codex support.** Stage 1 (limits) done; stage 2 (sessions through `~/.codex/hooks.json`) is plan 3; stage 3 (Codex in the recap and Statistics) needs its own spec."
-- [ ] **Step 6: Live check by the user** after `make install` (rows X1–X5), then on "коммить":
+- [ ] **Step 6: Live check by the user** after `make install` (rows X1–X5), then when the user says to commit:
 
 ```bash
 git add -A Workdeck WorkdeckTests docs README.md CLAUDE.md TODO.md specs/2026-10-15-codex-support-design.md plans/2026-10-15-codex-limits.md

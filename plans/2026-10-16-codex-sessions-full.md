@@ -19,7 +19,7 @@
 - Agent names: underscores to spaces, first letter upper case, only when shown; type `default` hidden; no name → `Agent`.
 - Waiting spawn names clear on `UserPromptSubmit`, `Stop` and `Interrupt`.
 - Workdeck no longer reads Codex session files for sessions; `CodexSessionFiles` stays for limits.
-- `ClaudeHooks/` code is `nonisolated`. English only. No per-task commits: one commit at the end, only when the user says "коммить".
+- `ClaudeHooks/` code is `nonisolated`. English only. No per-task commits: one commit at the end, only when the user says to commit.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite: add `-only-testing:WorkdeckTests/<Suite>` after `test`.
 
 ## Review Focus
@@ -678,7 +678,7 @@ line 21, replace with:
 Run: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`
 Expected: `** TEST SUCCEEDED **`.
 
-- [ ] **Step 6: Commit (only after the user says "коммить")**
+- [ ] **Step 6: Commit (only after the user says to commit)**
 
 ```bash
 git add -A

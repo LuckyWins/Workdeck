@@ -23,7 +23,7 @@
 - Versions: `MARKETING_VERSION` (semantic) and `CURRENT_PROJECT_VERSION` (integer, +1 per release), project-level; Sparkle compares the build number.
 - Tests never start Sparkle, never touch the network, the real Keychain or `~/.claude*`: `Updating` fakes; `AppDelegate` creates no `SparkleUpdater` when `XCTestConfigurationFilePath` is set.
 - Python scripts run with `python3 -I`, standard library only; they never print secrets.
-- No commits until the user says "коммить"; then one commit per stage the user approves.
+- No commits until the user says to commit; then one commit per stage the user approves.
 - Swift test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test -only-testing:WorkdeckTests/<Suite> 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`. Python: `python3 -I scripts/release/test_release.py`.
 
 ## Review Focus
@@ -436,7 +436,7 @@ nonisolated enum UpdateText {
 
 These steps need the user's GitHub account and Keychain; the executor prepares and stops at each hand-over.
 
-- [ ] **Step 1: The user does the one-time setup from `docs/releasing.md` (environment, secrets, ruleset). The executor waits for "готово".**
-- [ ] **Step 2: Executor: `make release-prep VERSION=1.1.0`, show the diff; on the user's "коммить", push `main`; the user (or the executor on request) pushes tag `v1.1.0`. Watch the run (`curl` on `https://api.github.com/repos/LuckyWins/Workdeck/actions/runs?per_page=1`, the repository is public); on failure, read the log, fix through `superpowers:systematic-debugging`, and repeat with the same tag only after deleting the failed release and tag with the user's consent.**
+- [ ] **Step 1: The user does the one-time setup from `docs/releasing.md` (environment, secrets, ruleset). The executor waits for the user to say it is done.**
+- [ ] **Step 2: Executor: `make release-prep VERSION=1.1.0`, show the diff; on the user's "commit", push `main`; the user (or the executor on request) pushes tag `v1.1.0`. Watch the run (`curl` on `https://api.github.com/repos/LuckyWins/Workdeck/actions/runs?per_page=1`, the repository is public); on failure, read the log, fix through `superpowers:systematic-debugging`, and repeat with the same tag only after deleting the failed release and tag with the user's consent.**
 - [ ] **Step 3: The user installs 1.1.0 from the release zip by hand (the last manual install) and confirms U1 and U2.**
 - [ ] **Step 4: A test update: a `### Fixed` line in `Unreleased` (a real small fix or a docs-only line such as "Release notes open on the newest version."), `make release-prep VERSION=1.1.1`, tag `v1.1.1`; the user runs U3–U6 on the 1.1.0 install and reports. Any §6 failure (helper re-approval, quarantine prompt) is recorded in `docs/closed-lid-mode.md` / `docs/releasing.md` as the spec says.**

@@ -20,7 +20,7 @@
 - Hash limits: at most 200 files and 5 MB per skill; beyond, compare `SKILL.md` only and set `isPartial`.
 - A missing, unreadable or invalid file makes that instance's tab `.unreadable`, never a crash.
 - Window id `"claude-instances"`, title "Instances". Tabs: Skills · MCP · Plugins · Instructions. Filter: Not everywhere (default) · Everywhere · All.
-- No commits until the user says "коммить". Suite: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test -only-testing:WorkdeckTests/<Suite> 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`.
+- No commits until the user says to commit. Suite: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test -only-testing:WorkdeckTests/<Suite> 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`.
 
 ## Review Focus
 

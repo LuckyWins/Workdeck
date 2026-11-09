@@ -21,7 +21,7 @@
 - Each file under 5 MB (target 4 MB).
 - Without `WORKDECK_SCREENSHOTS=1` nothing renders or writes (same switch as the stills). No product code changes.
 - Landing: `<picture>` with `(prefers-reduced-motion: reduce)` → the still.
-- No commits until the user says "коммить". Suite alone: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test -only-testing:WorkdeckTests/<Suite> 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; with rendering: `make screenshots`.
+- No commits until the user says to commit. Suite alone: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test -only-testing:WorkdeckTests/<Suite> 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; with rendering: `make screenshots`.
 
 ## Review Focus
 

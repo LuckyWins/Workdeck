@@ -20,7 +20,7 @@
 - Alert memory (`firedAlertKeys`) is never cleared on an account change.
 - Tests never touch the real `~/.claude*`, Keychain, network or snapshots: temporary directories, fakes, `fixedNow`.
 - Everything in `ClaudeUsage/` is `nonisolated`. English only in code, comments and docs.
-- No commits until the user says "коммить"; then one commit.
+- No commits until the user says to commit; then one commit.
 - Test command for a suite: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test -only-testing:WorkdeckTests/<Suite> 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`.
 
 ## Review Focus

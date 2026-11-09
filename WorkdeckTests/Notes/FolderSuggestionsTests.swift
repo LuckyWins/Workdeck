@@ -69,10 +69,10 @@ struct FolderSuggestionsTests {
     @Test func nameMatchingIgnoresCaseAndSeparatorsAndWorksInCyrillic() {
         let candidates = [
             candidate("/Users/test/newer", daysAgo: 0),
-            candidate("/Users/test/мой_проект", daysAgo: 30),
+            candidate("/Users/test/über_projekt", daysAgo: 30),
         ]
-        let suggestions = FolderSuggestions.suggest(for: "Мой проект", from: candidates, exists: { _ in true })
-        #expect(suggestions.map(\.path) == ["/Users/test/мой_проект", "/Users/test/newer"])
+        let suggestions = FolderSuggestions.suggest(for: "Über Projekt", from: candidates, exists: { _ in true })
+        #expect(suggestions.map(\.path) == ["/Users/test/über_projekt", "/Users/test/newer"])
     }
 
     @Test func oneNameInsideTheOtherRanksAboveASharedWord() {

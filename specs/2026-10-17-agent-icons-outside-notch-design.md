@@ -44,7 +44,7 @@ The look was chosen on mockups in the visual companion on 2026-10-17 (option B).
 - Codex's `>_` is a hole in the circle's path itself (`CodexMarkShape`), so on the mint square the square's gradient shows through the prompt everywhere, also in a Form section header, which flattens blend modes.
 - Light and dark appearance: the popover and Settings follow the system appearance. Codex's mint is the system mint in dark appearance (the notch is always dark) and a darker mint (`#009990`-like) in light appearance, so its icon stands out on a light popover.
 - Accessibility: in the popover rows and Settings headers the icon is hidden from VoiceOver: the title beside it already names the agent, and the row's switch names it again. In the notch the icon keeps the agent's name as its label.
-- English only; Conventional Commits; one commit at the end on "коммить".
+- English only; Conventional Commits; one commit at the end when the user says to commit.
 
 ## 5. Left to the Builder
 

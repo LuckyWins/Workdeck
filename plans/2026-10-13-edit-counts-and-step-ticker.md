@@ -19,7 +19,7 @@
 - Counts text: `+N` green, `−M` red (U+2212), a zero part left out; turn line `this turn · N files` / `last turn · 1 file`.
 - The compact notch, popover row and menu bar text do not change.
 - Tests never touch the real sessions folder, `~/.claude*`, the Keychain or the network.
-- Commits: none per task; the user commits after checking ("коммить"). Conventional Commits, no `Co-Authored-By`, no mention of AI tools.
+- Commits: none per task; the user commits after checking (when the user says to commit). Conventional Commits, no `Co-Authored-By`, no mention of AI tools.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite adds `-only-testing:WorkdeckTests/<SuiteName>` after `test`.
 
 ## Review Focus

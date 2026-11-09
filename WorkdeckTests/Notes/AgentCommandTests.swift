@@ -11,7 +11,7 @@ struct AgentCommandTests {
 
     /// Every character that is special to a shell, a newline (also at the end), quotes, `$(…)`, backticks, emoji, Cyrillic.
     static let nastyPrompts = [
-        "it's $(rm -rf ~) `x` ; && \n \"q\" 🚀 Проверка",
+        "it's $(rm -rf ~) `x` ; && \n \"q\" 🚀 日本語",
         "back\\slash \\\\ $HOME ${PATH} ~ * ? [a-z] | > < !! #x",
         "line one\nline two\n\ttab\n",
         "'; rm -rf ~; echo '",

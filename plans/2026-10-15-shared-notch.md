@@ -1373,7 +1373,7 @@ Run the Global Constraints test command. Expected: `** TEST SUCCEEDED **`.
 
 - [ ] **Step 3: `CLAUDE.md`** — in the `Workdeck/Features/Notch/` bullet (Task 1) add: "`NotchComposer` owns the presenter and decides what shows; each agent tool conforms to `AgentSource` and hands it an `AgentNotchPart`. `NotchSettings` holds the settings every agent shares (Settings → Notch) under the keys Claude Code's settings used." In the `Workdeck/Features/ClaudeCode/` bullet replace "composes `Limits/` … into the notch, popover row and menu bar" with "composes `Limits/` … into its popover row and its part of the notch".
 
-- [ ] **Step 4: Live check by the user** after `make install`: the notch, alerts, peek, "When active", the recap and the demo behave as before; row N1 of `docs/testing.md`. Then, on "коммить":
+- [ ] **Step 4: Live check by the user** after `make install`: the notch, alerts, peek, "When active", the recap and the demo behave as before; row N1 of `docs/testing.md`. Then, when the user says to commit:
 
 ```bash
 git add -A Workdeck WorkdeckTests docs README.md CLAUDE.md specs/2026-10-15-codex-support-design.md plans/2026-10-15-shared-notch.md

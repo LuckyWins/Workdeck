@@ -18,7 +18,7 @@
 - Quit from the menu restores sleep at once (unchanged) and keeps the choice. A safeguard cutoff or refusal forgets the choice. The user's switch is the only other way to forget it.
 - Helper start without a valid record restores sleep (unchanged); a helper crash (no SIGTERM) leaves no record.
 - `WorkdeckTests` compiles helper sources except `main.swift`, `HelperService.swift`, `HelperListenerDelegate.swift`: logic goes in testable files.
-- English only. No per-task commits: one commit at the end, only on "коммить".
+- English only. No per-task commits: one commit at the end, only when the user says to commit.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite: `-only-testing:WorkdeckTests/<Suite>`.
 
 ## Review Focus
@@ -128,4 +128,4 @@
 - [ ] **Step 1:** `docs/closed-lid-mode.md`: the mode is remembered until turned off (or a safeguard); Quit restores sleep and the mode comes back at the next launch; "How It Works" exit paths: crash or force quit → the helper waits up to a minute for Workdeck to come back; reinstall (`make install`) → handover to the new helper; restart → the helper resets at boot and Workdeck turns the mode on after login; helper stopped (Login Items off) → restores at once.
 - [ ] **Step 2:** `docs/testing.md` Closed-Lid Mode rows for the spec's §6 manual checks (each with `pmset -g | grep SleepDisabled` and `log show --predicate 'subsystem == "com.appcreators.workdeck.helper"' --last 5m`).
 - [ ] **Step 3:** Full suite — Expected: `** TEST SUCCEEDED **`. Spec status `Approved; implemented`.
-- [ ] **Step 4: Commit (only after "коммить")** — `feat(lid): keep closed-lid mode across restarts of Workdeck and the Mac`.
+- [ ] **Step 4: Commit (only after "commit")** — `feat(lid): keep closed-lid mode across restarts of Workdeck and the Mac`.

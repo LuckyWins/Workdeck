@@ -18,7 +18,7 @@
 - Never the real `~/.claude*`, `~/.codex`, Keychain, network or `UserDefaults.standard`: temp dirs, `UserDefaults(suiteName:)`, existing fakes.
 - Notch exactly as the real view (300 pt `LimitsExpandedView`, truncation kept); windows without title bar or toolbar.
 - Without `WORKDECK_SCREENSHOTS=1` the suite writes nothing.
-- No commits until the user says "коммить".
+- No commits until the user says to commit.
 - Commands: `make screenshots`; the suite alone `xcodebuild -scheme Workdeck -destination 'platform=macOS' test -only-testing:WorkdeckTests/ScreenshotTests TEST_RUNNER_WORKDECK_SCREENSHOTS=1 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`.
 
 ## Review Focus
@@ -149,5 +149,5 @@ Each asserts the written file exists and its pixel width is 2× the width used.
 - [ ] **Step 2: README** — the expanded notch under the badges; under Features a row of images (compact notch, alert, recap, popover, Statistics, Chats) with `<picture>` light/dark pairs; alt text on each.
 - [ ] **Step 3: Page** — the expanded notch under the install box; a row of the others above "What does Workdeck do?", `<picture>` light/dark, `loading="lazy"` below the fold, width/height attributes; `pages.yml` copies `docs/media/screenshots/` to `_site/screenshots/` and adds `docs/media/screenshots/**` to its paths filter.
 - [ ] **Step 4: CLAUDE.md** — Build and Test: `make screenshots`; Conventions: a change to how the notch, popover, Statistics or Chats look ends with `make screenshots` and the new images in the same commit; Architecture: `WorkdeckTests/Screenshots/`. TODO: README media — screenshots done (spec), video still open.
-- [ ] **Step 5: Show the user the README and page with images (the companion tab or a local preview); placement changes go here before "коммить".**
+- [ ] **Step 5: Show the user the README and page with images (the companion tab or a local preview); placement changes go here before the user says to commit.**
 - [ ] **Step 6: `make test`; expect green and `git status` shows no change under `docs/media/screenshots/` from the test run itself.**

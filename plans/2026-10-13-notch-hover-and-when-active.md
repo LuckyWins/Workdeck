@@ -17,7 +17,7 @@
 - The pointer monitor needs no permission, observes mouse-moved only, and runs only while the notch can be peeked at or is being peeked at.
 - The menu bar text mode keeps today's behavior ("When active" shows text only near limits).
 - Tests never touch real global event monitors; presenter tests inject short delays.
-- Commits: none per task; the user commits after checking ("коммить"). Conventional Commits, no `Co-Authored-By`, no mention of AI tools.
+- Commits: none per task; the user commits after checking (when the user says to commit). Conventional Commits, no `Co-Authored-By`, no mention of AI tools.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite adds `-only-testing:WorkdeckTests/<SuiteName>` after `test`.
 
 ## Review Focus
@@ -721,4 +721,4 @@ Expected: `** TEST SUCCEEDED **`.
 
 - [ ] **Step 4: Hand over**
 
-Ask the user to `make install` and run V7 and V8. No commit until they say "коммить".
+Ask the user to `make install` and run V7 and V8. No commit until they say "commit".

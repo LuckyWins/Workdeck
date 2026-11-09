@@ -76,7 +76,7 @@ struct NotesCleanupTests {
 
     @Test func removesItemsCompletedLongerAgo() async throws {
         store.items = [
-            item("old", title: "Проверить миграцию", doneDaysAgo: 8),
+            item("old", title: "Check the migration", doneDaysAgo: 8),
             item("recent", title: "Buy milk", doneDaysAgo: 6),
         ]
         let removed = await makeCleanup().run()
@@ -85,7 +85,7 @@ struct NotesCleanupTests {
         #expect(store.items.map(\.id) == ["recent"])
         #expect(removedIDs == ["old"])
         let text = try archive()
-        #expect(text == "- [x] Проверить миграцию — Workdeck · created 2026-10-20 · done 2026-10-29\n")
+        #expect(text == "- [x] Check the migration — Workdeck · created 2026-10-20 · done 2026-10-29\n")
     }
 
     @Test func exactlyTheCleanupPeriodIsRemoved() async {
@@ -389,12 +389,12 @@ struct NotesCleanupTests {
 
     @Test func archiveLineFormat() {
         let reminder = ReminderItem(
-            id: "r", listID: "used", title: "Проверить миграцию", due: nil, hasDueTime: false,
+            id: "r", listID: "used", title: "Check the migration", due: nil, hasDueTime: false,
             created: localDate(2026, 11, 1, 9), completed: localDate(2026, 11, 2, 23), notes: "kept out"
         )
         #expect(
             NotesCleanup.archiveLine(reminder, listTitle: "Workdeck")
-                == "- [x] Проверить миграцию — Workdeck · created 2026-11-01 · done 2026-11-02"
+                == "- [x] Check the migration — Workdeck · created 2026-11-01 · done 2026-11-02"
         )
     }
 

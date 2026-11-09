@@ -90,14 +90,14 @@ struct NotesDemoScriptTests {
 
     @Test func theUsersNoteComesBackAndNothingIsSavedMeanwhile() async {
         let (demo, model, controller) = makeDemo()
-        model.textChanged("Позвонить в банк")
+        model.textChanged("Call the bank")
         demo.demoDidStart()
         demo.demoTick(elapsed: NotesDemoScript.startsAt + 3, previous: nil)
-        #expect(model.draft.text != "Позвонить в банк")
+        #expect(model.draft.text != "Call the bank")
         // Return in the demo's panel saves nothing.
-        #expect(await controller.save(NoteDraft(text: "Что-то", project: nil)) == .failed(NotesController.demoReason))
+        #expect(await controller.save(NoteDraft(text: "Something", project: nil)) == .failed(NotesController.demoReason))
         demo.demoDidStop()
-        #expect(model.draft.text == "Позвонить в банк")
+        #expect(model.draft.text == "Call the bank")
         #expect(store.added.isEmpty)
     }
 }

@@ -41,8 +41,8 @@ struct ListMatcherTests {
     }
 
     @Test func matchingIgnoresCaseAndWorksForCyrillic() {
-        let result = ListMatcher.matches("ПРО", in: [list("Проект"), list("Мой проект"), list("Home")], recent: [])
-        #expect(result.map(\.title) == ["Проект", "Мой проект"])
+        let result = ListMatcher.matches("ÜBE", in: [list("Überblick"), list("Mein Überblick"), list("Home")], recent: [])
+        #expect(result.map(\.title) == ["Überblick", "Mein Überblick"])
     }
 
     @Test func anEmptyQueryListsEveryListRecentFirstAndNoMoreThanSix() {

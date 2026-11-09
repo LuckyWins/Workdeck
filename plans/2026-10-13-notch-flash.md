@@ -19,7 +19,7 @@
 - Alert firing rules (thresholds, reset toggle, finished minimum, needs-you toggle, skipping the session's app in front) are unchanged.
 - No alert text on screen, no alert clicks. The click plumbing and alert texts stay in the code, unused by the notch, for later notifications.
 - Tests never touch real screens or the window server.
-- Commits: none per task; the user commits after checking ("коммить"). Conventional Commits, no `Co-Authored-By`, no mention of AI tools.
+- Commits: none per task; the user commits after checking (when the user says to commit). Conventional Commits, no `Co-Authored-By`, no mention of AI tools.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite adds `-only-testing:WorkdeckTests/<SuiteName>` after `test`.
 
 ## Review Focus
@@ -575,4 +575,4 @@ Accounts spec §4.4, last two bullets: replace "Clicking a limit alert opens the
 - [ ] **Step 4: Full suite and hand over**
 
 Run: the Global Constraints test command.
-Expected: `** TEST SUCCEEDED **`. Ask the user to check S20 and the flash rows; no commit until they say "коммить".
+Expected: `** TEST SUCCEEDED **`. Ask the user to check S20 and the flash rows; no commit until they say "commit".

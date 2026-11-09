@@ -20,7 +20,7 @@
 - A note's text never leaves memory (quick notes spec §8): nothing new is persisted.
 - Tabs switch by click only; no new keyboard shortcuts.
 - No third-party dependencies, no `project.pbxproj` edits (synchronized groups), `makeTestDefaults()` for defaults.
-- No commits until the user says "коммить" (feature workflow): each task's last step stages only. Suite run: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test -only-testing:WorkdeckTests/<Suite> 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`.
+- No commits until the user says to commit (feature workflow): each task's last step stages only. Suite run: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test -only-testing:WorkdeckTests/<Suite> 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`.
 
 ## Review Focus
 

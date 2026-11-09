@@ -38,7 +38,7 @@
   - Shared `skills/` folder: Remove is disabled with `Shares the skills folder with <names>`.
   - Project MCP server whose folder is gone: Remove is disabled with `The project folder is gone; remove it with claude mcp in that project's place.`
 - English UI. Conventional Commits with scope `instances`, and no `Co-Authored-By` trailer or AI mention.
-- Work happens on the branch `feat/instances-manage` and is squash-merged when the user says "коммить".
+- Work happens on the branch `feat/instances-manage` and is squash-merged when the user says to commit.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test -only-testing:WorkdeckTests/<Suite> 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`. Drop `-only-testing` to run the whole suite.
 
 ## Review Focus

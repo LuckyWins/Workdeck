@@ -18,7 +18,7 @@
 - Full screen hides the virtual notch's compact and hover states only; alerts still expand it. The real notch ignores full screen.
 - No new third-party dependencies; DynamicNotchKit stays at 1.1.x.
 - English only in UI strings, comments and docs. Unit tests never touch real screens or the window server.
-- Commits: none per task. The user commits after checking the build ("коммить"). Messages are plain imperative sentences without `Co-Authored-By` trailers or mentions of AI tools.
+- Commits: none per task. The user commits after checking the build (when the user says to commit). Messages are plain imperative sentences without `Co-Authored-By` trailers or mentions of AI tools.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite adds `-only-testing:WorkdeckTests/<SuiteName>` after `test`.
 
 ## Review Focus
@@ -541,4 +541,4 @@ Spec §4, the `LimitsPresentation.display` row becomes: "Unchanged signature; `h
 
 - [ ] **Step 4: Hand over**
 
-Ask the user to `make install` and run V1–V5 (V2 is the full-screen half of probe item 4). Record the full-screen result in spec §8. No commit until the user says "коммить".
+Ask the user to `make install` and run V1–V5 (V2 is the full-screen half of probe item 4). Record the full-screen result in spec §8. No commit until the user says to commit.

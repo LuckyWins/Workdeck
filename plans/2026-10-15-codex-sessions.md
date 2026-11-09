@@ -17,7 +17,7 @@
 - Claude Code's hooks in `settings.json` must not gain `PermissionRequest` or `Interrupt`.
 - `~/.codex/hooks.json` changes only after the diff review, with a backup `hooks.json.workdeck-backup`; Disconnect removes only Workdeck's entries.
 - Tests never touch the real `~/.codex`, `~/.claude*`, Keychain or network.
-- English only; Conventional Commits; no `Co-Authored-By`, no AI mentions; commit only on "коммить" (the commit step runs at the end). No `project.pbxproj` edits for sources.
+- English only; Conventional Commits; no `Co-Authored-By`, no AI mentions; commit only when the user says to commit (the commit step runs at the end). No `project.pbxproj` edits for sources.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite adds `-only-testing:WorkdeckTests/<Suite>` after `test`.
 
 ## Review Focus
@@ -1316,7 +1316,7 @@ Connect **Session hooks** in Settings → Codex to list Codex sessions next to C
 ```
 
 - [ ] **Step 5: `TODO.md`** — the Codex item: "Stages 1 (limits) and 2 (sessions) done; stage 3 (Codex in the recap and Statistics) needs its own spec." Spec status: "Approved; stages 1 and 2 implemented".
-- [ ] **Step 6: Live check by the user** after `make install` (rows X1–X9), then on "коммить":
+- [ ] **Step 6: Live check by the user** after `make install` (rows X1–X9), then when the user says to commit:
 
 ```bash
 git add -A ClaudeHooks WorkdeckHook Workdeck WorkdeckTests docs README.md CLAUDE.md TODO.md specs/2026-10-15-codex-support-design.md plans/2026-10-15-codex-sessions.md

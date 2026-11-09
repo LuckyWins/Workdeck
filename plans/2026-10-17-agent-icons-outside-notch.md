@@ -16,7 +16,7 @@
 - Settings: Claude Code · Limits, · Sessions, · Instances → Claude icon on a terracotta square; Codex → Codex icon on a mint square; 20 × 20, corner radius 5, gradient fill as today; icon white, about 12–13 pt.
 - General, Closed-Lid Mode, Notch, About and the popover's other rows and buttons are unchanged.
 - VoiceOver: popover icons labeled with the agent's name; Settings header icons hidden.
-- Reuse `AgentIcon` / `AgentIcon.glyph(_:size:)`; no image assets. English only. One commit at the end, only on "коммить".
+- Reuse `AgentIcon` / `AgentIcon.glyph(_:size:)`; no image assets. English only. One commit at the end, only when the user says to commit.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`.
 
 ## Review Focus
@@ -79,4 +79,4 @@ struct SettingsHeaderTests {
 
 - [ ] **Step 4: Full suite** — Expected: `** TEST SUCCEEDED **`.
 
-- [ ] **Step 5: Commit (only after "коммить")** — `feat(settings): show agent icons in the popover and Settings`.
+- [ ] **Step 5: Commit (only after "commit")** — `feat(settings): show agent icons in the popover and Settings`.

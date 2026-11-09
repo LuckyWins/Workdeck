@@ -23,7 +23,7 @@
 - Default list "Inbox", created on first save if missing. Date without time → all-day due date + alarm 09:00; past time today → next day.
 - Info.plist `NSRemindersFullAccessUsageDescription`: "Workdeck saves your quick notes as reminders and removes completed ones you chose to clean up." Entitlement `com.apple.security.personal-information.calendars` (hardened runtime gates Reminders under it).
 - No third-party dependencies. No `project.pbxproj` edits for sources (synchronized groups). Test `UserDefaults` from `makeTestDefaults()`; temporary folders from `makeTemporaryDirectory()`.
-- No commits until the user says "коммить" (feature workflow): each task's last step stages only. Suite run: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test -only-testing:WorkdeckTests/<Suite> 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`.
+- No commits until the user says to commit (feature workflow): each task's last step stages only. Suite run: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test -only-testing:WorkdeckTests/<Suite> 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`.
 
 ## Review Focus
 
@@ -98,7 +98,7 @@ extension NoteDraft { mutating func apply(_ edit: DraftEdit) }
   - `uncommittedHashStaysInTitle`: `fix issue #123` and `C# notes` → `title(removing: nil)` returns the text unchanged, `project == nil`.
   - `createListCommitsNewTitle`: `#infra` + `.createList("infra")` → `project.listID == nil`, `newListTitle == "infra"`.
   - `backspaceAfterChipRestoresText`: chip `Workdeck` + `.backspaceAfterChip` → text `#Workdeck`, `project == nil`.
-  - `titleDropsChipAndDateAndCollapsesSpaces`: `Проверить миграцию на staging завтра в 16 #Workdeck` with the date range of `завтра в 16` → `Проверить миграцию на staging`; a text that is only the date and chip → the original text.
+  - `titleDropsChipAndDateAndCollapsesSpaces`: `Check the staging migration tomorrow at 4pm #Workdeck` with the date range of `tomorrow at 4pm` → `Check the staging migration`; a text that is only the date and chip → the original text.
 - [ ] **Step 2: Run** `-only-testing:WorkdeckTests/NoteDraftTests -only-testing:WorkdeckTests/ListMatcherTests`. Expected: build failure (types missing).
 - [ ] **Step 3: Implement** the types above. A committed chip keeps its text in `text` (as the list title) with `project.range` covering it, so the field can tint it; any edit inside the range un-commits.
 - [ ] **Step 4: Run** the same suites. Expected: all pass.
@@ -127,7 +127,7 @@ nonisolated enum NoteDateParser {
   - `timeAfterDetectedDay`: `созвон в пятницу в 11` → Nov 13 11:00, range `пятницу в 11`; `friday at 9:30` → Nov 13 09:30.
   - `relativeRussianAndEnglish`: `через 2 часа` → 16:32; `через 30 мин` → 15:02; `через 3 дня` → Nov 9 14:32 hasTime true; `in 45 minutes` → 15:17; `in 1 day` → Nov 7 14:32.
   - `pastTimeMovesToNextDay`: `в 9` → Nov 7 09:00.
-  - `noDateReturnsNil`: `Обновить скриншоты`.
+  - `noDateReturnsNil`: `Update screenshots`.
 - [ ] **Step 2: Run** `-only-testing:WorkdeckTests/NoteDateParserTests`. Expected: build failure.
 - [ ] **Step 3: Implement** `parse`: relative rule first (regex, case-insensitive, `минут|мин|час|часа|часов|день|дня|дней|min|minutes|hour|hours|day|days`); else the first `NSDataDetector(.date)` match, extended by a following `в H(:MM)` / `at H(:MM)` (rule 1); `hasTime` = the final phrase contains a time token (`\d{1,2}:\d{2}`, `в \d`, `at \d`, `\d+\s?(am|pm)`, `утром|днём|вечером|morning|evening`); past → +1 day.
 - [ ] **Step 4: Run** the suite. Expected: all pass.
@@ -196,7 +196,7 @@ Keys under `notes.` (`notes.enabled`, `notes.shortcut`, `notes.defaultList`, `no
   - `defaultsMatchTheSpec`: fresh `makeTestDefaults()` → enabled, `.rightOption`, cleanup on, 7 days, destination for any list = `Claude · main`, folder nil.
   - `rememberedDestinationSurvivesReload`; `missingInstanceFallsBackToMain` (helper `NotesSettings.resolve(_:instances:)` returns main when the instance name is gone); `usedListsAreForgottenWhenDeleted`.
   - `handOffIsRecordedWithoutText`: recorded value contains only label and date (inspect the defaults dictionary: no title).
-  - `promptWithShellCharactersIsQuoted`: for `it's $(rm -rf ~) \`x\` ; && \n "q" 🚀 Проверка` the command, run with `/bin/zsh -c` replacing `claude` by `printf %s`, prints the prompt verbatim (use a temp folder).
+  - `promptWithShellCharactersIsQuoted`: for `it's $(rm -rf ~) \`x\` ; && \n "q" 🚀 日本語` the command, run with `/bin/zsh -c` replacing `claude` by `printf %s`, prints the prompt verbatim (use a temp folder).
   - `promptStartingWithDashIsNotAFlag`: per Task 1's result, the prompt `-x hi` appears after `--` (or with the recorded prefix) in both commands.
   - `extraInstanceSetsConfigDir`: `claude-work` instance → command contains `CLAUDE_CONFIG_DIR='…/.claude-work'`.
 - [ ] **Step 2: Run** `-only-testing:WorkdeckTests/NotesSettingsTests -only-testing:WorkdeckTests/AgentCommandTests`. Expected: build failure.
@@ -227,7 +227,7 @@ Archive folder in production: `WorkdeckPaths.standard().supportDirectory.appendi
   - `unusedListIsNeverTouched`: an item done 30 d ago in an unused list stays.
   - `itemsFromOtherDevicesAreCleanedToo`: an item in a used list not created by Workdeck (no hand-off, any `created`) is removed.
   - `archiveFailureRemovesNothing`: archive folder is a file (unwritable) → `run()` returns 0, `remove` never called.
-  - `archiveLineFormat`: `- [x] Проверить миграцию — Workdeck · created 2026-11-01 · done 2026-11-02`.
+  - `archiveLineFormat`: `- [x] Check the migration — Workdeck · created 2026-11-01 · done 2026-11-02`.
   - `disabledCleanupDoesNothing`.
 - [ ] **Step 2: Run** `-only-testing:WorkdeckTests/NotesCleanupTests`. Expected: build failure.
 - [ ] **Step 3: Implement**; write each item's line (append, `FileHandle`) before its `remove`; stop on the first archive error; log counts only.
@@ -307,7 +307,7 @@ enum HandOffResult: Equatable { case started(label: String, listTitle: String), 
 - [ ] **Step 1: Write the failing tests** with `FakeRemindersStore`, a fake `TerminalLaunching` recording commands, fixed `now`:
   - `saveGoesToDefaultInboxCreatedOnce`: no lists → first save creates "Inbox", marks it used, sets `defaultListID`; second save reuses it.
   - `saveCreatesNewListFromChip`: draft with `newListTitle: "infra"` → list created, item in it, list used.
-  - `saveSetsTitleAndDate`: `Проверить миграцию на staging завтра в 16 #Workdeck` → title `Проверить миграцию на staging`, due Nov 7 16:00 hasTime.
+  - `saveSetsTitleAndDate`: `Check the staging migration tomorrow at 4pm #Workdeck` → title `Check the staging migration`, due Nov 7 16:00 hasTime.
   - `failedSaveKeepsText`: store throws → `.failed`, nothing marked used (the panel keeps the draft; Task 8 checks it).
   - `deniedAccessReturnsNeedsAccess`.
   - `handOffStartsClaudeMainByDefault`: list with folder → launcher got `ShellCommand.claude(main, in: folder, prompt: title)`; note line `Given to Claude · main, Nov 6, 14:32` appended; hand-off recorded.
@@ -358,7 +358,7 @@ Window: `NSPanel` with `[.nonactivatingPanel, .borderless]`, `canBecomeKey = tru
   - `failedSaveKeepsText`: store throws → mode back to `.typing`, `draft.text` unchanged, confirmation `Couldn't save` shown first.
   - `emptyReturnDoesNothing`.
   - `tabInsideQueryIsConsumedOutsideIsNot`: Tab with no `#` query → `handle` returns false.
-  - `emptyFieldShowsOpenItemsAndFilters`: typing `миграц` filters `visibleItems`; `#Workdeck` limits to that list.
+  - `emptyFieldShowsOpenItemsAndFilters`: typing `migrat` filters `visibleItems`; `#Workdeck` limits to that list.
   - `returnNeverActsOnARow`: a row selected and text typed → ↩ saves the text as a new note.
   - `commandReturnActsOnSelectedRowElseOnText`.
   - `commandShiftReturnOpensPickerAndEscapeGoesBack`.
@@ -381,7 +381,7 @@ Window: `NSPanel` with `[.nonactivatingPanel, .borderless]`, `canBecomeKey = tru
 **Interfaces — Consumes:** everything above. **Produces:** `AppDelegate.notes: NotesController` (lazy, like `recap`), `NotesShortcutMonitor` started in `applicationDidFinishLaunching` (skipped under `XCTestConfigurationFilePath`, like the helper refresh), `NotesCleanup.start()` at launch. The monitor's tap toggles the panel: opens it, or closes it when open (spec §2.1).
 
 - [ ] **Step 1: Write the failing tests:**
-  - `NotesDemoScriptTests.typesThenConfirms`: `NotesDemoScript.frame(at:)` gives the panel with `Проверить миграцию на staging завтра в 16 #Workdeck` typed by 6 s and the `Saved · Workdeck` confirmation by 8 s; nothing calls the store (fake records no `add`).
+  - `NotesDemoScriptTests.typesThenConfirms`: `NotesDemoScript.frame(at:)` gives the panel with `Check the staging migration tomorrow at 4pm #Workdeck` typed by 6 s and the `Saved · Workdeck` confirmation by 8 s; nothing calls the store (fake records no `add`).
   - `ScreenshotTests.notesCapture` (enabled only with `TEST_RUNNER_WORKDECK_SCREENSHOTS=1`): writes `notes-capture` (dark) from fixtures: the draft with the date tinted and the `#wo` list open.
 - [ ] **Step 2: Run** `-only-testing:WorkdeckTests/NotesDemoScriptTests`. Expected: build failure.
 - [ ] **Step 3: Implement:**
@@ -393,4 +393,4 @@ Window: `NSPanel` with `[.nonactivatingPanel, .borderless]`, `canBecomeKey = tru
 - [ ] **Step 5: `make screenshots`**; check `docs/media/screenshots/notes-capture.png` matches `1-capture.png` in spirit; leave other changed images out unless they really changed (`notch-expanded.png` note in CLAUDE.md).
 - [ ] **Step 6: Docs:** CHANGELOG Unreleased → New line from spec §11; `docs/quick-notes.md` (key, `#`, dates incl. the two own rules, hand-off, cleanup and archive, privacy); README Features line and the same text in `site/index.html`; CLAUDE.md Architecture entry for `Workdeck/Features/Notes/` with the privacy rule of spec §8; TODO item 12 marked as being built.
 - [ ] **Step 7: Manual end-to-end** on the Mac (`make install`): first tap asks for Reminders access; a note with `#` and a date lands in Reminders on the Mac and iPhone; ⌘↩ opens Terminal with `claude` and the prompt; completing an item and setting cleanup to 1 day removes it after a relaunch, with its line in the archive.
-- [ ] **Step 8: Stage** all files; tell the user it is ready for their check before "коммить".
+- [ ] **Step 8: Stage** all files; tell the user it is ready for their check before the user says to commit.

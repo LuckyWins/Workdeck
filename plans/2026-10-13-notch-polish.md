@@ -17,7 +17,7 @@
 - Ticker: finished steps show `✓` in `Terminal.faint`, the current `▸`; demotion 0.38 s `timingCurve(0.4, 0, 0.2, 1)`, scale 0.92, 4 pt left; shimmer period 2.2 s; edge fade top 16 %, bottom 8 %; Reduce Motion keeps only the mark change.
 - Settings tiles 20 × 20, corner radius 5, white SF Symbol: General `gearshape.fill` gray, Closed-Lid Mode `laptopcomputer` indigo, Limits `gauge.with.dots.needle.50percent` orange, Sessions `terminal.fill` green, Instances `person.2.fill` blue, About `info.circle.fill` gray.
 - Alert texts, durations, clicks and flashes are unchanged; DynamicNotchKit is not modified.
-- Commits: none per task; the user commits after checking ("коммить"). Conventional Commits, no `Co-Authored-By`, no mention of AI tools.
+- Commits: none per task; the user commits after checking (when the user says to commit). Conventional Commits, no `Co-Authored-By`, no mention of AI tools.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite adds `-only-testing:WorkdeckTests/<SuiteName>` after `test`.
 - Look checks: render a view to PNG with a temporary test (`ImageRenderer`, see Task 3 Step 4) that is deleted before the task ends; never commit it.
 

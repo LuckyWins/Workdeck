@@ -19,7 +19,7 @@
 - Script output exactly as spec §3.2 (`==> ` steps, `Error: ` on stderr, exit 1).
 - The page loads nothing from third parties; light and dark by `prefers-color-scheme`; English.
 - Workflow actions pinned to full commit SHAs; Pages job on `ubuntu-latest`.
-- No commits until the user says "коммить".
+- No commits until the user says to commit.
 - Test command: `python3 -I scripts/release/test_install.py`.
 
 ## Review Focus
@@ -126,6 +126,6 @@ def test_page_and_readme_share_the_command(self):
 
 ### Task 4: Publish (with the user)
 
-- [ ] **Step 1: On "коммить": commit (`feat: install Workdeck with one command from its own page`), push `main`.**
+- [ ] **Step 1: On "commit": commit (`feat: install Workdeck with one command from its own page`), push `main`.**
 - [ ] **Step 2: The user enables Settings → Pages → Source: GitHub Actions; then re-runs or triggers `pages.yml` (Actions → Pages → Run workflow).**
 - [ ] **Step 3: Check `https://luckywins.github.io/Workdeck/` and `…/install.sh` return 200 (`curl -fsSI`); the user runs P1 and P2.**

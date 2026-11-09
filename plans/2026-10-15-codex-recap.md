@@ -18,7 +18,7 @@
 - Kept data stays counts and names only: project and file names, session IDs, account labels; never paths, prompts or contents (spec §4).
 - Source folders are file-system-synchronized groups: never edit `project.pbxproj`; move files with `git mv`.
 - Tests never touch the real `~/Library/Application Support/Workdeck`, `~/.claude*`, `~/.codex`, the Keychain or the network.
-- Commit only when the user says "коммить": no commit inside tasks; one commit at the end (Task 8, Step 2). Conventional Commits, header ≤ 72 characters, no scope (the change spans areas), no `Co-Authored-By`, no mention of AI tools.
+- Commit only when the user says to commit: no commit inside tasks; one commit at the end (Task 8, Step 2). Conventional Commits, header ≤ 72 characters, no scope (the change spans areas), no `Co-Authored-By`, no mention of AI tools.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite: add `-only-testing:WorkdeckTests/<Suite>` after `test`.
 
 ## Review Focus
@@ -2144,7 +2144,7 @@ Expected: all pass; `** TEST SUCCEEDED **`.
 
 Run the test command. Expected: `** TEST SUCCEEDED **`.
 
-- [ ] **Step 3: Commit, after the user's check and "коммить"**
+- [ ] **Step 3: Commit, after the user's check and "commit"**
 
 ```bash
 git add -A Workdeck WorkdeckTests docs README.md CLAUDE.md TODO.md specs plans

@@ -18,7 +18,7 @@
 - Compact notch: [icon while marks show] [ring] [purple badge with the account's upper-case letter, extra Claude accounts only] [text]; text below the first threshold is empty for the 5-hour window and the short label (`7d`) for another window; from the first threshold the percent as today; `—` with no data.
 - The menu bar text keeps the glyphs `✳`/`◎` (`AgentKind.menuBarMark`) before the account letter, unchanged.
 - Expanded notch layout, level colors and the popover are unchanged.
-- English only. No per-task commits: one commit at the end, only when the user says "коммить".
+- English only. No per-task commits: one commit at the end, only when the user says to commit.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite: add `-only-testing:WorkdeckTests/<Suite>` after `test`.
 
 ## Review Focus
@@ -557,7 +557,7 @@ Spec `**Status:** Approved; implemented`; `TODO.md` item 9 → `9. ~~**Clearer a
 Run: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`
 Expected: `** TEST SUCCEEDED **`.
 
-- [ ] **Step 4: Commit (only after the user says "коммить")**
+- [ ] **Step 4: Commit (only after the user says to commit)**
 
 ```bash
 git add -A

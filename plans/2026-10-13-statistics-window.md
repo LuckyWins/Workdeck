@@ -20,7 +20,7 @@
 - Navigation: back to the oldest week with a day, never more than 12 weeks before the current one; never past the current week.
 - Window: `Window` scene titled "Claude Code Statistics", id `claude-statistics`, default 460 × 680, suppressed at launch, not restored.
 - UI strings, comments, docs and commits in English. No third-party dependencies (Swift Charts is Apple's).
-- Commits: none per task; the user commits after checking ("коммить"). Conventional Commits, no `Co-Authored-By`, no mention of AI tools.
+- Commits: none per task; the user commits after checking (when the user says to commit). Conventional Commits, no `Co-Authored-By`, no mention of AI tools.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite adds `-only-testing:WorkdeckTests/<SuiteName>` after `test`.
 
 ## Review Focus

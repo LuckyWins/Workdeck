@@ -22,7 +22,7 @@
 - Only in a notch Workdeck draws (camera housing or virtual); not in the menu bar text mode, not with the indicator off.
 - Card strings: `─ last week · Oct 6–12 ─`, `coding`, `sessions`, `agents`, `files`, `commands`, `busiest`, `longest`, `─ top projects ─`, `─ limits ─`, `5h hit N×`, `7d peak N%`, `Got it`; durations `<1m`, `42m`, `2h 14m`, `9h 03m`; thousands with a thin space (U+2009).
 - Gaps between updates longer than 120 s (`RecapRecorder.maxGap`) count as not observed.
-- Commits: none per task; the user commits after checking ("коммить"). Conventional Commits, no `Co-Authored-By`, no mention of AI tools.
+- Commits: none per task; the user commits after checking (when the user says to commit). Conventional Commits, no `Co-Authored-By`, no mention of AI tools.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; one suite adds `-only-testing:WorkdeckTests/<SuiteName>` after `test`.
 
 ## Review Focus

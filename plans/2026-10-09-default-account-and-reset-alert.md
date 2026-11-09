@@ -17,7 +17,7 @@
 - Never modify or delete a transcript.
 - Tests never touch the real Keychain, network, `~/.claude*`, the sessions folder or snapshots; `ChatsControllerTests` uses a temporary home and a throwaway `UserDefaults` suite.
 - Source folders are synchronized groups: do not edit `project.pbxproj`.
-- Commits: none per task. The user commits after checking the UI ("коммить"), together with the uncommitted account filter (§14) already in the working tree. Commit messages are plain imperative sentences without `Co-Authored-By` trailers or mentions of AI tools.
+- Commits: none per task. The user commits after checking the UI (when the user says to commit), together with the uncommitted account filter (§14) already in the working tree. Commit messages are plain imperative sentences without `Co-Authored-By` trailers or mentions of AI tools.
 - Test command: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"`; a single suite adds `-only-testing:WorkdeckTests/<SuiteName>` after `test`.
 
 ## Review Focus
@@ -403,4 +403,4 @@ The `…` menu of a chat sets a **Default Account** for its project: Terminal an
 
 - [ ] **Step 5: Hand over for the visual check**
 
-Tell the user to run `make install` and check the Chats `…` menu, the buttons and a reset alert (L9). No commit until they say "коммить".
+Tell the user to run `make install` and check the Chats `…` menu, the buttons and a reset alert (L9). No commit until they say "commit".

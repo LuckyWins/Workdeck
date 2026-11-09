@@ -81,7 +81,7 @@ Whatever shows in the notch (sessions, an alert) is hidden while the panel is op
 
 ```
 ┌──────────────────────── notch ────────────────────────┐
-│ Проверить миграцию на staging [завтра в 16] (● Workdeck) │
+│ Check the staging migration [tomorrow at 4pm] (● Workdeck) │
 │ ───────────────────────────────────────────────────── │
 │ 🔔 Tomorrow, 16:00 · ☰ Workdeck              ↩ Save  esc │
 │ ⌘↩ (✳ Claude · main ~/Development/…/Workdeck ⌄)  ⌘⇧↩ Change │
@@ -122,9 +122,9 @@ When the text field is empty, the panel shows the open items:
 ```
 │ New note…  # for a project                             │
 │ Open · 5                                 Type to filter │
-│ ○ Проверить миграцию на staging  ● Workdeck  Tomorrow, 16:00 │
-│ ○ Спросить Сашу про лимиты      ● Workdeck  ✳→ Claude · today 11:05 │
-│ ○ Обновить скриншоты            ● Workdeck-site      3 d │
+│ ○ Check the staging migration  ● Workdeck  Tomorrow, 16:00 │
+│ ○ Ask Sasha about limits       ● Workdeck  ✳→ Claude · today 11:05 │
+│ ○ Update screenshots            ● Workdeck-site      3 d │
 │ ↑↓ Select   ⌘↩ Give to agent   ⌘D Done            esc │
 ```
 
@@ -151,7 +151,7 @@ After ↩ the panel shrinks to a small notch message for about 2 s, in the style
 Opened by a click on the destination line or ⌘⇧↩. It replaces the lower part of the panel:
 
 ```
-│ Проверить миграцию на staging (● Workdeck)              │
+│ Check the staging migration (● Workdeck)              │
 │ Start in                                                │
 │   ✳ Claude · main  ✓                                    │
 │ ▸ ✳ Claude · work                                       │
