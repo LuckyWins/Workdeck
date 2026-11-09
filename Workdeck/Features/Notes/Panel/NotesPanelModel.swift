@@ -201,6 +201,12 @@ final class NotesPanelModel {
         !matches.isEmpty || createListTitle != nil
     }
 
+    /// The `#…` the field tints: only while its list is open. Once it closes, the text stays as written and reads as
+    /// plain text (`#1 check staging`).
+    var tintedQuery: Range<String.Index>? {
+        isListOpen ? draft.query()?.range : nil
+    }
+
     private func refreshDerived() {
         let wasOpen = isListOpen
         let oldMatches = matches.map(\.id)
@@ -350,17 +356,42 @@ final class NotesPanelModel {
             guard let last = pendingDone.last else { return false }
             cancelPendingDone(last.id)
             return true
-        case .returnKey, .commandReturn:
+        case .returnKey:
+            // While the `#` list is open, ↩ takes the selected row and the note stays: the next ↩ saves it (a new
+            // list is created then).
+            if !isBusy, takeSelectedListRow() {
+                return true
+            }
+            return isBusy ? true : nil
+        case .commandReturn:
             return isBusy ? true : nil
         }
+    }
+
+    /// Turns the "Create list" row into the chip while it is the only row; false when it is not shown.
+    private func takeCreateListRow() -> Bool {
+        guard isListOpen, draft.query() != nil, matches.isEmpty, let title = createListTitle else { return false }
+        cycleMatches = []
+        draft.apply(.createList(title))
+        return true
+    }
+
+    /// Turns the selected row of the open `#` list (the first when none is selected) into the chip; false while the
+    /// list is closed.
+    private func takeSelectedListRow() -> Bool {
+        if takeCreateListRow() {
+            return true
+        }
+        guard isListOpen, draft.query() != nil, !matches.isEmpty else { return false }
+        let row = selectedRow.flatMap { matches.indices.contains($0) ? $0 : nil } ?? 0
+        pickList(matches[row])
+        return true
     }
 
     /// Tab, as in a terminal (spec §3.2). Not consumed outside a `#…` and without a chip to cycle.
     private func tab() -> Bool {
         if isListOpen, draft.query() != nil {
-            if matches.isEmpty, let title = createListTitle {
-                cycleMatches = []
-                draft.apply(.createList(title))
+            if takeCreateListRow() {
                 return true
             }
             let used = matches
@@ -628,9 +659,7 @@ final class NotesPanelModel {
 
     private func saveTypedNote() async {
         guard hasText else { return }
-        if isListOpen {
-            draft.apply(.commitExact(lists: controller.lists))
-        }
+        commitOpenList()
         switch await controller.save(draft) {
         case let .saved(item, listTitle):
             needsAccess = false
@@ -646,9 +675,7 @@ final class NotesPanelModel {
     /// Saves the typed note before a hand-off; nil when it was not saved (the panel says why).
     private func saveDraftForHandOff() async -> ReminderItem? {
         guard hasText else { return nil }
-        if isListOpen {
-            draft.apply(.commitExact(lists: controller.lists))
-        }
+        commitOpenList()
         switch await controller.save(draft) {
         case let .saved(item, _):
             needsAccess = false
@@ -662,6 +689,17 @@ final class NotesPanelModel {
         case let .failed(reason):
             confirm(NotesConfirmation(symbol: "exclamationmark", title: "Couldn't save", subtitle: reason), closesPanel: false)
             return nil
+        }
+    }
+
+    /// Before a ⌘↩ save (↩ takes the open list's row without saving): an exact match becomes the chip, and so does the
+    /// "Create list" row (the list is created with the note). Text typed past the list keeps its `#…` as written.
+    private func commitOpenList() {
+        guard isListOpen else { return }
+        if matches.isEmpty, let title = createListTitle {
+            draft.apply(.createList(title))
+        } else {
+            draft.apply(.commitExact(lists: controller.lists))
         }
     }
 

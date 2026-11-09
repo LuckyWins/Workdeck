@@ -108,10 +108,10 @@ Whatever shows in the notch (sessions, an alert) is hidden while the panel is op
 - **Committing** (builder's call, made in review): only a committed project is a project.
   - Tab or a click on a row commits it; the `#…` text becomes a chip and the list closes.
   - **Space** commits only when the typed text after `#` equals a list name exactly and no other list starts with that text followed by a space; otherwise the space becomes part of the query, so multi-word names ("Shopping list", Russian names with spaces) are typed naturally.
-  - **↩** commits an exact match, then saves the note.
-  - When the query matches no list and is not committed, the list closes as soon as the text no longer matches anything but the "Create list" row and the user types on; the `#…` text then stays in the title as written (`fix issue #123`, `C#`). A list is created only through the "Create list" row (Tab or click).
+  - **↩** commits the selected row (the first when none is selected), the "Create list" row too, and does not save: the next ↩ saves. ⌘↩ commits an exact match or the "Create list" row, then saves and hands off.
+  - When the query matches no list and is not committed, the list closes as soon as the text no longer matches anything but the "Create list" row and the user types on; the `#…` text then stays in the title as written (`fix issue #123`, `C#`). A list is created only through the "Create list" row (Tab, ↩ or a click).
 - **Backspace** right after a chip turns it back into `#name` text.
-- **No match:** the only row is "Create list "name" in Reminders". Tab or a click commits it; the list is created when the note is saved, in the default source (iCloud when present), with a color Reminders picks.
+- **No match:** the only row is "Create list "name" in Reminders". Tab, ↩ or a click commits it; the list is created when the note is saved, in the default source (iCloud when present), with a color Reminders picks.
 - One project per note; committing a second project replaces the first chip.
 - The chip is not part of the saved title; uncommitted `#…` text is.
 

@@ -5,6 +5,8 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 ## Unreleased
 
 ### Fixed
+- Quick notes: Return in the `#` list now picks the selected list, or the new one on the "Create list" row, and the next Return saves the note; before, it saved at once, and a new list's note went to Inbox with `#name` in its text.
+- Quick notes: a `#` followed by more words, as in "#1 check staging", now reads as plain text once no list matches, instead of staying blue.
 - A chat started in Terminal or VS Code for the main Claude Code instance could open in another instance when Workdeck itself had been started from a Claude Code session.
 
 ## 1.3.0 — 2026-11-06

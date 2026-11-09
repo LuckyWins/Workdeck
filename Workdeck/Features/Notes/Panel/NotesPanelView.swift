@@ -189,8 +189,8 @@ struct NoteField: View {
             decorations.chip = NSRange(project.range, in: text)
             decorations.chipColor = model.list(withID: project.listID).map(\.nsColor) ?? .systemBlue
         }
-        if let query = draft.query() {
-            decorations.query = NSRange(query.range, in: text)
+        if let query = model.tintedQuery, query.upperBound <= text.endIndex {
+            decorations.query = NSRange(query, in: text)
         }
         return decorations
     }
@@ -266,8 +266,13 @@ struct ListFooter: View {
             }
             ListLabel(title: model.summaryListTitle)
             Spacer(minLength: 8)
-            KeyHint(key: "⇥", label: model.createListTitle != nil ? "Create" : "Complete")
-            KeyHint(key: "↩", label: "Save")
+            // ↩ takes the selected row; the note is saved by the next ↩.
+            if model.createListTitle != nil {
+                KeyHint(key: "↩", label: "Create")
+            } else {
+                KeyHint(key: "⇥", label: "Complete")
+                KeyHint(key: "↩", label: "Choose")
+            }
         }
         .font(NotesPanelStyle.secondaryFont)
         .foregroundStyle(NotesPanelStyle.secondary)

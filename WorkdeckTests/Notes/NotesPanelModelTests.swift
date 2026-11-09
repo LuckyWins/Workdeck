@@ -274,6 +274,23 @@ struct NotesPanelModelTests {
         #expect(model.summaryListTitle == "infra (new)")
     }
 
+    @Test func theQueryIsTintedOnlyWhileTheListIsOpen() async {
+        let (model, _) = await makeModel()
+        model.textChanged("#infra")
+        #expect(model.tintedQuery == model.draft.query()?.range)
+        #expect(model.tintedQuery != nil)
+
+        model.textChanged("#1 проверить стейдж")
+        #expect(!model.isListOpen)
+        #expect(model.tintedQuery == nil)
+        #expect(await model.handle(.returnKey))
+        guard case let .add(title, _, _) = store.added.first else {
+            Issue.record("expected a save")
+            return
+        }
+        #expect(title == "#1 проверить стейдж")
+    }
+
     @Test func typingRightAfterAChipAddsASpace() async {
         let (model, _) = await makeModel()
         await typeWithProject(model, "Note #Workdeck")
@@ -291,9 +308,18 @@ struct NotesPanelModelTests {
         #expect(await model.handle(.backspace) == false)
     }
 
-    @Test func returnCommitsAnExactMatchThenSaves() async {
+    @Test func returnTakesTheSelectedListThenTheNextReturnSaves() async {
         let (model, _) = await makeModel()
-        model.textChanged("Note #wordle-bot")
+        model.textChanged("Note #wor")
+        #expect(await model.handle(.down))
+        #expect(model.matches[1].id == "wb")
+        #expect(await model.handle(.returnKey))
+        #expect(model.draft.project?.listID == "wb")
+        #expect(model.draft.text == "Note Wordle-bot")
+        #expect(model.draft.query() == nil)
+        #expect(!model.isListOpen)
+        #expect(store.added.isEmpty)
+
         #expect(await model.handle(.returnKey))
         guard case let .add(title, _, listID) = store.added.first else {
             Issue.record("expected a save")
@@ -301,6 +327,42 @@ struct NotesPanelModelTests {
         }
         #expect(title == "Note")
         #expect(listID == "wb")
+    }
+
+    @Test func returnOnTheCreateRowTakesItThenTheNextReturnCreatesTheListAndSaves() async {
+        let (model, _) = await makeModel()
+        model.textChanged("#infra")
+        #expect(model.createListTitle == "infra")
+        #expect(await model.handle(.returnKey))
+        #expect(model.draft.project?.newListTitle == "infra")
+        #expect(model.draft.query() == nil)
+        #expect(store.added.isEmpty)
+        #expect(!store.calls.contains(.createList("infra")))
+
+        model.textChanged("Продлить домен infra")
+        #expect(model.draft.project?.newListTitle == "infra")
+        #expect(await model.handle(.returnKey))
+        #expect(store.calls.contains(.createList("infra")))
+        let created = store.listInfos.first { $0.title == "infra" }
+        guard case let .add(title, _, listID) = store.added.first else {
+            Issue.record("expected a save")
+            return
+        }
+        #expect(title == "Продлить домен")
+        #expect(listID == created?.id)
+    }
+
+    @Test func returnAfterTypingPastTheCreateRowKeepsTheHashInTheTitle() async {
+        let (model, _) = await makeModel()
+        model.textChanged("fix issue #123 ")
+        #expect(model.createListTitle == nil)
+        #expect(await model.handle(.returnKey))
+        #expect(!store.calls.contains(.createList("123")))
+        guard case let .add(title, _, _) = store.added.first else {
+            Issue.record("expected a save")
+            return
+        }
+        #expect(title == "fix issue #123")
     }
 
     // MARK: Open items

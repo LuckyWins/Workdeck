@@ -25,8 +25,8 @@ A project is a Reminders list. Type `#` and a few letters: the matching lists op
 
 - **Tab works like a terminal.** When the matches share a longer start than you typed, Tab completes to it (shown in gray beforehand). Otherwise Tab takes the selected list, and Tab again moves to the next match. ↑↓ select, a click takes a row.
 - A taken list becomes a chip in its color; it is not part of the reminder's title, and its name is never read as a date (a list called "Today" sets no reminder). Backspace right after the chip turns it back into `#name` text. A note has one project; taking another replaces the chip.
-- Space takes a list only when the text after `#` is exactly its name and no other list starts with that name and a space, so names with spaces ("Shopping list") type naturally. Return takes an exact match and saves.
-- When nothing matches, the only row is **Create list "name" in Reminders**; Tab or a click on it creates the list when the note is saved. Text you do not take stays in the title as written: `fix issue #123`, `C#`.
+- Space takes a list only when the text after `#` is exactly its name and no other list starts with that name and a space, so names with spaces ("Shopping list") type naturally. Return takes the selected list without saving; the next Return saves.
+- When nothing matches, the only row is **Create list "name" in Reminders**; Tab, Return or a click turns it into the project, and the list is created when you save the note with the next Return. Type on past the row and the text stays in the title as written: `fix issue #123 today`, `C#`.
 
 ### Dates
 
