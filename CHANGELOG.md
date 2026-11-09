@@ -4,6 +4,9 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 
 ## Unreleased
 
+### Improved
+- Quick notes: long notes show in full when you hover or select them, and the list shows how many more notes are below.
+
 ### Fixed
 - Quick notes: typing a list's name, without `#`, now filters the open notes by that list; before, only the notes' own text was searched.
 

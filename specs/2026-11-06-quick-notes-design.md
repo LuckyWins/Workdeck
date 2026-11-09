@@ -120,17 +120,22 @@ Whatever shows in the notch (sessions, an alert) is hidden while the panel is op
 When the text field is empty, the panel shows the open items:
 
 ```
-│ New note…  # for a project                             │
-│ Open · 5                                 Type to filter │
-│ ○ Check the staging migration  ● Workdeck  Tomorrow, 16:00 │
-│ ○ Ask Sasha about limits       ● Workdeck  ✳→ Claude · today 11:05 │
-│ ○ Update screenshots            ● Workdeck-site      3 d │
-│ ↑↓ Select   ⌘↩ Give to agent   ⌘D Done            esc │
+│ New note…  # for a project                               │
+│ Open · 12                                  Type to filter │
+│ ○ Check the staging migration                            │
+│   ● Workdeck · Tomorrow, 16:00                           │
+│ ○ Ask Sasha about the weekly limits reset and whether the │
+│   Codex numbers match what the usage API returns for th… │
+│   ● Workdeck · ✳→ Claude · today 11:05                   │
+│ ○ Update screenshots                                      │
+│   ● Workdeck-site · 3 d                                  │
+│                        ⌄ 9 more                          │
+│ ↑↓ Select   ⌘↩ Give to agent   ⌘D Done              esc │
 ```
 
 - Items come from the **lists used through Workdeck** (the default list and every list chosen or created with `#`; §6.1), not every list in Reminders.
-- **Order:** overdue first, then by due date, then items without a date from oldest to newest. At most eight rows visible, the rest scroll.
-- Right column: the due date (orange when today or overdue), "→ agent · time" when the item was handed to an agent (§5.4), else its age ("3 d").
+- **Order:** overdue first, then by due date, then items without a date from oldest to newest. The list grows up to about seven one-line rows (Done: four), then scrolls with a fade at each edge that has rows beyond it and "⌄ N more" under it (long rows spec §4).
+- Each row: the title on up to two lines, the whole of it when the row is selected or hovered for 0.4 s; under it the list and the detail: the due date (orange when today or overdue), "→ agent · time" when the item was handed to an agent (§5.4), else its age ("3 d") (long rows spec, `specs/2026-11-09-notes-long-rows-design.md`, which replaced the one-line row with a right column).
 - **Typing filters** the list by text: each typed word must appear in the item's title or its list's title (the user, 2026-11-09: typing a list's name without `#` should show that list); `#name` limits it to one project. Typing also starts a new note: ↩ always saves the typed text as a new note, never acts on a row.
 - **↑↓** select a row; **⌘↩** hands the selected item to its project's agent; **⌘D** marks it done. When no row is selected, ⌘↩ acts on the typed text.
 - **Taking a tick back** (the user, 2026-11-06, after the check at the Mac): a ticked row stays in place crossed out, with "⌘Z Undo", for 4 seconds before the tick is written to Reminders; ⌘Z (the last tick first, then the field's own undo) or another click on the circle takes it back. Closing the panel writes waiting ticks at once.

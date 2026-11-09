@@ -45,7 +45,7 @@ How a few phrases read:
 
 ### Open Notes
 
-With the field empty, the panel lists the open notes of the lists you used here (the default list and every list a note went to): overdue first, then by due date, then undated ones from the oldest. The right column shows the due date (orange when it is today or overdue), the agent a note was given to and when, or its age.
+With the field empty, the panel lists the open notes of the lists you used here (the default list and every list a note went to): overdue first, then by due date, then undated ones from the oldest. Each note shows its text on up to two lines and, under it, its list and the due date (orange when it is today or overdue), the agent it was given to and when, or its age. A longer note shows in full when you select it or rest the pointer on it for a moment. When more notes are below, the list fades at the bottom and counts them ("⌄ 4 more").
 
 - Typing filters the list by the notes' text and their list's name (`workdeck staging` finds the Workdeck notes about staging); `#name` limits it to one project. Return always saves what you typed as a new note.
 - ↑↓ select a note, **⌘↩** gives it to its project's agent, **⌘D** marks it done. With the mouse: the circle marks it done, a row's **Give to agent** button hands it over.

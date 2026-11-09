@@ -4,11 +4,14 @@ import SwiftUI
 /// them: what was ticked lately, folded until clicked open.
 struct OpenItemsView: View {
     let model: NotesPanelModel
-    /// At most this many open rows show; the rest scroll. Fewer rows never scroll.
-    static let visibleRows = 8
-    /// As `visibleRows`, for the Done section.
-    static let visibleDoneRows = 5
-    static let rowHeight: CGFloat = 30
+    /// The open notes' list grows with its rows up to this height (about seven one-line rows), then scrolls.
+    static let maxOpenHeight: CGFloat = 340
+    /// As `maxOpenHeight`, for the Done section (about four one-line rows).
+    static let maxDoneHeight: CGFloat = 196
+    /// How far a scrolled-away edge fades into the panel's black.
+    static let fadeHeight: CGFloat = 30
+    /// A one-line row with its second line, for the list's height before it is first measured.
+    static let estimatedRowHeight: CGFloat = 46
 
     var body: some View {
         let items = model.visibleItems
@@ -33,7 +36,7 @@ struct OpenItemsView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 14)
             } else {
-                rows(items, from: 0, visible: Self.visibleRows)
+                ItemRowsList(model: model, items: items, first: 0, maxHeight: Self.maxOpenHeight)
             }
 
             if !done.isEmpty {
@@ -56,7 +59,7 @@ struct OpenItemsView: View {
                 .help(model.isDoneShown ? "Hide done notes" : "Show done notes")
                 .padding(.top, 4)
                 if model.isDoneShown {
-                    rows(done, from: items.count, visible: Self.visibleDoneRows)
+                    ItemRowsList(model: model, items: done, first: items.count, maxHeight: Self.maxDoneHeight)
                 }
             }
 
@@ -80,49 +83,141 @@ struct OpenItemsView: View {
         }
         .padding(.bottom, model.hasText ? 12 : 0)
     }
+}
 
-    /// `items` as rows, the first one being row `first` of the selection; up to `visible` show, the rest scroll.
-    private func rows(_ items: [ReminderItem], from first: Int, visible: Int) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView(.vertical) {
-                VStack(spacing: 2) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                        OpenItemRow(model: model, item: item, isSelected: model.selectedRow == first + index) {
-                            model.selectedRow = first + index
+/// A section's rows, the first one being row `first` of the selection: as tall as the rows up to `maxHeight`, then
+/// scrolling, with a fade at each edge that has rows beyond it and "N more" under it (long rows spec §4).
+private struct ItemRowsList: View {
+    let model: NotesPanelModel
+    let items: [ReminderItem]
+    let first: Int
+    let maxHeight: CGFloat
+
+    private struct Geometry: Equatable {
+        var contentHeight: CGFloat
+        var offset: CGFloat
+        var visibleHeight: CGFloat
+    }
+
+    @State private var geometry: Geometry?
+    @State private var rowTops: [String: CGFloat] = [:]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var cue: ScrollCue {
+        guard let geometry else { return .none }
+        return ScrollCue(
+            rowTops: items.compactMap { rowTops[$0.id] }, contentHeight: geometry.contentHeight,
+            offset: geometry.offset, maxHeight: maxHeight
+        )
+    }
+
+    private var height: CGFloat {
+        let content = geometry?.contentHeight ?? CGFloat(items.count) * OpenItemsView.estimatedRowHeight
+        return min(content, maxHeight)
+    }
+
+    var body: some View {
+        let cue = cue
+        // Read once per update: `selectedItem` filters every row.
+        let selectedID = model.selectedItem?.id
+        VStack(spacing: 4) {
+            ScrollViewReader { proxy in
+                ScrollView(.vertical) {
+                    VStack(spacing: 2) {
+                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                            OpenItemRow(
+                                model: model, item: item, isSelected: model.selectedRow == first + index,
+                                isExpanded: item.id == selectedID || item.id == model.hoverExpandedID, isHovered: model.isHovered(item)
+                            ) {
+                                model.selectedRow = first + index
+                            }
+                            .id(item.id)
+                            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.space)).minY } action: {
+                                rowTops[item.id] = $0
+                            }
+                            .transition(.opacity)
                         }
-                        .id(item.id)
-                        .transition(.opacity)
+                    }
+                    .coordinateSpace(.named(Self.space))
+                    .animation(.easeOut(duration: 0.25), value: items.map(\.id))
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: [selectedID, model.hoverExpandedID])
+                }
+                .scrollIndicators(.never)
+                .scrollBounceBehavior(.basedOnSize)
+                .scrollDisabled(!cue.scrolls)
+                .onScrollGeometryChange(for: Geometry.self) { scroll in
+                    Geometry(
+                        contentHeight: scroll.contentSize.height, offset: scroll.contentOffset.y + scroll.contentInsets.top,
+                        visibleHeight: scroll.containerSize.height
+                    )
+                } action: { _, new in
+                    geometry = new
+                }
+                .frame(height: height)
+                .overlay(alignment: .top) { fade(from: .top, strength: cue.fadesTop ? fadeStrength(hidden: geometry?.offset) : 0) }
+                .overlay(alignment: .bottom) {
+                    fade(from: .bottom, strength: cue.fadesBottom ? fadeStrength(hidden: geometry.map { $0.contentHeight - $0.offset - maxHeight }) : 0)
+                }
+                .onChange(of: model.selectedRow) { old, row in
+                    let section = first..<(first + items.count)
+                    guard let row, section.contains(row) else { return }
+                    let target = items[ScrollCue.scrollTarget(from: old, to: row, in: section) - first].id
+                    // The next turn: the selected row has its expanded height by then.
+                    Task { @MainActor in
+                        proxy.scrollTo(target)
                     }
                 }
-                .animation(.easeOut(duration: 0.25), value: items.map(\.id))
             }
-            .scrollIndicators(.never)
-            // Up to `visible` rows the list grows with the panel and stays still; only more rows scroll.
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollDisabled(items.count <= visible)
-            .frame(height: CGFloat(min(items.count, visible)) * (Self.rowHeight + 2))
-            .onChange(of: model.selectedRow) { _, row in
-                if let row, row >= first, row - first < items.count {
-                    proxy.scrollTo(items[row - first].id)
+            if cue.scrolls {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                    Text("\(cue.hiddenBelow) more")
+                        .font(NotesPanelStyle.secondaryFont)
                 }
+                .foregroundStyle(NotesPanelStyle.secondary)
+                .frame(maxWidth: .infinity)
+                // Kept in the layout at the end of the list, so the panel does not jump.
+                .opacity(cue.hiddenBelow > 0 ? 1 : 0)
             }
         }
     }
+
+    private static let space = "rows"
+
+    /// A fade grows with what is hidden beyond its edge, full once a fade's height is: a list scrolled a point or two
+    /// barely dims its edge row.
+    private func fadeStrength(hidden: CGFloat?) -> Double {
+        Double(min(max(hidden ?? 0, 0) / OpenItemsView.fadeHeight, 1))
+    }
+
+    private func fade(from edge: VerticalEdge, strength: Double) -> some View {
+        LinearGradient(colors: [.black, .black.opacity(0)], startPoint: edge == .top ? .top : .bottom, endPoint: edge == .top ? .bottom : .top)
+            .frame(height: OpenItemsView.fadeHeight)
+            .opacity(strength)
+            .allowsHitTesting(false)
+    }
 }
 
-/// "○ Title  ● List   Tomorrow, 16:00": the circle marks done, hovering offers "Give to agent".
+/// "○ Title" over "● List · Tomorrow, 16:00": the title takes the row's width, two lines at most unless the row is
+/// selected or hovered a moment (long rows spec §2, §3); the circle marks done, hovering offers "Give to agent".
 struct OpenItemRow: View {
     let model: NotesPanelModel
     let item: ReminderItem
     let isSelected: Bool
+    /// Shown whole: selected, or hovered for a moment (`NotesPanelModel.isExpanded`).
+    let isExpanded: Bool
+    /// The pointer is over the row and counts (`NotesPanelModel.isHovered`).
+    let isHovered: Bool
     var select: () -> Void
-    @State private var isHovered = false
     @State private var isCircleHovered = false
+    /// The height of one line of the title at the panel's 15 pt font.
+    private static let firstLineHeight = NSFont.systemFont(ofSize: 15).boundingRectForFont.height.rounded(.up)
 
     var body: some View {
         let isDeleting = model.isPendingDelete(item)
         let isDone = model.isDone(item) || isDeleting
-        HStack(spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Button {
                 Task { await model.toggleDone(item) }
             } label: {
@@ -134,56 +229,26 @@ struct OpenItemRow: View {
                         .foregroundStyle(isSelected ? Color.white : NotesPanelStyle.secondary)
                 }
             }
+            // The circle and the undo ring share one box, centered on the title's first line, so a tick moves nothing.
+            .frame(width: 18, height: Self.firstLineHeight)
             .buttonStyle(.plain)
             .onHover { isCircleHovered = $0 }
             .help(isDone ? "Mark as not done" : "Mark as done")
 
-            Text(item.title)
-                .font(NotesPanelStyle.font())
-                .strikethrough(isDone)
-                .foregroundStyle(isDone && !isSelected ? NotesPanelStyle.secondary : isSelected ? Color.white : NotesPanelStyle.text)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            if let list = model.list(withID: item.listID) {
-                ListChip(title: list.title, color: isSelected ? .white : list.color, size: 12)
-            }
-            Spacer(minLength: 8)
-            if isDeleting {
-                // A deletion waits like a tick: the ring counts down, ⌘Z takes it back (row menu spec §6).
-                Text("Deleted")
-                    .font(NotesPanelStyle.font(12))
-                    .foregroundStyle(isSelected ? Color.white : NotesPanelStyle.secondary)
-                KeyHint(key: "⌘Z", label: "Undo")
-            } else if model.isPendingDone(item) {
-                KeyHint(key: "⌘Z", label: "Undo")
-            } else if item.completed != nil {
-                Text(model.doneDetail(of: item))
-                    .font(NotesPanelStyle.font(12))
-                    .foregroundStyle(isSelected ? Color.white : NotesPanelStyle.secondary)
-                    .lineLimit(1)
-                    .fixedSize()
-            } else if isHovered {
-                Button {
-                    Task { await model.handOff(item) }
-                } label: {
-                    HStack(spacing: 5) {
-                        AgentIcon(agent: model.controller.destination(for: item.listID).agent.kind, size: 11)
-                        Text("Give to agent")
-                            .font(NotesPanelStyle.font(12, weight: .semibold))
-                    }
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(Color.white.opacity(0.14)))
-                }
-                .buttonStyle(.plain)
-            } else {
-                detail
-                    .lineLimit(1)
-                    .fixedSize()
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .font(NotesPanelStyle.font())
+                    .strikethrough(isDone)
+                    .foregroundStyle(isDone && !isSelected ? NotesPanelStyle.secondary : isSelected ? Color.white : NotesPanelStyle.text)
+                    .lineLimit(isExpanded ? nil : 2)
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                secondLine(isDeleting: isDeleting)
             }
         }
         .padding(.horizontal, 12)
-        .frame(height: OpenItemsView.rowHeight)
+        .padding(.vertical, 6)
         .foregroundStyle(isSelected ? Color.white : NotesPanelStyle.text)
         .background(
             RoundedRectangle(cornerRadius: 7)
@@ -191,12 +256,62 @@ struct OpenItemRow: View {
         )
         .contentShape(Rectangle())
         .onTapGesture(perform: select)
-        .onHover { isHovered = $0 }
+        .onContinuousHover { phase in
+            switch phase {
+            case .active:
+                model.pointer(over: item)
+            case .ended:
+                model.pointerLeft(item)
+            }
+        }
         .contextMenu {
             if model.allowsMenu(for: item) {
                 menu
             }
         }
+    }
+
+    /// "● List · detail", then on the right what replaces the old right column on hover or while waiting.
+    private func secondLine(isDeleting: Bool) -> some View {
+        HStack(spacing: 6) {
+            if let list = model.list(withID: item.listID) {
+                RowListLabel(title: list.title, color: list.color, isSelected: isSelected)
+                Text("·")
+                    .foregroundStyle(isSelected ? Color.white.opacity(0.7) : NotesPanelStyle.faint)
+            }
+            if item.completed != nil {
+                Text(model.doneDetail(of: item))
+                    .foregroundStyle(isSelected ? Color.white : NotesPanelStyle.secondary)
+            } else {
+                detail
+            }
+            Spacer(minLength: 8)
+            if isDeleting {
+                // A deletion waits like a tick: the ring counts down, ⌘Z takes it back (row menu spec §6).
+                Text("Deleted")
+                    .foregroundStyle(isSelected ? Color.white : NotesPanelStyle.secondary)
+                KeyHint(key: "⌘Z", label: "Undo")
+            } else if model.isPendingDone(item) {
+                KeyHint(key: "⌘Z", label: "Undo")
+            } else if item.completed == nil, isHovered {
+                Button {
+                    Task { await model.handOff(item) }
+                } label: {
+                    HStack(spacing: 5) {
+                        AgentIcon(agent: model.controller.destination(for: item.listID).agent.kind, size: 10)
+                        Text("Give to agent")
+                            .font(NotesPanelStyle.font(11, weight: .semibold))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Color.white.opacity(0.14)))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .font(NotesPanelStyle.secondaryFont)
+        .lineLimit(1)
+        .frame(minHeight: 18)
     }
 
     /// Right-click: Edit, Move to List, Copy, Delete (row menu spec §2).
@@ -237,19 +352,35 @@ struct OpenItemRow: View {
         case let .due(text, isSoon):
             Text(text)
                 .foregroundStyle(isSelected ? Color.white : (isSoon ? Color.orange : NotesPanelStyle.secondary))
-                .font(NotesPanelStyle.font(12))
         case let .handedOff(text, agent):
             HStack(spacing: 4) {
-                AgentIcon(agent: agent.kind, size: 11)
+                AgentIcon(agent: agent.kind, size: 10)
                 Text("→ " + text)
             }
-            .font(NotesPanelStyle.font(12))
             .foregroundStyle(isSelected ? Color.white : NotesPanelStyle.secondary)
         case let .age(text):
             Text(text)
-                .font(NotesPanelStyle.font(12))
                 .foregroundStyle(isSelected ? Color.white : NotesPanelStyle.secondary)
         }
+    }
+}
+
+/// "● Workdeck" on a row's second line: the list's color dot and its title in the secondary style.
+private struct RowListLabel: View {
+    let title: String
+    let color: Color
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(isSelected ? Color.white : color)
+                .frame(width: 6, height: 6)
+            Text(title)
+                .fontWeight(.medium)
+                .foregroundStyle(isSelected ? Color.white : NotesPanelStyle.secondary)
+        }
+        .fixedSize()
     }
 }
 

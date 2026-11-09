@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 @testable import Workdeck
@@ -21,6 +22,8 @@ struct NotesPanelModelTests {
         var closes = 0
         var opened: [URL] = []
         var copied: [String] = []
+        /// Where the pointer is, in screen coordinates.
+        var pointer = CGPoint.zero
     }
 
     let workdeck = ReminderListInfo(id: "work", title: "Workdeck", red: 0, green: 0.48, blue: 1, openCount: 0)
@@ -41,7 +44,8 @@ struct NotesPanelModelTests {
     }
 
     private func makeModel(
-        launcher override: (any TerminalLaunching)? = nil, candidates: [FolderCandidate] = [], doneUndoDelay: Duration = .seconds(60)
+        launcher override: (any TerminalLaunching)? = nil, candidates: [FolderCandidate] = [], doneUndoDelay: Duration = .seconds(60),
+        hoverDelay: Duration = .milliseconds(20)
     ) async -> (NotesPanelModel, NotesController) {
         let now = now
         let instances: [ClaudeInstance] = [.main(home: home), .extra(named: "work", home: home)]
@@ -53,6 +57,7 @@ struct NotesPanelModelTests {
         let recorder = recorder
         let model = NotesPanelModel(
             controller: controller, now: { now }, calendar: calendar, confirmationDuration: .seconds(60), doneUndoDelay: doneUndoDelay,
+            hoverDelay: hoverDelay, pointerLocation: { recorder.pointer },
             openURL: { recorder.opened.append($0) }, copy: { recorder.copied.append($0) }
         )
         model.onClose = { recorder.closes += 1 }
@@ -397,6 +402,115 @@ struct NotesPanelModelTests {
         // Each word matches the title or the list: the list's notes, narrowed by the rest.
         model.textChanged("workdeck sasha")
         #expect(model.visibleItems.map(\.id) == ["limits"])
+    }
+
+    // MARK: Expanding
+
+    @Test func selectingARowExpandsItAtOnce() async {
+        addOpenItems()
+        let (model, _) = await makeModel()
+        #expect(await model.handle(.down))
+        let items = model.visibleItems
+        #expect(model.isExpanded(items[0]))
+        #expect(!model.isExpanded(items[1]))
+    }
+
+    @Test func hoveringExpandsAfterTheDelay() async {
+        addOpenItems()
+        let (model, _) = await makeModel()
+        let items = model.visibleItems
+        recorder.pointer = CGPoint(x: 3, y: 3)   // the pointer moves onto the row
+        model.pointer(over: items[1])
+        #expect(!model.isExpanded(items[1]))
+        #expect(await eventually { model.isExpanded(items[1]) })
+    }
+
+    @Test func leavingBeforeTheDelayDoesNotExpand() async {
+        addOpenItems()
+        let (model, _) = await makeModel(hoverDelay: .milliseconds(100))
+        let items = model.visibleItems
+        model.pointer(over: items[1])
+        model.pointerLeft(items[1])
+        try? await Task.sleep(for: .milliseconds(200))
+        #expect(!model.isExpanded(items[1]))
+    }
+
+    @Test func arrowsCollapseTheHoveredRowAndIgnoreAStillPointer() async {
+        addOpenItems()
+        let (model, _) = await makeModel()
+        let items = model.visibleItems
+        recorder.pointer = CGPoint(x: 10, y: 10)
+        model.pointer(over: items[2])
+        #expect(await eventually { model.isExpanded(items[2]) })
+
+        #expect(await model.handle(.down))
+        #expect(!model.isExpanded(items[2]))
+        #expect(model.isExpanded(items[0]))
+
+        // The list scrolls under the resting pointer: the row now under it does not expand.
+        model.pointer(over: items[1])
+        try? await Task.sleep(for: .milliseconds(80))
+        #expect(!model.isExpanded(items[1]))
+
+        // The pointer really moves: hover counts again.
+        recorder.pointer = CGPoint(x: 12, y: 10)
+        model.pointer(over: items[1])
+        #expect(await eventually { model.isExpanded(items[1]) })
+    }
+
+    @Test func reopeningForgetsTheHoveredRow() async {
+        addOpenItems()
+        let (model, _) = await makeModel()
+        let items = model.visibleItems
+        recorder.pointer = CGPoint(x: 3, y: 3)   // the pointer moves onto the row
+        model.pointer(over: items[1])
+        #expect(await eventually { model.isExpanded(items[1]) })
+        model.closed()
+        await model.opened()
+        #expect(!model.isExpanded(items[1]))
+    }
+
+    @Test func onlyACountedHoverHighlightsTheRow() async {
+        // After ↑↓, a row sliding under the resting pointer shows no hover (background, "Give to agent").
+        addOpenItems()
+        let (model, _) = await makeModel()
+        let items = model.visibleItems
+        recorder.pointer = CGPoint(x: 3, y: 3)
+        model.pointer(over: items[2])
+        #expect(model.isHovered(items[2]))
+        #expect(await model.handle(.down))
+        #expect(!model.isHovered(items[2]))
+        model.pointer(over: items[1])
+        #expect(!model.isHovered(items[1]))
+        recorder.pointer = CGPoint(x: 4, y: 3)
+        model.pointer(over: items[1])
+        #expect(model.isHovered(items[1]))
+    }
+
+    @Test func openingIgnoresAPointerThatDidNotMove() async {
+        // The panel opens under a resting pointer: the row that appears under it is not hovered.
+        addOpenItems()
+        let (model, _) = await makeModel()
+        let items = model.visibleItems
+        model.pointer(over: items[1])
+        try? await Task.sleep(for: .milliseconds(80))
+        #expect(!model.isExpanded(items[1]))
+    }
+
+    @Test func typingForgetsTheHoveredRow() async {
+        // Filtering or editing hides the row without the pointer leaving it: it must not come back expanded.
+        addOpenItems()
+        let (model, _) = await makeModel()
+        let items = model.visibleItems
+        recorder.pointer = CGPoint(x: 3, y: 3)
+        model.pointer(over: items[1])
+        #expect(await eventually { model.isExpanded(items[1]) })
+        model.textChanged("x")
+        model.textChanged("")
+        #expect(!model.isExpanded(items[1]))
+        model.pointer(over: items[1])
+        try? await Task.sleep(for: .milliseconds(80))
+        #expect(!model.isExpanded(items[1]))
     }
 
     @Test func returnNeverActsOnARow() async {

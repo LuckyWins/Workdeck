@@ -197,13 +197,15 @@ final class ScreenshotFixtures {
         ReminderListInfo(id: "homework", title: "Homework", red: 0.4, green: 0.8, blue: 0.3, openCount: 0),
     ]
 
-    /// Quick notes over a fake Reminders store with five open notes in the lists used through Workdeck, and two in
+    /// Quick notes over a fake Reminders store with six open notes (one long) in the lists used through Workdeck, and two in
     /// Homework, which was never used here. `leavingOut` drops the open note with that title.
     func notes(leavingOut title: String? = nil) async -> NotesController {
         let now = monday
         let open: [(String, String)] = [
             ("workdeck", "Check the staging migration"), ("workdeck", "Ask Sam about the limits"), ("workdeck", "Update the screenshots"),
-            ("workdeck-site", "Fix the footer spacing"), ("wordle-bot", "Tune the letter weights"),
+            ("workdeck-site", "Fix the footer spacing"),
+            ("workdeck-site", "Rewrite the landing page hero so it explains the notch in one sentence, then try two shorter versions on a phone"),
+            ("wordle-bot", "Tune the letter weights"),
             ("homework", "Exercise 4"), ("homework", "Exercise 5"),
         ]
         let items = open.enumerated().filter { $0.element.1 != title }.map { index, entry in

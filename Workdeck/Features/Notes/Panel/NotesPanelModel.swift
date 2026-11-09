@@ -95,6 +95,10 @@ final class NotesPanelModel {
     private(set) var editing: ReminderItem?
     /// Open items just deleted, waiting `doneUndoDelay` like a tick before they leave Reminders (row menu spec §6).
     private(set) var pendingDelete: [ReminderItem] = []
+    /// The open or done row the pointer has rested on for `hoverDelay`: shown whole (long rows spec §3).
+    private(set) var hoverExpandedID: String?
+    /// The row the pointer is over, as `RowHover` counts it: the row's hover background and "Give to agent".
+    private(set) var hoveredRowID: String?
 
     /// The matches a chip came from: Tab after a commit moves to the next one.
     @ObservationIgnored private var cycleMatches: [ReminderListInfo] = []
@@ -115,6 +119,10 @@ final class NotesPanelModel {
     @ObservationIgnored private var noticeOnOpen: NotesConfirmation?
     /// What the line held when Edit was chosen; it comes back when the edit ends.
     @ObservationIgnored private var editKeptDraft: NoteDraft?
+    @ObservationIgnored private var rowHover = RowHover()
+    @ObservationIgnored private let hoverDelay: Duration
+    @ObservationIgnored private let pointerLocation: () -> CGPoint
+    @ObservationIgnored private var hoverTask: Task<Void, Never>?
     /// The line as Edit built it: a Return on it unchanged writes nothing.
     @ObservationIgnored private var editBuiltDraft: NoteDraft?
     /// The date phrase Edit appended; left as it is, the reminder keeps its exact due date.
@@ -126,6 +134,8 @@ final class NotesPanelModel {
         calendar: Calendar = .autoupdatingCurrent,
         confirmationDuration: Duration = .seconds(2),
         doneUndoDelay: Duration = .seconds(4),
+        hoverDelay: Duration = .milliseconds(400),
+        pointerLocation: @escaping () -> CGPoint = { NSEvent.mouseLocation },
         openURL: @escaping (URL) -> Void = { _ = NSWorkspace.shared.open($0) },
         copy: @escaping (String) -> Void = { value in
             NSPasteboard.general.clearContents()
@@ -137,12 +147,15 @@ final class NotesPanelModel {
         self.calendar = calendar
         self.confirmationDuration = confirmationDuration
         self.doneUndoDelay = doneUndoDelay
+        self.hoverDelay = hoverDelay
+        self.pointerLocation = pointerLocation
         self.openURL = openURL
         self.copy = copy
     }
 
     deinit {
         confirmationTask?.cancel()
+        hoverTask?.cancel()
         for task in pendingDoneTasks.values {
             task.cancel()
         }
@@ -201,6 +214,8 @@ final class NotesPanelModel {
         pickerItem = nil
         folderItem = nil
         cycleMatches = []
+        // The panel opens under a resting pointer: the row that appears under it is not hovered until it moves.
+        keyboardTookOver()
     }
 
     // MARK: Text
@@ -242,6 +257,8 @@ final class NotesPanelModel {
     }
 
     private func refreshDerived() {
+        // Typing filters, edits or restores the rows under a resting pointer: hover counts again once it moves.
+        keyboardTookOver()
         let wasOpen = isListOpen
         let oldMatches = matches.map(\.id)
         parsedDate = draft.text.isEmpty ? nil : lineDate()
@@ -376,6 +393,7 @@ final class NotesPanelModel {
                 move(key, rows: max(matches.count, 1), allowsNone: false)
             } else {
                 move(key, rows: rows.count, allowsNone: true)
+                keyboardTookOver()
             }
             return true
         case .escape:
@@ -666,6 +684,55 @@ final class NotesPanelModel {
         guard let completed = item.completed else { return "" }
         let age = NotesDateText.age(since: completed, now: now())
         return age == "now" ? "Done now" : "Done \(age) ago"
+    }
+
+    // MARK: Expanding
+
+    /// Shown whole instead of two lines: the selected row, or the one the pointer rested on (long rows spec §3).
+    func isExpanded(_ item: ReminderItem) -> Bool {
+        item.id == selectedItem?.id || item.id == hoverExpandedID
+    }
+
+    /// The pointer is over the row and counts (not a row that slid under a resting pointer after ↑↓).
+    func isHovered(_ item: ReminderItem) -> Bool {
+        item.id == hoveredRowID
+    }
+
+    /// The pointer is over `item`'s row (its `onContinuousHover`): it expands after `hoverDelay` if it stays.
+    func pointer(over item: ReminderItem) {
+        if rowHover.pointer(over: item.id, at: pointerLocation()) {
+            hoverChanged()
+        }
+    }
+
+    func pointerLeft(_ item: ReminderItem) {
+        if rowHover.pointerLeft(item.id) {
+            hoverChanged()
+        }
+    }
+
+    /// ↑↓ moved through the rows: a pointer resting over the list stops counting until it moves.
+    private func keyboardTookOver() {
+        rowHover.keyboardMoved(pointer: pointerLocation())
+        hoverChanged()
+    }
+
+    private func hoverChanged() {
+        if hoveredRowID != rowHover.hoveredID {
+            hoveredRowID = rowHover.hoveredID
+        }
+        hoverTask?.cancel()
+        hoverTask = nil
+        if hoverExpandedID != nil {
+            hoverExpandedID = nil
+        }
+        guard let id = rowHover.hoveredID else { return }
+        let delay = hoverDelay
+        hoverTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, let self, self.rowHover.hoveredID == id else { return }
+            self.hoverExpandedID = id
+        }
     }
 
     // MARK: Row menu
