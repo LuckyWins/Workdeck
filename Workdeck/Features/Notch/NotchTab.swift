@@ -12,7 +12,8 @@ nonisolated enum NotchTab: String, CaseIterable, Sendable {
         switch self {
         case .sessions: "rectangle.stack"
         case .notes: "square.and.pencil"
-        case .stats: "chart.bar"
+        // Not the `chart.bar` family: inside the notch those symbols ignore the dim style's opacity and look selected.
+        case .stats: "chart.xyaxis.line"
         }
     }
 

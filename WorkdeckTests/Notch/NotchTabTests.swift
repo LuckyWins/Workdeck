@@ -5,7 +5,7 @@ struct NotchTabTests {
     @Test func tabsInOrder() {
         #expect(NotchTab.allCases == [.sessions, .notes, .stats])
         #expect(NotchTab.allCases.map(\.title) == ["Sessions", "Notes", "Stats"])
-        #expect(NotchTab.allCases.map(\.symbol) == ["rectangle.stack", "square.and.pencil", "chart.bar"])
+        #expect(NotchTab.allCases.map(\.symbol) == ["rectangle.stack", "square.and.pencil", "chart.xyaxis.line"])
     }
 
     @Test func onlyNotesHoldsAlerts() {
