@@ -10,18 +10,24 @@ nonisolated struct HookPayload: Equatable, Sendable {
 }
 
 /// Copies an allowlist of fields from Claude Code's and Codex's hook JSON. Everything else, including prompts, answers,
-/// and tool input and output, is never stored: from tool input only the action summary, an edit's file name and a
-/// Codex spawn's task name, from an applied edit or Codex patch only its line counts and file names. Codex's tools are
-/// recognized by their names, which Claude Code never uses.
+/// and tool input and output, is never stored: from tool input only the action summary (a Bash call's description or
+/// a short target), an edit's file name and a Codex spawn's task name, from an applied edit or Codex patch only its
+/// line counts and file names. Codex's tools are recognized by their names, which Claude Code never uses.
 nonisolated enum HookPayloadFilter {
     static let maxFieldLength = 100
     static let maxActionLength = 30
+    /// A Bash call's description as the step's name (polish batch spec §2); the notch cuts it to its width.
+    static let maxDescriptionLength = 60
     static let maxEditedFiles = 20
     /// Codex's own tools, named as a person would.
     static let codexToolNames = ["webrun": "Web", "clockcurr_time": "Clock"]
 
-    /// The tool and a short target (spec §10.1); the rest of the tool input is never read.
+    /// The tool and a short target (spec §10.1), or a Bash call's description as Claude Code's CLI shows it (polish
+    /// batch spec §2); the rest of the tool input is never read.
     static func action(toolName: String, input: [String: Any]?) -> String {
+        if toolName == "Bash", let description = firstLine(input?["description"]) {
+            return truncated(maskingSecrets(description, isProse: true), limit: maxDescriptionLength)
+        }
         // Codex's agent tools: a launch reads like Claude's ("Agent …"), so the ticker hides it behind the agent card.
         if toolName == "collaborationspawn_agent" {
             return truncated(firstLine(input?["task_name"]).map { "Agent " + $0 } ?? "Agent")
@@ -42,7 +48,7 @@ nonisolated enum HookPayloadFilter {
         let target: String? = switch toolName {
         case "Read", "Edit", "MultiEdit", "Write": fileName(input?["file_path"])
         case "NotebookEdit": fileName(input?["notebook_path"])
-        case "Bash": firstLine(input?["command"]).map(maskingSecrets)
+        case "Bash": firstLine(input?["command"]).map { maskingSecrets($0) }
         case "WebFetch": (input?["url"] as? String).flatMap { URL(string: $0)?.host() }
         case "WebSearch": firstLine(input?["query"])
         case "Grep", "Glob": firstLine(input?["pattern"])
@@ -105,12 +111,16 @@ nonisolated enum HookPayloadFilter {
         return collapsed.isEmpty ? nil : collapsed
     }
 
-    /// Hides values that look like secrets in a shell command: `NAME=value`, `-pPASSWORD`, `Bearer TOKEN`.
-    static func maskingSecrets(_ command: String) -> String {
+    /// Hides values that look like secrets in a shell command: `NAME=value`, `-pPASSWORD`, `Bearer TOKEN`. In prose (a
+    /// Bash call's description) "basic" and "token" are ordinary words, so only a credential-like word after them (at
+    /// least 12 characters with a digit) is hidden.
+    static func maskingSecrets(_ command: String, isProse: Bool = false) -> String {
         let rules: [(pattern: String, template: String)] = [
             (#"\b([A-Za-z_][A-Za-z0-9_]*)=("[^"]*"|'[^']*'|[^\s'"]+)"#, "$1=…"),
             (#"(^|\s)-p[^\s'"]+"#, "$1-p…"),
-            (#"(?i)\b(bearer|basic|token)\s+[^\s'"]+"#, "$1 …"),
+            isProse
+                ? (#"(?i)\b(bearer)\s+[^\s'"]+|\b(basic|token)\s+(?=[^\s'"]*[0-9])[^\s'"]{12,}"#, "$1$2 …")
+                : (#"(?i)\b(bearer|basic|token)\s+[^\s'"]+"#, "$1 …"),
         ]
         var result = command
         for rule in rules {
@@ -120,8 +130,8 @@ nonisolated enum HookPayloadFilter {
         return result
     }
 
-    private static func truncated(_ text: String) -> String {
-        text.count <= maxActionLength ? text : String(text.prefix(maxActionLength - 1)) + "…"
+    private static func truncated(_ text: String, limit: Int = maxActionLength) -> String {
+        text.count <= limit ? text : String(text.prefix(limit - 1)) + "…"
     }
 
     static func parse(_ data: Data, environment: [String: String], now: Date) -> HookPayload? {
@@ -151,6 +161,7 @@ nonisolated enum HookPayloadFilter {
             agentType: short(root["agent_type"])
         )
         if name == .preToolUse, let tool = root["tool_name"] as? String {
+            event.tool = String(tool.prefix(maxFieldLength))
             event.action = action(toolName: String(tool.prefix(maxFieldLength)), input: root["tool_input"] as? [String: Any])
         }
         if name == .preToolUse || name == .postToolUse, let id = root["tool_use_id"] as? String, isSafeToolUseID(id) {

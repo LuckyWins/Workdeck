@@ -7,6 +7,16 @@ nonisolated enum SessionReducer {
     /// Early counts kept for steps not seen yet; older ones belong to steps that already left the ticker.
     static let maxEarlyLines = 8
 
+    /// A shell command, counted for the recap: by the tool's name, or for event files written before it was kept, by
+    /// the action's `Bash` prefix (polish batch spec §2).
+    static func isCommand(_ event: HookEvent) -> Bool {
+        if let tool = event.tool {
+            return tool == "Bash"
+        }
+        guard let action = event.action else { return false }
+        return action == "Bash" || action.hasPrefix("Bash ")
+    }
+
     /// Events are applied oldest first: async hooks may have written them out of order.
     static func reduce(_ events: [HookEvent]) -> ClaudeSession? {
         events
@@ -82,10 +92,10 @@ nonisolated enum SessionReducer {
             session.earlyLines = []
             setStatus(.working, at: event.time, on: &session)
         case .preToolUse:
-            if let action = event.action, action == "Bash" || action.hasPrefix("Bash ") {
+            if isCommand(event) {
                 session.commands += 1
             }
-            setAction(event.action, toolUseID: event.toolUseID, for: event.agentID, at: event.time, on: &session)
+            setAction(event.action, tool: event.tool, toolUseID: event.toolUseID, for: event.agentID, at: event.time, on: &session)
             if let agentID = event.agentID, let index = session.agents.firstIndex(where: { $0.id == agentID }) {
                 session.agents[index].steps += 1
             }
@@ -176,11 +186,11 @@ nonisolated enum SessionReducer {
     }
 
     /// An agent's own tool call updates that agent; a call without an agent ID is the main agent's and joins the ticker.
-    private static func setAction(_ action: String?, toolUseID: String?, for agentID: String?, at time: Date, on session: inout ClaudeSession) {
+    private static func setAction(_ action: String?, tool: String?, toolUseID: String?, for agentID: String?, at time: Date, on session: inout ClaudeSession) {
         guard let agentID else {
             session.action = action
             if let action {
-                session.steps.append(SessionStep(toolUseID: toolUseID, action: action, lines: takeEarlyLines(toolUseID, from: &session), at: time))
+                session.steps.append(SessionStep(toolUseID: toolUseID, action: action, lines: takeEarlyLines(toolUseID, from: &session), at: time, tool: tool))
                 session.steps.removeFirst(max(0, session.steps.count - ClaudeSession.maxSteps))
             }
             return

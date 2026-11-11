@@ -133,13 +133,13 @@ Claude Code reports plan usage only for Pro and Max subscriptions. Details: [doc
 
 - **Closed-Lid Mode** needs the root-only `SleepDisabled` power setting (`pmset -a disablesleep 1`); `caffeinate`'s power assertions do not prevent clamshell sleep. A small launchd helper registered with `SMAppService` can only set it to 0 or 1, accepts XPC connections only from Workdeck signed by the same team, and restores sleep on every exit path. [Details](docs/closed-lid-mode.md#how-it-works)
 - **Limits** come from Claude Code's status line: `workdeck-statusline` writes the usage it receives to a snapshot file that the app watches.
-- **Sessions** come from asynchronous Claude Code hooks: `workdeck-hook` keeps an allowlist of fields (event, IDs, project folder, tool name and a short target, line counts) in one file per session.
+- **Sessions** come from asynchronous Claude Code hooks: `workdeck-hook` keeps an allowlist of fields (event, IDs, project folder, tool name and a short description or target, line counts) in one file per session.
 - **The notch** is drawn with [DynamicNotchKit](https://github.com/MrKai77/DynamicNotchKit) in a terminal style; the recap and Statistics read daily totals from `recap.json`.
 
 ## Privacy
 
 - No account, no analytics, no telemetry. The only network call is the opt-in usage endpoint, to Anthropic.
-- Prompts, answers, file contents and chat titles are never stored or logged; tool calls keep only the tool name, a short target with secret-looking values masked, and line counts.
+- Prompts, answers, file contents and chat titles are never stored or logged; tool calls keep only the tool name, a short description or target with secret-looking values masked, and line counts.
 - The login token is read from your Keychain only for the opt-in usage call; it is never refreshed, stored or logged.
 - Codex limits come from Codex's own session files and `codex app-server`; Workdeck never reads Codex's login.
 - Quick notes live in Reminders and, once cleaned up, in a local archive; their text is never logged or kept anywhere else.

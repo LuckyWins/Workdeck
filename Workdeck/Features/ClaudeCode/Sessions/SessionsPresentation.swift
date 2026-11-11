@@ -165,8 +165,8 @@ nonisolated enum SessionsPresentation {
     /// is current: the agent is what runs now.
     static func stepRows(_ steps: [SessionStep]) -> [StepRow] {
         let recent = Array(steps.suffix(ClaudeSession.maxSteps))
-        let shown = recent.filter { !launchesAgent($0.action) }
-        let waitsForAgent = recent.last.map { launchesAgent($0.action) } ?? false
+        let shown = recent.filter { !launchesAgent($0) }
+        let waitsForAgent = recent.last.map { launchesAgent($0) } ?? false
         return shown.enumerated().map { index, step in
             let age = shown.count - 1 - index + (waitsForAgent ? 1 : 0)
             return StepRow(
@@ -178,9 +178,11 @@ nonisolated enum SessionsPresentation {
         }
     }
 
-    /// "Agent Explore", "Task": the actions `HookPayloadFilter` gives the Agent and Task tools.
-    static func launchesAgent(_ action: String) -> Bool {
-        ["Agent", "Task"].contains { action == $0 || action.hasPrefix($0 + " ") }
+    /// "Agent Explore", "Task": the actions `HookPayloadFilter` gives the Agent and Task tools. A command's action is
+    /// Claude's description, which may begin with either word.
+    static func launchesAgent(_ step: SessionStep) -> Bool {
+        guard step.tool != "Bash" else { return false }
+        return ["Agent", "Task"].contains { step.action == $0 || step.action.hasPrefix($0 + " ") }
     }
 
     static func turnRow(_ session: ClaudeSession) -> TurnRow? {

@@ -4,6 +4,9 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 
 ## Unreleased
 
+### Improved
+- The notch shows what a Claude Code command is for, as the terminal does ("Run the tests"), instead of the command itself.
+
 ## 1.4.1 — 2026-11-10
 
 ### Improved

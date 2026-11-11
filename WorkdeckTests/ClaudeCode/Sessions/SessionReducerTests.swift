@@ -16,6 +16,28 @@ struct SessionReducerTests {
         $0.hostBundleID = "com.microsoft.VSCode"
     }
 
+    @Test func commandsCountByToolName() {
+        #expect(SessionReducer.isCommand(hookEvent(.preToolUse, at: 1) { $0.tool = "Bash"; $0.action = "Run the tests" }))
+        #expect(!SessionReducer.isCommand(hookEvent(.preToolUse, at: 1) { $0.tool = "Read"; $0.action = "Read a.swift" }))
+    }
+
+    @Test func oldEventsCountByTheBashPrefix() {
+        #expect(SessionReducer.isCommand(hookEvent(.preToolUse, at: 1) { $0.action = "Bash ls" }))
+        #expect(SessionReducer.isCommand(hookEvent(.preToolUse, at: 1) { $0.action = "Bash" }))
+        #expect(!SessionReducer.isCommand(hookEvent(.preToolUse, at: 1) { $0.action = "Read a.swift" }))
+    }
+
+    @Test func describedCommandsAreCounted() throws {
+        let session = try #require(SessionReducer.reduce([
+            start,
+            hookEvent(.userPromptSubmit, at: 1),
+            hookEvent(.preToolUse, at: 2) { $0.tool = "Bash"; $0.action = "Run the tests" },
+            hookEvent(.preToolUse, at: 3) { $0.tool = "Bash"; $0.action = "Lint the project" },
+        ]))
+        #expect(session.commands == 2)
+        #expect(session.steps.map(\.tool) == ["Bash", "Bash"])
+    }
+
     @Test func noEventsNoSession() {
         #expect(SessionReducer.reduce([]) == nil)
     }

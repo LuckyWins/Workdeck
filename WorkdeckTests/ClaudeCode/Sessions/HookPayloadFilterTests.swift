@@ -121,6 +121,11 @@ struct HookPayloadFilterTests {
         ("mcp__github__search_repositories", ["query": "x"], "mcp:github"),
         ("TodoWrite", ["todos": "x"], "TodoWrite"),
         ("Read", [:], "Read"),
+        ("Bash", ["command": "git status", "description": "Show working tree status"], "Show working tree status"),
+        ("Bash", ["command": "git status", "description": "  \n "], "Bash git status"),
+        ("Bash", ["command": "git status", "description": "Run   the tests\nthen lint"], "Run the tests"),
+        ("Bash", ["command": "ls", "description": String(repeating: "a", count: 70)], String(repeating: "a", count: 59) + "…"),
+        ("Agent", ["subagent_type": "Explore", "description": "Find the presenter"], "Agent Explore"),
     ] as [(String, [String: String], String)])
     func actions(tool: String, input: [String: String], expected: String) {
         #expect(HookPayloadFilter.action(toolName: tool, input: input) == expected)
@@ -154,6 +159,39 @@ struct HookPayloadFilterTests {
     ] as [(String, String)])
     func bashSecretsAreMasked(command: String, expected: String) {
         #expect(HookPayloadFilter.action(toolName: "Bash", input: ["command": command]) == expected)
+    }
+
+    @Test func bashDescriptionSecretsAreMasked() {
+        let action = HookPayloadFilter.action(toolName: "Bash", input: ["command": "x", "description": "Export GITHUB_TOKEN=ghp_abc123 for CI"])
+        #expect(action == "Export GITHUB_TOKEN=… for CI")
+    }
+
+    @Test(arguments: [
+        ("Run basic smoke tests", "Run basic smoke tests"),
+        ("Check token usage for the session", "Check token usage for the session"),
+        ("Refresh the OAuth token cache", "Refresh the OAuth token cache"),
+        ("Call the API with token ghp_abc123def456", "Call the API with token …"),
+        ("Send Bearer abc to the server", "Send Bearer … to the server"),
+    ] as [(String, String)])
+    func descriptionsMaskOnlyCredentialLikeWords(description: String, expected: String) {
+        #expect(HookPayloadFilter.action(toolName: "Bash", input: ["command": "x", "description": description]) == expected)
+    }
+
+    @Test func aNonStringDescriptionFallsBackToTheCommand() {
+        #expect(HookPayloadFilter.action(toolName: "Bash", input: ["command": "ls", "description": 42]) == "Bash ls")
+    }
+
+    @Test func preToolUseKeepsTheToolName() throws {
+        let pre = try #require(parse([
+            "hook_event_name": "PreToolUse", "session_id": sessionID, "tool_name": "Bash",
+            "tool_input": ["command": "rm -rf build", "description": "Clean the build folder"],
+        ]))
+        #expect(pre.event.tool == "Bash")
+        #expect(pre.event.action == "Clean the build folder")
+        let encoded = String(decoding: try JSONEncoder().encode(pre.event), as: UTF8.self)
+        #expect(!encoded.contains("rm -rf"))
+        let post = try #require(parse(["hook_event_name": "PostToolUse", "session_id": sessionID, "tool_name": "Bash", "tool_input": ["command": "ls"]]))
+        #expect(post.event.tool == nil)
     }
 
     @Test func mainStopRecordsLiveBackgroundAgentIDsOnly() throws {

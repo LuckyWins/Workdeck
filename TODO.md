@@ -39,6 +39,16 @@ Agreed on 2026-11-09, from [Lumio](https://lumiomac.com/).
 
 13. ~~**Notch tabs.**~~ Done (`61cf66f`). The expanded notch gets Sessions, Notes and Stats tabs; hover opens on Sessions, the right Option on Notes, Stats shows this week. Spec: `specs/2026-11-09-notch-tabs-design.md`. Later: remember the last tab if Sessions-first proves inconvenient.
 
+Agreed on 2026-11-11. Spec: `specs/2026-11-11-polish-batch-design.md`; each item gets its own plan and commit, in this order.
+
+14. **Step names in the notch.** A Bash step shows the description Claude wrote for it, as the CLI does, instead of the command (spec §2).
+15. **An empty notch without sessions.** "When active" becomes the default, renamed, and shows nothing while no session is open, at any percent (spec §3).
+16. **The last tab, Notes by hover, saving from the tab.** Hover opens the last picked tab; Notes opened by hover leave the keyboard alone; a save from the tab returns to the list (spec §4).
+17. **Smooth quick notes animation on the landing page** (spec §5).
+18. **An Instances animation on the landing page** (spec §6).
+19. **A shorter README** (spec §8).
+20. **GitHub Sponsors.** `FUNDING.yml`, README and landing lines, a Sponsor button in Settings → About; after the sponsors profile is approved (spec §7).
+
 ## Distribution
 
 - **README media.** Screenshots done: `make screenshots` (spec `specs/2026-11-04-screenshots-design.md`). Still open: a demo GIF or MP4 of the notch in motion for the README header and the page, recorded from the demo on the MacBook notch (`screencapture` needs Screen Recording for the app that runs it; Terminal works without restarting VS Code).

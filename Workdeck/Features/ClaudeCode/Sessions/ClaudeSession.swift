@@ -14,6 +14,8 @@ nonisolated struct SessionStep: Equatable, Sendable {
     /// Set when the call's edit is applied.
     var lines: LineCounts?
     var at: Date
+    /// The tool's name; `nil` for events written before the hook kept it.
+    var tool: String? = nil
 }
 
 /// Edits since the last prompt, by the main agent and every agent (spec §2.3). Files are told apart by name.

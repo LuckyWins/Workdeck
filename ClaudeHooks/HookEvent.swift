@@ -53,6 +53,9 @@ nonisolated struct HookEvent: Codable, Equatable, Sendable {
     var backgroundAgentIDs: [String]?
     /// `PreToolUse` only: the tool and a short target, e.g. "Read NotchPresenter.swift".
     var action: String?
+    /// `PreToolUse` only: the tool's name, which counts commands without reading the action (a Bash call's action can
+    /// be its description).
+    var tool: String?
     /// `PreToolUse` and `PostToolUse`: the tool call's ID, which pairs its two events.
     var toolUseID: String?
     /// `PostToolUse` of `Edit`, `MultiEdit` and `Write`: lines the applied edit added and removed (counted, never kept),

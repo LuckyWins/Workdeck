@@ -47,7 +47,7 @@ nonisolated enum ClaudeCodeDemoScript {
         Step(action: "Edit OrbitView.swift", lines: LineCounts(added: 12, removed: 3)),
         Step(action: "Read PlanetModel.swift"),
         Step(action: "Edit PlanetModel.swift", lines: LineCounts(added: 8, removed: 2)),
-        Step(action: "Bash swift test"),
+        Step(action: "Run the tests"),
         Step(action: "Read Package.swift"),
         Step(action: "Edit OrbitViewTests.swift", lines: LineCounts(added: 24, removed: 0)),
     ]
@@ -55,10 +55,10 @@ nonisolated enum ClaudeCodeDemoScript {
     private static let apiSteps = [
         Step(action: "Read routes.ts"),
         Step(action: "Edit routes.ts", lines: LineCounts(added: 18, removed: 4)),
-        Step(action: "Bash npm test"),
+        Step(action: "Run the API tests"),
         Step(action: "Read auth.ts"),
         Step(action: "Edit auth.ts", lines: LineCounts(added: 6, removed: 6)),
-        Step(action: "Bash npm run lint"),
+        Step(action: "Lint the project"),
     ]
 
     static let docsID = "demo-docs-site"

@@ -165,6 +165,17 @@ struct SessionsPresentationTests {
         #expect(goingOn.map(\.age) == [1, 0])
     }
 
+    @Test func aCommandDescribedLikeAnAgentLaunchStaysInTheTicker() throws {
+        // A Bash step's action is Claude's description, which may begin with "Agent" or "Task".
+        var main = session("a", .working)
+        main.steps = [
+            SessionStep(toolUseID: "t1", action: "Task list cleanup", at: fixedNow, tool: "Bash"),
+            SessionStep(toolUseID: "t2", action: "Agent Explore", at: fixedNow.addingTimeInterval(1), tool: "Agent"),
+        ]
+        let steps = try #require(SessionsPresentation.viewState(sessions: [main], now: fixedNow).rows.first?.steps)
+        #expect(steps.map(\.action) == ["Task list cleanup"])
+    }
+
     @Test func rowsAndAgentsCarryTheirActionCounts() throws {
         var agentWithEdit = RunningAgent(id: "x", type: "Explore", startedAt: fixedNow, action: "Edit y.swift")
         agentWithEdit.actionLines = LineCounts(added: 12, removed: 3)

@@ -24,6 +24,14 @@ struct HookEventFileTests {
         #expect(second.offset == size)
     }
 
+    @Test func theToolNameSurvivesTheFile() throws {
+        var pre = event(.preToolUse)
+        pre.tool = "Bash"
+        pre.action = "Run the tests"
+        try HookEventFile.append(pre, to: directory)
+        #expect(try HookEventFile.read(from: fileURL, offset: 0).events == [pre])
+    }
+
     @Test func partialLineWaitsForTheRest() throws {
         try HookEventFile.append(event(.sessionStart), to: directory)
         let line = try HookEventFile.line(for: event(.stop, at: 1))
