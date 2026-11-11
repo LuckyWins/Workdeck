@@ -63,6 +63,7 @@ class ReleaseTests(unittest.TestCase):
         git(self.root, "init", "-q")
         git(self.root, "-c", "user.name=T", "-c", "user.email=t@example.com", "add", ".")
         git(self.root, "-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-q", "-m", "init")
+        git(self.root, "checkout", "-q", "-b", "develop")
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -88,6 +89,14 @@ class ReleaseTests(unittest.TestCase):
 
     def test_prepare_refuses_a_dirty_tree(self):
         (self.root / "stray.txt").write_text("x")
+        before = self.snapshot()
+        with self.assertRaises(release.ReleaseError):
+            self.prepare("1.1.0")
+        self.assertEqual(self.snapshot(), before)
+
+    def test_prepare_refuses_any_branch_but_develop(self):
+        # A release is prepared on develop, then main takes it (docs/releasing.md).
+        git(self.root, "checkout", "-q", "-b", "release-1.1")
         before = self.snapshot()
         with self.assertRaises(release.ReleaseError):
             self.prepare("1.1.0")

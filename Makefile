@@ -43,7 +43,7 @@ install: build
 clean:
 	rm -rf $(BUILD_DIR)
 
-## release-prep: move CHANGELOG's Unreleased under VERSION, bump the versions, commit (then push and tag v$(VERSION))
+## release-prep: on develop, move CHANGELOG's Unreleased under VERSION, bump the versions, commit (then docs/releasing.md)
 release-prep:
 	@if [ -z "$(VERSION)" ]; then echo "usage: make release-prep VERSION=1.2.3"; exit 1; fi
 	python3 -I scripts/release/release.py prepare $(VERSION)

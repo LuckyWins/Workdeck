@@ -2,12 +2,21 @@
 
 Workdeck updates itself through [Sparkle](https://sparkle-project.org): the app reads `appcast.xml` from the newest GitHub release, and a release is built, signed and published by GitHub Actions (`.github/workflows/release.yml`) when a version tag is pushed. Design: [`specs/2026-11-04-in-app-updates-design.md`](../specs/2026-11-04-in-app-updates-design.md).
 
+## Branches
+
+A short Git flow, so the landing page never shows what no release has yet:
+
+- **`develop`** — all work. Features and fixes are committed and pushed here; nothing deploys from it.
+- **`main`** — releases only: it moves forward to `develop` when a version is cut, and every commit on it is a released version. Pushing `main` deploys the landing page (`.github/workflows/pages.yml`, when `site/` or `docs/media/screenshots/` changed), and GitHub shows its README.
+- A fix for a released version is committed on `develop` and released as the next patch version, like any other change.
+
 ## Cutting a Release
 
-1. Make sure `CHANGELOG.md` has lines under `## Unreleased` (every feature and fix adds one; see CLAUDE.md).
-2. `make release-prep VERSION=1.3.0` — moves Unreleased under `## 1.3.0 — <today>`, sets `MARKETING_VERSION` to 1.3.0, increments the build number, and commits `chore: release 1.3.0`. It refuses a dirty tree, a version not above the current one, and an empty Unreleased.
-3. `git push origin main`, then `git tag v1.3.0 && git push origin v1.3.0`.
+1. On `develop`, make sure `CHANGELOG.md` has lines under `## Unreleased` (every feature and fix adds one; see CLAUDE.md).
+2. `make release-prep VERSION=1.3.0` — moves Unreleased under `## 1.3.0 — <today>`, sets `MARKETING_VERSION` to 1.3.0, increments the build number, and commits `chore: release 1.3.0`. It refuses a branch other than `develop`, a dirty tree, a version not above the current one, and an empty Unreleased.
+3. `git push origin develop`, then bring `main` to it and tag: `git checkout main && git merge --ff-only develop && git tag v1.3.0 && git push origin v1.3.0`. The tag push uploads the release commit and starts the Release workflow; `main` itself is not pushed yet.
 4. Watch the Release workflow in the repository's Actions tab. It checks the tag against the project and the changelog, builds and signs the app, zips it, signs the zip for Sparkle, writes `appcast.xml`, and creates the release `v1.3.0` with the zip, the appcast and the version's notes.
+5. Once it is green: `git push origin main && git checkout develop`. The landing page and the README on GitHub now show the version that can be installed.
 
 Installed copies find the version at their next daily check, or at once with Settings → About → Check for Updates. New installs get it too: `curl -fsSL https://luckywins.github.io/Workdeck/install.sh | bash` (`site/install.sh`) reads the same `appcast.xml`, so nothing else changes per release.
 

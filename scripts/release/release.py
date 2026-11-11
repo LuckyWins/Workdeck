@@ -110,6 +110,10 @@ def prepare(root, version, today=None, commit=True, git_identity=None):
     new = _parse_semver(version)
     if _git(root, "status", "--porcelain").strip():
         raise ReleaseError("the working tree has changes; commit or stash them first")
+    # Work happens on develop; main takes a release once it is prepared (docs/releasing.md).
+    branch = _git(root, "rev-parse", "--abbrev-ref", "HEAD").strip()
+    if branch != "develop":
+        raise ReleaseError(f"prepare a release on develop, not on {branch}")
     current = marketing_version(root)
     if new <= _version_tuple(current):
         raise ReleaseError(f"{version} is not above the current version {current}")
@@ -235,7 +239,9 @@ def main(argv=None):
     try:
         if args.command == "prepare":
             build = prepare(args.root, args.version, today=args.today, commit=not args.no_commit)
-            print(f"Prepared {args.version} (build {build}). Push main, then: git tag v{args.version} && git push origin v{args.version}")
+            print(f"Prepared {args.version} (build {build}). Next (docs/releasing.md): git push origin develop && "
+                  f"git checkout main && git merge --ff-only develop && git tag v{args.version} && "
+                  f"git push origin v{args.version}; once the Release workflow is green: git push origin main && git checkout develop")
         elif args.command == "check":
             check(args.root, args.version)
             print(f"{args.version} matches the project and the changelog")

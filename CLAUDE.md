@@ -8,7 +8,7 @@ Workdeck is a macOS menu bar toolbox for developers. Each tool is one row in the
 
 ## Build and Test
 
-- Shortcuts: `make build` (Release into `./build`), `make test`, `make install` (copies to `/Applications`), `make clean`, `make screenshots` (renders the README and landing page images from demo data into `docs/media/screenshots/`, then compresses the notch animations losslessly with `oxipng`: `brew install oxipng`), `make release-prep VERSION=x.y.z` (moves `CHANGELOG.md`'s Unreleased under the version, bumps `MARKETING_VERSION` and the build number, commits; see `docs/releasing.md`). Release scripts: `scripts/release/`, tests `python3 -I scripts/release/test_release.py` and `python3 -I scripts/release/test_install.py` (the install script).
+- Shortcuts: `make build` (Release into `./build`), `make test`, `make install` (copies to `/Applications`), `make clean`, `make screenshots` (renders the README and landing page images from demo data into `docs/media/screenshots/`, then compresses the notch animations losslessly with `oxipng`: `brew install oxipng`), `make release-prep VERSION=x.y.z` (on `develop`: moves `CHANGELOG.md`'s Unreleased under the version, bumps `MARKETING_VERSION` and the build number, commits; then `docs/releasing.md`). Release scripts: `scripts/release/`, tests `python3 -I scripts/release/test_release.py` and `python3 -I scripts/release/test_install.py` (the install script).
 - Build: `xcodebuild -scheme Workdeck -destination 'platform=macOS' build`
 - Test: `xcodebuild -scheme Workdeck -destination 'platform=macOS' test 2>&1 | grep -E "error:|recorded an issue|Test run with|\*\* TEST"` (`-quiet` hides Swift Testing output)
 - Single suite: add `-only-testing:WorkdeckTests/<SuiteName>` after `test`.
@@ -69,6 +69,7 @@ Workdeck is a macOS menu bar toolbox for developers. Each tool is one row in the
 
 ## Git
 
+- Branches (`docs/releasing.md`): work is committed and pushed on `develop`; `main` only moves to `develop` when a release is cut, and is pushed after the Release workflow is green, because pushing it deploys the landing page.
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): description`.
   - Types: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `style`, `build`, `ci`, `chore`, `revert`.
   - Scopes are the area touched: `lid`, `helper`, `notch`, `limits`, `usage-api`, `statusline`, `sessions`, `hooks`, `instances`, `chats`, `accounts`, `settings`, `popover`, `app`; omit the scope when a change spans many areas.
