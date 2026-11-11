@@ -62,6 +62,21 @@ struct NotesPanelTabsTests {
         #expect(!tracker.isSettling(at: start.addingTimeInterval(0.02)))
     }
 
+    /// The window never changes its width: one that widened with the content showed the old layout at the left for a
+    /// frame, so a morph seemed to grow from the left edge. The shape grows and shrinks inside it, centred.
+    @Test func thePanelWindowKeepsTheNotesWidthCentred() {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let confirmation = NotesPanelPresenter.panelFrame(content: CGSize(width: 400, height: 95), on: screen)
+        #expect(confirmation == CGRect(x: 466, y: 887, width: 580, height: 95))
+        let sessions = NotesPanelPresenter.panelFrame(content: CGSize(width: 330, height: 300), on: screen)
+        #expect(sessions.width == NotesPanelStyle.width)
+        #expect(sessions.midX == screen.midX)
+        // During a switch the window keeps the taller of both until the spring is over.
+        let switching = NotesPanelPresenter.panelFrame(content: CGSize(width: 580, height: 200), on: screen, keepingHeight: 480)
+        #expect(switching.height == 480)
+        #expect(switching.maxY == screen.maxY)
+    }
+
     /// Closing springs the shape back to the notch: the notch's width inside the shape's flares, the notch's height
     /// (notes polish spec §5).
     @Test func closingDrawsBackToTheNotchsSize() {

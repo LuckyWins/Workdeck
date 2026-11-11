@@ -10,6 +10,9 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 - The expanded notch opens on the tab you last clicked. On Notes, hovering shows your open notes without taking the keyboard from your app; click in the panel to type.
 - Saving a note from the notch or the popover brings the panel back to an empty line instead of closing it, so you can add the next one. The shortcut still closes it after a new note; saving an edited note always brings you back to the list.
 
+### Fixed
+- Quick notes: the panel grows and shrinks evenly from the middle when it switches tabs or comes back from a confirmation, instead of jumping from the left edge.
+
 ## 1.4.1 — 2026-11-10
 
 ### Improved

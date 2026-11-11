@@ -274,17 +274,10 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
         }
     }
 
-    /// Before the content animates to the new tab's size the window widens to the widest tab, centred, so the shape
-    /// grows on both sides (a window that widens with the switch made it grow to the right only); it keeps the larger
-    /// size until the animation is over, then fits the content again.
+    /// While the content animates to its new size the window keeps the taller of both, then fits the content again.
     private func beginSwitch() {
         guard isOpen else { return }
         isSwitching = true
-        if let panel, let screen, panel.frame.width < NotesPanelStyle.width {
-            let width = NotesPanelStyle.width
-            let wide = CGRect(x: (screen.frame.midX - width / 2).rounded(), y: panel.frame.minY, width: width, height: panel.frame.height)
-            panel.setFrame(wide, display: true)
-        }
         switchTask?.cancel()
         switchTask = Task { [weak self] in
             try? await Task.sleep(for: NotesPanelStyle.tabSwitchDuration + .milliseconds(50))
@@ -379,15 +372,20 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
     private func fit(_ size: CGSize) {
         lastSize = size
         guard let panel, let screen, size.width > 0, size.height > 0 else { return }
-        var size = size
-        if isSwitching {
-            size = CGSize(width: max(size.width, panel.frame.width), height: max(size.height, panel.frame.height))
-        }
-        let frame = screen.frame
-        let target = CGRect(x: (frame.midX - size.width / 2).rounded(), y: frame.maxY - size.height, width: size.width, height: size.height)
+        let target = Self.panelFrame(content: size, on: screen.frame, keepingHeight: isSwitching ? panel.frame.height : 0)
         if panel.frame != target {
             panel.setFrame(target, display: true)
         }
+    }
+
+    /// The window at the top centre of the screen, as tall as the content (or `keepingHeight` while a spring runs) and
+    /// always as wide as Notes: the shape grows and shrinks inside it. A window that changed its width with the content
+    /// showed the old layout at its left for a frame, so a morph seemed to start from the left edge; the clear sides
+    /// let clicks through.
+    nonisolated static func panelFrame(content: CGSize, on screen: CGRect, keepingHeight: CGFloat = 0) -> CGRect {
+        let width = max(content.width, NotesPanelStyle.width)
+        let height = max(content.height, keepingHeight)
+        return CGRect(x: (screen.midX - width / 2).rounded(), y: screen.maxY - height, width: width, height: height)
     }
 
     /// A confirmation that ends in closing stays on screen, but the keyboard goes back to the app the user typed in:
