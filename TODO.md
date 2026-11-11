@@ -41,12 +41,12 @@ Agreed on 2026-11-09, from [Lumio](https://lumiomac.com/).
 
 Agreed on 2026-11-11. Spec: `specs/2026-11-11-polish-batch-design.md`; each item gets its own plan and commit, in this order.
 
-14. **Step names in the notch.** A Bash step shows the description Claude wrote for it, as the CLI does, instead of the command (spec §2).
-15. **An empty notch without sessions.** "When active" becomes the default, renamed, and shows nothing while no session is open, at any percent (spec §3).
-16. **The last tab, Notes by hover, saving from the tab.** Hover opens the last picked tab; Notes opened by hover leave the keyboard alone; a save from the tab returns to the list (spec §4).
-17. **Smooth quick notes animation on the landing page** (spec §5).
-18. **An Instances animation on the landing page** (spec §6).
-19. **A shorter README** (spec §8).
+14. ~~**Step names in the notch.**~~ Done (`fd33a9a`). A Bash step shows the description Claude wrote for it, as the CLI does, instead of the command (spec §2).
+15. ~~**An empty notch without sessions.**~~ Done (`9137251`). "When active" becomes the default, renamed, and shows nothing while no session is open, at any percent (spec §3).
+16. ~~**The last tab, Notes by hover, saving from the tab.**~~ Done (`7907456`). Hover opens the last picked tab; Notes opened by hover leave the keyboard alone; a save from the tab returns to the list (spec §4).
+17. ~~**Smooth quick notes animation on the landing page**~~ Done (`b5a011d`) (spec §5).
+18. ~~**An Instances animation on the landing page**~~ Done (`dd4725c`) (spec §6).
+19. ~~**A shorter README**~~ Done (`c29f2e6`) (spec §8).
 20. **GitHub Sponsors.** `FUNDING.yml`, README and landing lines, a Sponsor button in Settings → About; after the sponsors profile is approved (spec §7).
 
 ## Distribution
