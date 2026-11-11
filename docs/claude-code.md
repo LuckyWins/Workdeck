@@ -1,6 +1,6 @@
 # Claude Code
 
-Workdeck's Claude Code tool: plan limits and live sessions in the notch, alerts, the weekly recap and Statistics, a demo, and extra accounts. The [README](../README.md) has the overview and setup.
+Workdeck's Claude Code tool: plan limits and live sessions in the notch, alerts, the weekly recap and Statistics, a demo, and extra accounts. The [README](../README.md) has the overview; [Install and Get Started](install.md#setup) the setup.
 
 ## Limits
 
@@ -86,6 +86,12 @@ A cell shows what that instance has:
 - A skill, `CLAUDE.md` or a rule is copied by Workdeck itself, into a hidden temporary name next to the target and then renamed, so a failed copy leaves nothing half-written. A copy it replaces is first moved to `~/Library/Application Support/Workdeck/Replaced/<instance>/<date>/…` (the **Replaced folder**), so nothing is lost. A copy keeps the on or off state the target already had.
 - Plugins and MCP servers are installed by Claude Code, not by Workdeck, which never writes Claude Code's JSON files: Terminal opens and runs `claude plugin install <plugin>@<marketplace> --scope user` (after `claude plugin marketplace add` when the target does not know the marketplace) or `claude mcp add-json <name> <json> --scope user` (`--scope local` in the project's folder for a project's server), for an extra instance with `CLAUDE_CONFIG_DIR` set to its folder. An MCP server is on once it is added. If Terminal says `claude` is not found, install Claude Code's command first. The server's definition, secrets included, goes only into a private script that deletes itself when it starts. The window reads the instances again when you come back to it.
 - Sessions already open in the target pick a change up the next time they start. Editing an item is not done here.
+
+## How It Works
+
+- **Limits** come from Claude Code's status line: `workdeck-statusline` writes the usage it receives to a snapshot file that the app watches.
+- **Sessions** come from asynchronous Claude Code hooks: `workdeck-hook` keeps an allowlist of fields (event, IDs, project folder, tool name and a short description or target, line counts) in one file per session.
+- **The notch** is drawn with [DynamicNotchKit](https://github.com/MrKai77/DynamicNotchKit) in a terminal style; the recap and Statistics read daily totals from `recap.json`.
 
 ## Troubleshooting
 

@@ -65,7 +65,7 @@ Workdeck is a macOS menu bar toolbox for developers. Each tool is one row in the
 
 - `specs/` design specs, `plans/` implementation plans, `docs/` other documentation (`docs/releasing.md`: cutting a release, CI secrets), `README.md`, `CLAUDE.md`, `CHANGELOG.md` (release notes for colleagues) and `TODO.md` (ideas and deferred work) in the root.
 - A change to the README's tagline or Features updates the matching text in `site/index.html` by hand; the install command is the same string in both (a test checks it).
-- `README.md` is the short overview (features, install, setup, privacy); feature details live in `docs/claude-code.md`, `docs/codex.md`, `docs/quick-notes.md` and `docs/closed-lid-mode.md`, images in `docs/media/`. A user-visible change updates the matching docs page, and the README when it changes the overview.
+- `README.md` is the short overview (features, install, getting started, privacy in brief); `docs/install.md` has install, updates, setup, the tour, things to try, the full privacy list, troubleshooting, uninstalling and building from source; feature details live in `docs/claude-code.md`, `docs/codex.md`, `docs/quick-notes.md` and `docs/closed-lid-mode.md`, images in `docs/media/`. A user-visible change updates the matching docs page, and the README when it changes the overview.
 
 ## Git
 

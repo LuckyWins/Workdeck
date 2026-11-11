@@ -4,201 +4,58 @@
 
 # Workdeck
 
-**Your Claude Code limits and sessions in the MacBook notch — and a Mac that stays awake with the lid closed.**
+**Limits, sessions and alerts in the MacBook notch, for Claude Code and Codex — and a Mac that stays awake with the lid closed.**
 
 A minimal macOS menu bar toolbox for developers. Native SwiftUI, no account, no telemetry.
 
 ![macOS 26+](https://img.shields.io/badge/macOS-26%2B-black?logo=apple)
-![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)
-![SwiftUI](https://img.shields.io/badge/SwiftUI-native-0A84FF)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-status%20line%20%2B%20hooks-D97757)
 ![Code: MIT](https://img.shields.io/badge/code-MIT-green)
-![GitHub stars](https://img.shields.io/github/stars/LuckyWins/Workdeck?style=social)
+
+<img src="docs/media/screenshots/notch-hover-animated.png" width="368" alt="The notch opening under the pointer: limits and live sessions">
 
 </div>
 
----
-
-## Why
-
-A Claude Code plan limit runs out in the middle of a task, a session sits waiting for a permission in a window you are not looking at, and a long build stops the moment you close the lid. Workdeck puts all of it in one place: the notch shows how much of your limits is left and what every session and agent is doing, and the menu bar keeps the Mac awake when you need it to.
-
 ## Features
 
-- 💻 **Closed-Lid Mode** — keeps the Mac awake with the lid closed, for long builds, SSH sessions or a working Mac in a bag. Stays on across restarts of Workdeck and the Mac until you turn it off; turns itself off on low battery or when the Mac gets too hot, and sleep comes back whenever Workdeck is not running to watch over it. [More](docs/closed-lid-mode.md)
-- 📊 **Claude Code limits in the notch** — a ring for the window closest to its limit, with the percent once it nears the limit; hover for both windows with reset times and a forecast (`runs out ~16:40 · resets 18:00`). [More](docs/claude-code.md#limits)
-- 🧩 **Codex too** — Codex's plan limits and live sessions in the same notch, each with its own icon: Claude Code's terracotta rays, Codex's mint `>_` circle. [More](docs/codex.md)
-- 🤖 **Live sessions and agents** — every session working, waiting for you or idle, its agents as a tree, the focused session's last steps as a ticker, and each edit's `+12 −3`. [More](docs/claude-code.md#sessions)
-- 🔔 **Alerts that come to you** — a limit at 80 % and 95 %, a limit that reset, a session that needs you, a long session that finished. The notch opens with the alert, glows in its color, then flashes once.
-- 🎯 **Back to the right window** — click a session to bring forward its VS Code, Cursor or Windsurf window, or its own Terminal or iTerm2 tab.
-- 📅 **Weekly recap and Statistics** — last week's coding time by project, sessions, files, lines, commands, agents and limit hits on the first unlock of a week, for Claude Code and Codex with each agent's own time; any of the last 26 weeks in a window with a GitHub-style activity grid and your streak, filtered by agent. Counts and names only, stored locally. [More](docs/claude-code.md#weekly-recap-and-statistics)
-- 👥 **Two accounts side by side** — run a second Claude Code instance with its own login, see both accounts' limits, and continue a chat on the other account when a limit runs out. [More](docs/claude-code.md#instances-and-chats)
-- 🔀 **Compare your accounts' setups** — one window lists the skills, MCP servers, plugins and `CLAUDE.md` of every instance, marks what is missing, off or different, shows a skill's contents, and copies or installs an item into another instance after showing what will change. [More](docs/claude-code.md#instances-window)
-- 📝 **Quick notes** — tap the right Option key, type a note, press Return: it goes to Apple Reminders. `#` picks a project, a date sets a reminder, ⌘↩ gives the note to Claude Code or Codex in the project's folder; completed notes are cleaned up after a copy goes to an archive. [More](docs/quick-notes.md)
-- 🖥️ **Any display** — on an external monitor with the lid closed, a virtual notch at the top of the screen, or plain text in the menu bar.
-- 🧪 **Demo mode** — a one-minute scripted tour in the notch, no Claude Code needed.
-- 🔒 **Private by design** — prompts, answers and file contents are never stored; every change to a `settings.json` is shown as a diff first and backed up.
+- 📊 **Limits and sessions in the notch** — every account's 5-hour and weekly limits with a forecast, and every session of Claude Code and Codex with its agents, last steps and changed lines; on an external display a virtual notch. [More](docs/claude-code.md)
+- 🔔 **Alerts that come to you** — a session that finished or waits for a permission, a limit running low; click to jump to its window. [More](docs/claude-code.md#sessions)
+- 👥 **Out of limit? Switch accounts** — run a second Claude Code account and carry a chat on to it in one click. [More](docs/claude-code.md#instances-and-chats)
+- 💻 **Close the lid, the work goes on** — Closed-Lid Mode keeps the Mac awake with the lid closed: agents, builds and SSH finish while you're away. [More](docs/closed-lid-mode.md)
+- 📝 **Quick notes to Reminders** — tap the right Option key, type, press Return; `#` picks a project, a date sets a reminder, ⌘↩ gives the note to Claude Code or Codex. [More](docs/quick-notes.md)
+- 📅 **Your week at a glance** — a recap on the first unlock of each week, and half a year of work in Statistics. [More](docs/claude-code.md#weekly-recap-and-statistics)
+- 🔀 **Every account, set up alike** — see which skills, MCP servers, plugins and `CLAUDE.md` each account has, and copy what's missing. [More](docs/claude-code.md#instances-window)
 
-## A Quick Tour
-
-<table>
-  <tr>
-    <td align="center" width="45%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/screenshots/popover-dark.png"><img src="docs/media/screenshots/popover-light.png" width="238" alt="The menu bar popover"></picture></td>
-    <td><b>1. Turn on what you need</b><br>Click the Workdeck icon in the menu bar. Each tool is one row: Closed-Lid Mode keeps the Mac awake with the lid closed, Claude Code and Codex show your limits and sessions. Connect them once in Settings.</td>
-  </tr>
-  <tr>
-    <td align="center" width="45%"><img src="docs/media/screenshots/notch-compact.png" width="360" alt="The compact notch: the limit ring and session counters"></td>
-    <td><b>2. While you work</b><br>The notch shows the limit closest to running out and how many sessions are working. It stays out of the way until something changes.</td>
-  </tr>
-  <tr>
-    <td align="center" width="45%"><img src="docs/media/screenshots/notch-hover-animated.png" width="184" alt="The notch opening under the pointer: limits and live sessions"></td>
-    <td><b>3. Hover to see everything</b><br>Rest the pointer on the notch: every account's 5-hour and weekly limits with reset times and a forecast, and every session with its agents, last steps and changed lines.</td>
-  </tr>
-  <tr>
-    <td align="center" width="45%"><img src="docs/media/screenshots/notch-alert-animated.png" width="360" alt="The notch opening by itself with a limit alert"></td>
-    <td><b>4. When something needs you</b><br>A limit at 80 % or 95 %, a session waiting for a permission, a long session that finished: the notch opens with the alert. Click it to jump to the right window.</td>
-  </tr>
-  <tr>
-    <td align="center" width="45%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/screenshots/chats-dark.png"><img src="docs/media/screenshots/chats-light.png" width="232" alt="The Chats window with two accounts"></picture></td>
-    <td><b>5. Out of limit? Carry on with another account</b><br>Run a second Claude Code account side by side. In Chats, open any chat on the other account and continue where you stopped.</td>
-  </tr>
-  <tr>
-    <td align="center" width="45%"><img src="docs/media/screenshots/notch-recap.png" width="224" alt="Last week's recap in the notch"></td>
-    <td><b>6. Your week, on Monday</b><br>On the first unlock of a week the notch shows last week: coding time by project, sessions, files, lines and limit hits.</td>
-  </tr>
-  <tr>
-    <td align="center" width="45%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/screenshots/statistics-dark.png"><img src="docs/media/screenshots/statistics-light.png" width="141" alt="The Statistics window with the activity grid"></picture></td>
-    <td><b>7. And everything before</b><br>Statistics keeps half a year: any week in detail, an activity grid of days and your streak, for Claude Code and Codex.</td>
-  </tr>
-  <tr>
-    <td align="center" width="45%"><img src="docs/media/screenshots/notes-capture-animated.png" width="314" alt="The right Option key tapped under the notch, the quick notes panel growing out of it, a note typed with a date and a project, then saved"></td>
-    <td><b>8. Jot it down</b><br>Tap the right Option key, type, press Return: the note is a reminder in Apple Reminders, on your iPhone too. <code>#</code> and Tab pick the project, "tomorrow at 4pm" sets the reminder, ⌘↩ gives the note to Claude Code or Codex in the project's folder.</td>
-  </tr>
-</table>
-
-## Try It Without Claude Code
-
-Open Settings from the gear in the popover and click **Try Demo** under General. For one minute the notch plays a scripted session: two accounts' limits, a session with a step ticker and an agent, a second session that needs you, a limit alert, a finished session, a Codex session working in parallel, a quick note typed into the panel and a weekly recap whose **Details…** open the Statistics window with 26 made-up weeks. Nothing is written to disk, and your real sessions are still tracked while it plays.
+Codex has [its own page](docs/codex.md). The tour with pictures, things to try and more: [Install and Get Started](docs/install.md).
 
 ## Install
-
-Paste in Terminal:
 
 ```bash
 curl -fsSL https://luckywins.github.io/Workdeck/install.sh | bash
 ```
 
-It downloads the latest version into Applications, checks it is signed by Workdeck's team and opens it, with no "could not verify" prompt. macOS 26 or later. Later versions install themselves (see Updates below). More on [the Workdeck page](https://luckywins.github.io/Workdeck/).
+Paste it in Terminal: it downloads the latest version into Applications, checks it is signed by Workdeck's team and opens it. macOS 26 or later; Workdeck offers later versions in the app. [More](docs/install.md#install)
 
-**From source** (requires macOS 26 or later and Xcode 27):
+## Getting Started
+
+1. Turn on Claude Code (or Codex) in the menu bar popover, then **Connect…** the status line and session hooks in Settings. You see the exact change to its settings file first, and a backup is kept.
+2. Want a look first? Settings → General → **Try Demo** plays a one-minute tour with made-up data.
+
+[Setup in detail](docs/install.md#setup)
+
+## Privacy
+
+No account, no telemetry. Prompts, answers and file contents are never stored; every change to a `settings.json` is shown as a diff before it is written; the root helper of Closed-Lid Mode does one thing, turning sleep off and on. [The full list](docs/install.md#privacy)
+
+## Building from Source
 
 ```bash
 git clone https://github.com/LuckyWins/Workdeck.git
 cd Workdeck
-make install   # build, quit the installed Workdeck, copy it to /Applications, and launch it
+make install
 ```
 
-Releases are cut as described in [Releasing](docs/releasing.md). Both the `Workdeck` and `WorkdeckHelper` targets are signed with team `J55BY69CVU`; with a different team, also update `teamIdentifier` in `Shared/HelperConstants.swift`. The build is signed with your Apple Development certificate and runs on your own Mac; it is not sandboxed, not notarized and not on the Mac App Store.
-
-**Updates.** With automatic checks on (Workdeck asks once, on its second launch), it looks for a new version on GitHub once a day: the notch says so once, the popover shows a row above Quit, and **Install** opens the standard update window, which installs it in place and relaunches. Settings → About → **Release notes** lists every version and what changed (from `CHANGELOG.md`).
-
-The first time you turn on Closed-Lid Mode, macOS asks you to approve Workdeck's helper: click **Open System Settings…** in the popover and allow Workdeck in **General → Login Items & Extensions**. See [Closed-Lid Mode](docs/closed-lid-mode.md#first-run).
-
-## Setup
-
-1. **Connect Claude Code.** Turn on Claude Code in the popover, or click **Connect…** in Settings. Workdeck shows the change to `~/.claude/settings.json` as a diff; after you confirm, it adds its status line command (limits) and saves a backup. A status line you already had keeps running after Workdeck's.
-2. **Connect the session hooks** in Settings → Claude Code · Sessions to see sessions and agents. Again a diff first, then a backup; **Disconnect…** removes only Workdeck's entries.
-3. **Optional:** only working in the Claude Code VS Code extension, whose panel does not run the status line? Turn on **Fetch usage from Anthropic (unofficial)**: it calls an undocumented endpoint with Claude Code's login token. Read the [risks](docs/claude-code.md#limits) first.
-4. **Optional:** add a second account in Settings → Claude Code · Instances.
-5. **Optional:** turn on **Codex** in the popover to see its limits (it needs Codex signed in with ChatGPT), and connect its session hooks in Settings → Codex.
-6. **Quick notes** need nothing set up: tap the right Option key and save a note; the first save asks for access to Reminders. See [Quick Notes](docs/quick-notes.md).
-
-Claude Code reports plan usage only for Pro and Max subscriptions. Details: [docs/claude-code.md](docs/claude-code.md).
-
-## Things to Try
-
-| Do this | Workdeck does that |
-|---|---|
-| Hover the notch | opens with both limit windows and every session |
-| Click a session in the notch | brings forward its editor window or terminal tab |
-| Click a limit alert | opens Chats on that account, to go on with another one |
-| Turn on **Notify when a session finishes** in Settings → Notch and start a long task | tells you when it is done, with how long it worked |
-| Click the chart button in the popover's header | shows this week's coding time by day and project |
-| Tap the right Option key, type a note and press Return | saves it to Apple Reminders; `#wo` and Tab put it in a project |
-| Press ⌘D on a note in the panel, then ⌘Z | ticks it, then takes the tick back before it is written |
-| Turn on Closed-Lid Mode and close the lid | keeps the build running |
-| Settings → General → **Try Demo** | plays the one-minute tour |
-
-## How It Works
-
-- **Closed-Lid Mode** needs the root-only `SleepDisabled` power setting (`pmset -a disablesleep 1`); `caffeinate`'s power assertions do not prevent clamshell sleep. A small launchd helper registered with `SMAppService` can only set it to 0 or 1, accepts XPC connections only from Workdeck signed by the same team, and restores sleep on every exit path. [Details](docs/closed-lid-mode.md#how-it-works)
-- **Limits** come from Claude Code's status line: `workdeck-statusline` writes the usage it receives to a snapshot file that the app watches.
-- **Sessions** come from asynchronous Claude Code hooks: `workdeck-hook` keeps an allowlist of fields (event, IDs, project folder, tool name and a short description or target, line counts) in one file per session.
-- **The notch** is drawn with [DynamicNotchKit](https://github.com/MrKai77/DynamicNotchKit) in a terminal style; the recap and Statistics read daily totals from `recap.json`.
-
-## Privacy
-
-- No account, no analytics, no telemetry. The only network call is the opt-in usage endpoint, to Anthropic.
-- Prompts, answers, file contents and chat titles are never stored or logged; tool calls keep only the tool name, a short description or target with secret-looking values masked, and line counts.
-- The login token is read from your Keychain only for the opt-in usage call; it is never refreshed, stored or logged.
-- Codex limits come from Codex's own session files and `codex app-server`; Workdeck never reads Codex's login.
-- Quick notes live in Reminders and, once cleaned up, in a local archive; their text is never logged or kept anywhere else.
-- Every `settings.json` change is shown as a diff before it is written; `settings.json` and `~/.zshrc` are backed up before Workdeck changes them.
-
-<details>
-<summary><b>Troubleshooting</b></summary>
-
-- **Is sleep disabled right now?** `pmset -g | grep SleepDisabled` — no output means sleep works normally. If it ever stays disabled: `sudo pmset -a disablesleep 0`.
-- **Helper logs:** `/usr/bin/log stream --predicate 'subsystem == "com.appcreators.workdeck.helper"'`.
-- **"Couldn't change the sleep setting" after rebuilding in Xcode:** launchd may still run an older helper build; turn Workdeck off and on again in Login Items & Extensions.
-- **Claude Code:** Settings → About → **Copy Diagnostics** copies Workdeck's recent log and current state, without prompts, answers or tool details.
-- **Tell the developer:** Settings → About → **Send Feedback…** opens an email in your mail app with the diagnostics attached; nothing is sent until you press Send.
-
-More in [Closed-Lid Mode](docs/closed-lid-mode.md#troubleshooting) and [Claude Code](docs/claude-code.md#troubleshooting).
-
-</details>
-
-<details>
-<summary><b>Uninstalling</b></summary>
-
-1. Turn off Closed-Lid Mode, disconnect Claude Code in Settings (restores your status line and removes the hooks), and quit Workdeck.
-2. In **System Settings → General → Login Items & Extensions**, turn off Workdeck.
-3. Delete `Workdeck.app`.
-
-</details>
-
-<details>
-<summary><b>Building and project structure</b></summary>
-
-```bash
-make build     # Release build into ./build
-make test      # run the unit tests
-make install   # build, quit the installed Workdeck, copy it to /Applications, and launch it
-               # (stops with an error if Workdeck is running from Xcode — stop it there first)
-make clean     # remove ./build
-```
-
-Or open `Workdeck.xcodeproj` and run the `Workdeck` scheme. macOS ties the helper approval to the app's location: after the first `make install`, approve Workdeck again in Login Items & Extensions; the copy Xcode runs from DerivedData stays listed there as a separate entry and can be turned off.
-
-```
-Workdeck/          Menu bar app (SwiftUI)
-  App/             Scenes and top-level views
-  Core/            Helper client and installer, settings, demo mode
-  Features/        One folder per tool
-WorkdeckHelper/    Privileged launchd helper
-Shared/            Code compiled into both the app and the helper
-LaunchDaemons/     launchd job definition embedded in the app bundle
-ClaudeUsage/       Code shared by the app and the status line command
-WorkdeckStatusLine/ Claude Code status line command (workdeck-statusline)
-ClaudeHooks/       Code shared by the app and the hook command
-WorkdeckHook/      Claude Code hook command (workdeck-hook)
-WorkdeckTests/     Unit tests (Swift Testing)
-specs/             Design specs
-plans/             Implementation plans
-docs/              Feature details, media and the manual testing checklist
-```
-
-</details>
+Requires Xcode 27. Signing, `make` targets and the project's layout: [Building from Source](docs/install.md#building-from-source).
 
 ## Credits
 
