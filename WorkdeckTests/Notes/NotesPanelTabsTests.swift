@@ -44,6 +44,24 @@ struct NotesPanelTabsTests {
         #expect(springs == [false, true, false, false, true, false])
     }
 
+    /// The open notes measure their rows over a few layout passes: sizes reported right after a morph started follow
+    /// the spring to the settled size instead of jumping to it.
+    @Test func layoutsRightAfterAMorphFollowIt() {
+        var tracker = ShapeTracker()
+        let start = Date(timeIntervalSince1970: 0)
+        _ = tracker.update(kind: .confirmation, opening: 1, at: start)
+        #expect(!tracker.isSettling(at: start))
+        let morphs = tracker.update(kind: .note, opening: 1, at: start)
+        #expect(morphs)
+        let settles = tracker.update(kind: .note, opening: 1, at: start.addingTimeInterval(0.006))
+        #expect(!settles)
+        #expect(tracker.isSettling(at: start.addingTimeInterval(0.006)))
+        #expect(!tracker.isSettling(at: start.addingTimeInterval(1)))
+        // A new opening starts without a morph.
+        _ = tracker.update(kind: .note, opening: 2, at: start.addingTimeInterval(0.01))
+        #expect(!tracker.isSettling(at: start.addingTimeInterval(0.02)))
+    }
+
     /// Closing springs the shape back to the notch: the notch's width inside the shape's flares, the notch's height
     /// (notes polish spec §5).
     @Test func closingDrawsBackToTheNotchsSize() {

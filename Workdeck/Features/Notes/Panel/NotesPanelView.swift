@@ -164,9 +164,13 @@ struct NotesPanelView: View {
             // centre, as the notch opens on hover. Only the shape animates: animating the content's layout made the
             // note field relayout on every frame and AppKit gave up on the window's constraints (a crash).
             let kind = PanelContentKind.of(tab: tab, mode: mode, hasNotchModel: notchModel != nil)
-            let changed = shapeTracker.update(kind: kind, opening: opening)
-            let animates = changed && shapeSize != nil && !reduceMotion
-            if animates {
+            let now = Date()
+            let changed = shapeTracker.update(kind: kind, opening: opening, at: now)
+            // Sizes reported while the new content settles retarget the running spring; set at once, they would cut
+            // it short and the shape would jump to its end.
+            let follows = !changed && shapeTracker.isSettling(at: now)
+            let animates = (changed || follows) && shapeSize != nil && !reduceMotion
+            if animates, changed {
                 onMorph()
             }
             withAnimation(animates ? NotesPanelStyle.tabSwitchAnimation : nil) {

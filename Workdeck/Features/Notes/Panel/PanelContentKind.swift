@@ -24,15 +24,28 @@ enum PanelContentKind: Equatable {
 /// takes its size at once, whatever the previous opening ended on (a confirmation, Stats): the panel grows out of the
 /// notch then.
 struct ShapeTracker: Equatable {
+    /// How long after a morph starts the content may still be settling: the spring's own length.
+    static let settleTime: TimeInterval = 0.45
     private var kind: PanelContentKind?
     private var opening: Int?
+    private var morphStartedAt: Date?
 
     /// Records the kind of this layout; true when the shape should spring to the new size.
-    mutating func update(kind: PanelContentKind, opening: Int) -> Bool {
-        defer {
-            self.kind = kind
-            self.opening = opening
+    mutating func update(kind: PanelContentKind, opening: Int, at now: Date = Date()) -> Bool {
+        let morphs = self.opening == opening && self.kind != nil && self.kind != kind
+        if morphs {
+            morphStartedAt = now
+        } else if self.opening != opening {
+            morphStartedAt = nil
         }
-        return self.opening == opening && self.kind != nil && self.kind != kind
+        self.kind = kind
+        self.opening = opening
+        return morphs
+    }
+
+    /// A morph started moments ago: the new content still settles (the open notes measure their rows over a few
+    /// layout passes), and its sizes follow the spring instead of cutting it short.
+    func isSettling(at now: Date = Date()) -> Bool {
+        morphStartedAt.map { now.timeIntervalSince($0) < Self.settleTime } ?? false
     }
 }
