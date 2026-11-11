@@ -188,6 +188,11 @@ struct NotesAnimationView: View {
 struct NotesAnimation {
     /// The note the script types is left out of the open notes, so typing it filters them away instead of finding it.
     static let typedNote = "Check the staging migration"
+    /// The panel's own animations (growing out of the notch, turning into "Saved", the open notes fading as typing
+    /// filters them) run this much slower while it is recorded, so drawing the large panel never costs a frame (polish
+    /// batch spec §5); the file keeps 60 fps. A transaction slows what `withAnimation` starts; an `.animation(_:value:)`
+    /// inside the panel replaces it and reads `notesAnimationSpeed` instead.
+    static let timeScale: Double = 8
 
     let fixtures: ScreenshotFixtures
     let compactSize: CGSize
@@ -254,8 +259,11 @@ struct NotesAnimation {
         let view = NotesAnimationView(
             notchModel: notch, panelModel: panel, notchState: notchState, state: state, compactSize: compactSize, canvas: canvas
         )
+        .transaction { $0.animation = $0.animation?.speed(1 / Self.timeScale) }
+        // An `.animation(_:value:)` inside replaces the transaction's animation: those read the speed from here.
+        .environment(\.notesAnimationSpeed, 1 / Self.timeScale)
         return try await ScreenshotRenderer.writeAnimation(
-            view, canvas: canvas, frames: NotesAnimationTimeline.frames(), name: "notes-capture-animated"
+            view, canvas: canvas, frames: NotesAnimationTimeline.frames(), name: "notes-capture-animated", timeScale: Self.timeScale
         ) { frame in
             if let time = frame.scriptTime {
                 Self.show(script: time, in: panel)

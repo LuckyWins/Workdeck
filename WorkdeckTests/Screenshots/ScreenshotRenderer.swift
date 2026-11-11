@@ -233,10 +233,12 @@ enum ScreenshotRenderer {
     /// Records an animation (notch animations spec §3.3): one offscreen window for all `frames`, `update` setting what a
     /// frame shows before it is captured. Live frames are captured at their own moment of real time, so the view's own
     /// motion (spinners, shimmers, SwiftUI animations) keeps its pace; the file gets the timeline's delays, never the time
-    /// a capture took.
+    /// a capture took. `timeScale` stretches live frames over that much more real time: a scene whose views' animations
+    /// run that much slower (`Animation.speed`) is then captured on every frame even when drawing one takes longer than
+    /// its delay.
     @discardableResult
     static func writeAnimation<V: View, Frame: RecordedFrame>(
-        _ view: V, canvas: CGSize, frames: [Frame], name: String, update: (Frame) -> Void
+        _ view: V, canvas: CGSize, frames: [Frame], name: String, timeScale: Double = 1, update: (Frame) -> Void
     ) async throws -> URL {
         ActiveAppearance.install()
         let appearance = NSAppearance(named: .darkAqua)!
@@ -276,21 +278,21 @@ enum ScreenshotRenderer {
             if index == 0 {
                 // Layout and `onAppear` settle; the clock starts after.
                 try await pause(until: Date().addingTimeInterval(0.6))
-                clock = Date().addingTimeInterval(-frame.time)
+                clock = Date().addingTimeInterval(-frame.time * timeScale)
             } else if frame.isLive {
-                try await pause(until: clock.addingTimeInterval(frame.time))
+                try await pause(until: clock.addingTimeInterval(frame.time * timeScale))
                 // Drawing can take longer than a frame; a frame whose time has passed is dropped and the one before
                 // shows longer, as a screen recording does, so the motion keeps its real pace.
-                if !images.isEmpty, Date() > clock.addingTimeInterval(frame.time + frame.delay) {
+                if !images.isEmpty, Date() > clock.addingTimeInterval((frame.time + frame.delay) * timeScale) {
                     images[images.count - 1].delay += frame.delay
                     dropped += 1
                     continue
                 }
-                latest = max(latest, Date().timeIntervalSince(clock) - frame.time)
+                latest = max(latest, Date().timeIntervalSince(clock) / timeScale - frame.time)
             } else {
                 // A drawn change only; the clock moves on with the timeline.
                 try await pause(until: Date().addingTimeInterval(0.005))
-                clock = Date().addingTimeInterval(-frame.time)
+                clock = Date().addingTimeInterval(-frame.time * timeScale)
             }
             host.layoutSubtreeIfNeeded()
             guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { throw Failure.noBitmap(name) }

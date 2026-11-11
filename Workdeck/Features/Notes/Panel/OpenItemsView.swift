@@ -102,6 +102,7 @@ private struct ItemRowsList: View {
     @State private var geometry: Geometry?
     @State private var rowTops: [String: CGFloat] = [:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.notesAnimationSpeed) private var animationSpeed
 
     private var cue: ScrollCue {
         guard let geometry else { return .none }
@@ -139,8 +140,8 @@ private struct ItemRowsList: View {
                         }
                     }
                     .coordinateSpace(.named(Self.space))
-                    .animation(.easeOut(duration: 0.25), value: items.map(\.id))
-                    .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: [selectedID, model.hoverExpandedID])
+                    .animation(.easeOut(duration: 0.25).speed(animationSpeed), value: items.map(\.id))
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.2).speed(animationSpeed), value: [selectedID, model.hoverExpandedID])
                 }
                 .scrollIndicators(.never)
                 .scrollBounceBehavior(.basedOnSize)
@@ -412,4 +413,10 @@ struct UndoRing: View {
         }
         .accessibilityLabel("Done, undo possible")
     }
+}
+
+extension EnvironmentValues {
+    /// The speed of the open notes' own animations, which a transaction around the panel cannot reach: 1 in the app;
+    /// the landing page's recording slows them with the rest of the panel (polish batch spec §5).
+    @Entry var notesAnimationSpeed: Double = 1
 }

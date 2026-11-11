@@ -275,7 +275,8 @@ struct ScreenshotTests {
         #expect(animation.canvas.width >= NotesPanelStyle.width + 2 * NotchTransitionView.margin)
         #expect(animation.canvas.height >= animation.panelSize.height + NotchTransitionView.margin)
         #expect(animation.canvas.height >= animation.compactSize.height + NotesAnimationView.keycapGap + OptionKeycap.size.height)
-        try expectAnimation(try await animation.write(), canvas: animation.canvas)
+        // Every step of the panel's grow and fades is a frame now (polish batch spec §5): about 5 MB before oxipng, 3.3 after.
+        try expectAnimation(try await animation.write(), canvas: animation.canvas, limit: 8_000_000)
     }
 
     // MARK: Landing tour scenes
