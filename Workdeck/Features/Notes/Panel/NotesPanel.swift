@@ -37,6 +37,11 @@ final class NotesPanel: NSPanel {
         if event.type == .keyDown, keyHandler?(event) == true {
             return
         }
+        // A right-click does not make a window key: on a note it opens the menu whose Edit types in the line, so the
+        // panel opened by hover takes the keyboard here too (polish batch spec §4.2).
+        if event.type == .rightMouseDown, acceptsKey, !isKeyWindow {
+            makeKey()
+        }
         super.sendEvent(event)
     }
 }
@@ -63,6 +68,11 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
     private var lastOtherApp: NSRunningApplication?
     private var activationObserver: (any NSObjectProtocol)?
     private(set) var isOpen = false
+    /// Notes opened by hover, until a click gives them the keyboard: they close on the pointer and for alerts like
+    /// Sessions (polish batch spec §4.2). The pointer watch keeps it.
+    var isGlancing: Bool {
+        isOpen && pointerWatch.isGlancing
+    }
     /// The tab the panel shows (notch tabs spec §2); Notes on every opening by the key.
     private(set) var tab: NotchTab {
         get { tabState.tab }
@@ -99,7 +109,7 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
         super.init()
         // While Notes has the keyboard alerts wait; on the other tabs the panel steps aside for them (spec §6).
         composer?.onSuspendedAlert = { [weak self] in
-            guard let self, PanelTabRules.closesForAlert(isOpen: isOpen, tab: tab) else { return }
+            guard let self, PanelTabRules.closesForAlert(isOpen: isOpen, tab: tab, holdsKeyboard: !isGlancing) else { return }
             close()
         }
         if let front = NSWorkspace.shared.frontmostApplication, front != NSRunningApplication.current {
@@ -128,18 +138,21 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
         }
     }
 
-    /// The key: opens the panel, or closes it when open (spec §2.1).
-    func toggle() {
-        switch PanelTabRules.toggle(isOpen: isOpen, tab: tab) {
-        case .open: open()
+    /// The key, or the popover's Notes row: opens the panel, or closes it when open (spec §2.1).
+    func toggle(opening: PanelTabRules.Opening = .shortcut) {
+        switch PanelTabRules.toggle(isOpen: isOpen, tab: tab, holdsKeyboard: !isGlancing) {
+        case .open: open(opening: opening)
         case .close: close()
         case .showNotes: select(.notes)
+        case .takeKeyboard: takeKeyboard()
         }
     }
 
     /// `takingKeyboard` false shows the panel without making it key: the demo plays in it while the user keeps typing
     /// where they were.
-    func open(tab: NotchTab = .notes, takingKeyboard: Bool = true, grows: Bool = true) {
+    /// `opening` decides whether a save closes the panel and whether Notes wait for a click to take the keyboard
+    /// (polish batch spec §4).
+    func open(tab: NotchTab = .notes, takingKeyboard: Bool = true, grows: Bool = true, opening: PanelTabRules.Opening = .shortcut) {
         // No display at all (Closed-Lid Mode without an external screen): there is nowhere to show the panel.
         guard !isOpen, let screen = Self.screenUnderPointer() else { return }
         // Opened again while drawing back: gone at once, then it grows afresh; the notch stays hidden.
@@ -155,7 +168,8 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
         tabsModel = PanelTabRules.tabsModel(notchModel, hasNotchScreen: composer?.hasNotchScreen ?? false)
         self.tab = tabsModel == nil ? .notes : tab
         panel.acceptsKey = PanelTabRules.acceptsKey(self.tab)
-        pointerWatch.opened(on: self.tab)
+        model.returnsAfterSave = PanelTabRules.returnsAfterSave(opening)
+        pointerWatch.opened(on: self.tab, holdsKeyboard: PanelTabRules.takesKeyboard(opening))
         self.grows = grows
         model.willOpen()
         let view = makeView(on: screen)
@@ -171,7 +185,7 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
         composer?.setSuspended(true)
         fit(host?.fittingSize ?? CGSize(width: NotesPanelStyle.width, height: 120))
         panel.orderFrontRegardless()
-        if takingKeyboard, self.tab == .notes {
+        if takingKeyboard, !pointerWatch.isGlancing, self.tab == .notes {
             panel.makeKey()
         }
         clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
@@ -188,7 +202,11 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
             state: tabState, model: model, notchModel: tabsModel, topInset: Self.topInset(of: screen),
             closedSize: NotesPanelStyle.closedShapeSize(notchWidth: Self.notchWidth(of: screen), topInset: Self.topInset(of: screen)),
             opening: openings, grows: grows,
-            onSelectTab: { [weak self] tab in self?.select(tab) },
+            // A click on a tab is the one choice hover remembers (polish batch spec §4.1).
+            onSelectTab: { [weak self] tab in
+                self?.notchModel?.pickedTab = tab
+                self?.select(tab)
+            },
             onHover: { [weak self] inside in self?.pointerInside(inside) },
             onSize: { [weak self] size in self?.fit(size) },
             onMorph: { [weak self] in self?.beginSwitch() }
@@ -199,7 +217,7 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
     /// size, without growing, then switches to Notes with the usual size animation once that first frame is up.
     func openFromNotch() {
         guard !isOpen else { return }
-        open(tab: PanelTabRules.handOverStart(notchTab: notchModel?.tab ?? .sessions), takingKeyboard: false, grows: false)
+        open(tab: PanelTabRules.handOverStart(notchTab: notchModel?.tab ?? .sessions), takingKeyboard: false, grows: false, opening: .notchTab)
         guard isOpen else { return }
         guard tab != .notes else {
             // No tabs here (no notch screen): Notes straight away.
@@ -210,6 +228,23 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
             try? await Task.sleep(for: .milliseconds(30))
             self?.select(.notes)
         }
+    }
+
+    /// Notes opened by hover take the keyboard, the note field first (the shortcut, polish batch spec §4.2).
+    private func takeKeyboard() {
+        guard isOpen, isGlancing, let panel else { return }
+        panel.makeKey()
+        if let field = Self.noteField(in: panel.contentView) {
+            panel.makeFirstResponder(field)
+        }
+    }
+
+    /// Hover on the notch while Notes is the picked tab: the panel grows out of the notch on Notes, showing the open
+    /// notes, but the user's app keeps the keyboard until a click in the panel (polish batch spec §4.2).
+    func openFromHover() -> Bool {
+        guard !isOpen else { return false }
+        open(tab: .notes, takingKeyboard: false, opening: .hover)
+        return isOpen
     }
 
     /// A click on a tab icon. Notes takes the keyboard again with the note as it was; Sessions and Stats give it back
@@ -276,7 +311,7 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
             pointerExitTask?.cancel()
             pointerExitTask = Task { [weak self] in
                 try? await Task.sleep(for: Self.pointerExitDelay)
-                guard let self, !Task.isCancelled, isOpen, !tab.waitsForAlerts else { return }
+                guard let self, !Task.isCancelled, isOpen, !pointerWatch.holdsKeyboard else { return }
                 close()
             }
         case .close:
@@ -292,6 +327,7 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
         tabState.closingLook = PanelLook(tab: tab, mode: model.mode)
         isOpen = false
         tab = .notes
+        pointerWatch.reset()
         pointerExitTask?.cancel()
         pointerExitTask = nil
         switchTask?.cancel()
@@ -373,6 +409,10 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
             }
             return false
         }
+        // Text typed during a save's "Saved" that leads back to the line starts the next note.
+        if case .confirmation = model.mode, let text = Self.typedText(event), model.typeDuringConfirmation(text) {
+            return true
+        }
         // Nothing else is typed outside the field; ⌘⇧↩ is not ⌘↩ (the picker and the prompt ignore it).
         guard let key = NoteKeyCommand.panelKey(keyCode: event.keyCode, modifiers: event.modifierFlags) else { return true }
         if model.handleImmediately(key) == nil {
@@ -383,6 +423,12 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
 
     // MARK: NSWindowDelegate
 
+    /// A click in Notes opened by hover: from now on they hold the keyboard as Notes do.
+    func windowDidBecomeKey(_ notification: Notification) {
+        guard isGlancing else { return }
+        perform(pointerWatch.tookKeyboard())
+    }
+
     func windowDidResignKey(_ notification: Notification) {
         // A save in flight may have brought up the Reminders access prompt: the panel waits for it. Sessions and Stats
         // do not hold the keyboard: the pointer leaving closes them.
@@ -392,6 +438,14 @@ final class NotesPanelPresenter: NSObject, NSWindowDelegate {
             return
         }
         close()
+    }
+
+    /// What a key types, if it types text: no ⌘, ⌃ or ⌥ chord, no control character, no arrow or function key.
+    private static func typedText(_ event: NSEvent) -> String? {
+        guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty, let text = event.characters,
+              !text.isEmpty else { return nil }
+        let isText = text.unicodeScalars.allSatisfy { !CharacterSet.controlCharacters.contains($0) && !(0xF700 ... 0xF8FF).contains($0.value) }
+        return isText ? text : nil
     }
 
     private static func noteField(in view: NSView?) -> NoteNSTextView? {

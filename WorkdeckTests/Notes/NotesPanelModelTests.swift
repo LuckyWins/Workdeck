@@ -108,6 +108,62 @@ struct NotesPanelModelTests {
         #expect(model.mode == .typing)
     }
 
+    /// Opened any way but the shortcut, a save comes back to the empty line with the list (polish batch spec §4.3).
+    @Test func aSaveFromATabReturnsToTheLine() async {
+        let (model, _) = await makeModel()
+        model.returnsAfterSave = true
+        await typeWithProject(model, "Update screenshots #Workdeck")
+        #expect(await model.handle(.returnKey))
+        #expect(!model.confirmationClosesPanel)
+        model.finishConfirmation()
+        #expect(recorder.closes == 0)
+        #expect(model.mode == .typing)
+        #expect(model.draft.text.isEmpty)
+    }
+
+    /// The next note can be typed at once: a key during "Saved" ends it and starts the line (polish batch spec §4.3).
+    @Test func typingDuringASavesConfirmationStartsTheNextNote() async {
+        let (model, _) = await makeModel()
+        model.returnsAfterSave = true
+        await typeWithProject(model, "Update screenshots #Workdeck")
+        #expect(await model.handle(.returnKey))
+        #expect(model.typeDuringConfirmation("N"))
+        #expect(model.mode == .typing)
+        #expect(model.draft.text == "N")
+        #expect(recorder.closes == 0)
+    }
+
+    @Test func typingDuringAClosingConfirmationIsIgnored() async {
+        let (model, _) = await makeModel()
+        await typeWithProject(model, "Update screenshots #Workdeck")
+        #expect(await model.handle(.returnKey))
+        #expect(!model.typeDuringConfirmation("N"))
+        #expect(model.draft.text.isEmpty)
+    }
+
+    @Test func anEditSavedFromATabReturnsToTheLine() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.returnsAfterSave = true
+        model.startEdit(item)
+        model.textChanged(model.draft.text.replacingOccurrences(of: "staging", with: "prod"))
+        #expect(await model.handle(.returnKey))
+        #expect(!model.confirmationClosesPanel)
+    }
+
+    @Test func aHandOffClosesHoweverThePanelOpened() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.returnsAfterSave = true
+        model.startEdit(item)
+        model.textChanged(model.draft.text.replacingOccurrences(of: "staging", with: "prod"))
+        #expect(await model.handle(.commandReturn))
+        #expect(launcher.commands.count == 1)
+        #expect(model.confirmationClosesPanel)
+    }
+
     @Test func returnSavesAndShowsNeutralConfirmation() async {
         let (model, _) = await makeModel()
         await typeWithProject(model, "Check the staging migration tomorrow at 4pm #Workdeck")

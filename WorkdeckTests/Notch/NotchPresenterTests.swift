@@ -370,6 +370,82 @@ struct NotchPresenterTests {
         #expect(presenter.model.tab == .sessions)
     }
 
+    /// Hover opens on the tab last clicked (polish batch spec §4.1).
+    @Test func hoverOpensOnThePickedTab() async {
+        let (presenter, _) = makePresenter()
+        presenter.model.pickedTab = .stats
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        surface.onHoverChange?(true)
+        await settle(presenter)
+        #expect(presenter.appliedTarget == .expanded)
+        #expect(presenter.model.tab == .stats)
+    }
+
+    @Test func hoverOnAPickedNotesTabOpensTheNotesPanel() async {
+        let (presenter, _) = makePresenter()
+        var handOvers = 0
+        presenter.model.onHoverNotes = {
+            handOvers += 1
+            return true
+        }
+        presenter.model.pickedTab = .notes
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        surface.onHoverChange?(true)
+        await settle(presenter)
+        #expect(handOvers == 1)
+        #expect(presenter.appliedTarget != .expanded)
+    }
+
+    @Test func hoverOpeningNotesTaps() async {
+        let (presenter, _) = makePresenter()
+        presenter.model.onHoverNotes = { true }
+        presenter.model.pickedTab = .notes
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        surface.onHoverChange?(true)
+        await settle(presenter)
+        #expect(haptics.performed == [.hover])
+    }
+
+    /// A click on a tab is what hover remembers (polish batch spec §4.1).
+    @Test func aTabClickIsRemembered() {
+        let model = LimitsNotchModel()
+        var opened = 0
+        model.onOpenNotes = { opened += 1 }
+        model.pick(.stats)
+        #expect(model.tab == .stats)
+        #expect(model.pickedTab == .stats)
+        model.pick(.notes)
+        #expect(opened == 1)
+        #expect(model.pickedTab == .notes)
+        // The panel shows Notes; the notch under it keeps its tab.
+        #expect(model.tab == .stats)
+    }
+
+    @Test func hoverOnNotesThatCannotOpenShowsSessions() async {
+        let (presenter, _) = makePresenter()
+        presenter.model.onHoverNotes = { false }
+        presenter.model.pickedTab = .notes
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        surface.onHoverChange?(true)
+        await settle(presenter)
+        #expect(presenter.appliedTarget == .expanded)
+        #expect(presenter.model.tab == .sessions)
+    }
+
+    @Test func anAlertKeepsThePickedTab() async {
+        let (presenter, _) = makePresenter()
+        presenter.model.pickedTab = .stats
+        presenter.show(state(.notch(.normal)))
+        await settle(presenter)
+        presenter.flash([.sessionNeedsYou(project: "vitastir")])
+        #expect(presenter.model.tab == .sessions)
+        #expect(presenter.model.pickedTab == .stats)
+    }
+
     @Test func anAlertResetsTheTabToSessions() async {
         let (presenter, _) = makePresenter()
         presenter.show(state(.notch(.normal)))

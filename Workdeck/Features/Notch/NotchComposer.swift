@@ -32,6 +32,9 @@ final class NotchComposer {
     @ObservationIgnored var onStatsDetails: (() -> Void)?
     /// The Notes icon in the expanded notch (notch tabs spec §4).
     @ObservationIgnored var onOpenNotes: (() -> Void)?
+    /// Hover on a picked Notes tab: the notes panel opens without the keyboard; false when it cannot (polish batch
+    /// spec §4.2).
+    @ObservationIgnored var onHoverNotes: (() -> Bool)?
     /// An alert came while the quick notes panel holds the notch: the panel closes for it unless Notes has the
     /// keyboard (notch tabs spec §6).
     @ObservationIgnored var onSuspendedAlert: (() -> Void)?
@@ -141,6 +144,9 @@ final class NotchComposer {
         }
         presenter.setOpenNotesAction { [weak self] in
             self?.onOpenNotes?()
+        }
+        presenter.setHoverNotesAction { [weak self] in
+            self?.onHoverNotes?() ?? false
         }
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,

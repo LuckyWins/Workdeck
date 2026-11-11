@@ -187,13 +187,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
 
     /// Opens the panel, or closes it when open (spec §2.1). While the demo plays in it, the key does nothing.
-    private func toggleNotesPanel() {
+    private func toggleNotesPanel(opening: PanelTabRules.Opening = .shortcut) {
         guard !notesDemo.isShowing else { return }
         if !notesPanel.isOpen {
             // The folder prompt may ask in a moment: the chats are read meanwhile.
             notesFolders.refresh()
         }
-        notesPanel.toggle()
+        notesPanel.toggle(opening: opening)
     }
 
     /// Send Feedback in Settings → About (feedback spec): an email to the developer with the Copy Diagnostics report.
@@ -255,14 +255,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         codex.start()
         recap.start()
         notes.onOpenPanel = { [unowned self] in
-            guard !notesPanel.isOpen else { return }
-            toggleNotesPanel()
+            // Notes opened by hover take the keyboard from the popover's row too.
+            guard !notesPanel.isOpen || notesPanel.isGlancing else { return }
+            toggleNotesPanel(opening: .popover)
         }
         // The Notes icon in the expanded notch (notch tabs spec §4).
         notch.onOpenNotes = { [unowned self] in
             guard !notesPanel.isOpen, !notesDemo.isShowing else { return }
             notesFolders.refresh()
             notesPanel.openFromNotch()
+        }
+        // Hover on a picked Notes tab (polish batch spec §4.2).
+        notch.onHoverNotes = { [unowned self] in
+            guard !notesPanel.isOpen, !notesDemo.isShowing else { return false }
+            notesFolders.refresh()
+            return notesPanel.openFromHover()
         }
         // Cleanup needs Reminders access; it does nothing until then, and runs once when the first save gets it.
         notes.onAccessGranted = { [unowned self] in Task { await notesCleanup.run() } }

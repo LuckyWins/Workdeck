@@ -42,6 +42,9 @@ protocol LimitsPresenting: AnyObject {
     func setStatsDetailsAction(_ action: @escaping () -> Void)
     /// What the Notes icon in the expanded notch does: the quick notes panel opens on Notes (notch tabs spec §4).
     func setOpenNotesAction(_ action: @escaping () -> Void)
+    /// What hover on a picked Notes tab does: the notes panel opens without the keyboard; false when it cannot
+    /// (polish batch spec §4.2).
+    func setHoverNotesAction(_ action: @escaping () -> Bool)
     /// Called with true when the pointer has rested on the hidden notch's place, false when it has left (spec §5).
     func setPeekAction(_ action: @escaping (Bool) -> Void)
     /// Whether the pointer is on the notch or at its place right now.
@@ -452,6 +455,10 @@ final class NotchPresenter: LimitsPresenting {
         model.onOpenNotes = action
     }
 
+    func setHoverNotesAction(_ action: @escaping () -> Bool) {
+        model.onHoverNotes = action
+    }
+
     private func endRecapExpansion() {
         recapTask?.cancel()
         recapTask = nil
@@ -640,9 +647,20 @@ final class NotchPresenter: LimitsPresenting {
             hasScreen: screen != nil,
             hidesResting: mayRest && screen.map { $0.isVirtual && fullScreen.isFullScreen($0.screen) } ?? false
         )
-        // Hover always opens on Sessions (notch tabs spec §1); a collapsing notch keeps its content while it shrinks.
+        let opensByHover = target == .expanded && appliedTarget != .expanded && isHovering && !isShowingAlert && !showsRecap && !holds
+        // Hover on a picked Notes tab: the notes panel opens over the notch instead, without the keyboard (polish
+        // batch spec §4.2); its opening hides the notch.
+        if opensByHover, model.pickedTab == .notes, model.onHoverNotes?() == true {
+            tap(.hover)
+            hoverTask?.cancel()
+            hoverTask = nil
+            isHovering = false
+            return
+        }
+        // Hover opens on the tab last clicked, an alert on Sessions (polish batch spec §4.1); a collapsing notch keeps
+        // its content while it shrinks.
         if target == .expanded, appliedTarget != .expanded {
-            model.tab = .sessions
+            model.tab = opensByHover ? PanelTabRules.hoverTab(picked: model.pickedTab) : .sessions
         }
         let rebuild = needsRebuild
         needsRebuild = false
@@ -651,7 +669,7 @@ final class NotchPresenter: LimitsPresenting {
             return
         }
         // Hover alone opened it: an alert, the recap or the demo's hold keeping it open taps nothing (haptics spec §2.1).
-        if target == .expanded, appliedTarget != .expanded, isHovering, !isShowingAlert, !showsRecap, !holds {
+        if opensByHover {
             tap(.hover)
         }
 

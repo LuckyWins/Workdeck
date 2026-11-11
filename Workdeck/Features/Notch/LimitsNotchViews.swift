@@ -17,9 +17,25 @@ final class LimitsNotchModel {
     var countdown: NotchCountdown?
     /// The pointer is on the notch, after the hover delays; the countdown bar hides meanwhile.
     var isHovering = false
-    /// The tab the expanded notch shows; back to Sessions whenever the notch collapses or an alert comes (notch tabs
-    /// spec §1).
+    /// The tab the expanded notch shows: on hover the picked tab, for an alert Sessions (notch tabs spec §1, polish
+    /// batch spec §4.1).
     var tab: NotchTab = .sessions
+    /// The tab last clicked, in the notch or the notes panel: hover opens on it (polish batch spec §4.1). Kept in
+    /// memory only; alerts and the shortcut leave it alone.
+    @ObservationIgnored var pickedTab: NotchTab = .sessions
+    /// Hover on a picked Notes tab: the notes panel opens without the keyboard; false when it cannot, and the notch
+    /// opens on Sessions instead.
+    @ObservationIgnored var onHoverNotes: (() -> Bool)?
+
+    /// A click on a tab: hover remembers it; Notes hand over to the quick notes panel, the others switch here.
+    func pick(_ tab: NotchTab) {
+        pickedTab = tab
+        if tab == .notes {
+            onOpenNotes?()
+        } else {
+            self.tab = tab
+        }
+    }
     /// The current week for the Stats tab; nil until the recap has read its days.
     var weekStats: WeeklyRecapSummary?
     @ObservationIgnored var onRefresh: (() -> Void)?
@@ -220,10 +236,10 @@ struct LimitsExpandedView: View {
     /// Notes hands over to the quick notes panel; the other tabs switch here, the notch resizing smoothly.
     private func select(_ tab: NotchTab) {
         if tab == .notes {
-            model.onOpenNotes?()
+            model.pick(tab)
         } else {
             withAnimation(reduceMotion ? nil : NotesPanelStyle.tabSwitchAnimation) {
-                model.tab = tab
+                model.pick(tab)
             }
         }
     }

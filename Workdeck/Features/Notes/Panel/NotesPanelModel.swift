@@ -106,6 +106,10 @@ final class NotesPanelModel {
     @ObservationIgnored private var pickerItem: ReminderItem?
     @ObservationIgnored private var folderItem: ReminderItem?
     @ObservationIgnored private(set) var confirmationClosesPanel = false
+    /// Set on each opening: a save comes back to the line instead of closing the panel (polish batch spec §4.3).
+    @ObservationIgnored var returnsAfterSave = false
+    /// The confirmation shown is a save's that leads back to the line: typing ends it at once.
+    @ObservationIgnored private var confirmationReturnsToLine = false
     @ObservationIgnored private var confirmationTask: Task<Void, Never>?
     @ObservationIgnored private let doneUndoDelay: Duration
     @ObservationIgnored private var pendingDoneTasks: [String: Task<Void, Never>] = [:]
@@ -838,7 +842,7 @@ final class NotesPanelModel {
             } else {
                 // Nothing to write, but it reads as a save: a second ↩ must not save the line that came back.
                 let listTitle = list(withID: item.listID)?.title ?? NotesController.unknownListTitle
-                confirm(NotesConfirmation(symbol: "checkmark", title: "Saved · \(listTitle)", subtitle: remindsText(item)), closesPanel: true)
+                confirm(NotesConfirmation(symbol: "checkmark", title: "Saved · \(listTitle)", subtitle: remindsText(item)), closesPanel: !returnsAfterSave, returnsToLine: returnsAfterSave)
             }
             return
         }
@@ -865,7 +869,7 @@ final class NotesPanelModel {
             if handingOff {
                 await start(saved, savedNow: true)
             } else {
-                confirm(NotesConfirmation(symbol: "checkmark", title: "Saved · \(listTitle)", subtitle: remindsText(saved)), closesPanel: true)
+                confirm(NotesConfirmation(symbol: "checkmark", title: "Saved · \(listTitle)", subtitle: remindsText(saved)), closesPanel: !returnsAfterSave, returnsToLine: returnsAfterSave)
             }
         case .needsAccess:
             needsAccess = true
@@ -1023,7 +1027,7 @@ final class NotesPanelModel {
         case let .saved(item, listTitle):
             needsAccess = false
             resetDraft()
-            confirm(NotesConfirmation(symbol: "checkmark", title: "Saved · \(listTitle)", subtitle: remindsText(item)), closesPanel: true)
+            confirm(NotesConfirmation(symbol: "checkmark", title: "Saved · \(listTitle)", subtitle: remindsText(item)), closesPanel: !returnsAfterSave, returnsToLine: returnsAfterSave)
         case .needsAccess:
             needsAccess = true
         case let .failed(reason):
@@ -1214,9 +1218,10 @@ final class NotesPanelModel {
 
     // MARK: Confirmations
 
-    private func confirm(_ confirmation: NotesConfirmation, closesPanel: Bool, stays: Bool = false) {
+    private func confirm(_ confirmation: NotesConfirmation, closesPanel: Bool, stays: Bool = false, returnsToLine: Bool = false) {
         confirmationTask?.cancel()
         confirmationClosesPanel = closesPanel
+        confirmationReturnsToLine = returnsToLine && !closesPanel
         confirmationStays = stays
         selectedRow = nil
         mode = .confirmation(confirmation)
@@ -1236,6 +1241,7 @@ final class NotesPanelModel {
         confirmationTask = nil
         controller.failedCommand = nil
         confirmationStays = false
+        confirmationReturnsToLine = false
         // The panel freezes what it shows when it starts closing (notes polish spec §5): ask while the confirmation
         // still shows, so it draws into the notch as it is.
         if confirmationClosesPanel {
@@ -1245,6 +1251,15 @@ final class NotesPanelModel {
         }
         mode = .typing
         refreshDerived()
+    }
+
+    /// A key typed while a save's "Saved" leads back to the line: the confirmation ends and the text starts the next
+    /// note, so the next one can be typed at once (polish batch spec §4.3). False when this confirmation ends otherwise.
+    func typeDuringConfirmation(_ text: String) -> Bool {
+        guard case .confirmation = mode, confirmationReturnsToLine, !text.isEmpty else { return false }
+        finishConfirmation()
+        textChanged(draft.text + text)
+        return true
     }
 
     /// The demo's "Saved" (spec §9): shown as after a save, though nothing was saved; the demo closes the panel itself.

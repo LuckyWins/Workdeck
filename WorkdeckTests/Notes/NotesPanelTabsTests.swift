@@ -82,11 +82,81 @@ struct NotesPanelTabsTests {
         #expect(watch.clickOutside() == .close)
     }
 
+    /// Notes opened by hover hold no keyboard: they close on the pointer like Sessions until a click gives them the
+    /// keyboard (polish batch spec §4.2).
+    @Test func notesWithoutTheKeyboardCloseOnThePointer() {
+        var watch = PanelPointerWatch()
+        watch.opened(on: .notes, holdsKeyboard: false)
+        #expect(!watch.holdsKeyboard)
+        #expect(watch.pointer(inside: true) == .cancelExit)
+        #expect(watch.pointer(inside: false) == .armExit)
+        #expect(watch.clickOutside() == .close)
+        #expect(watch.tookKeyboard() == .cancelExit)
+        #expect(watch.holdsKeyboard)
+        #expect(watch.pointer(inside: false) == .cancelExit)
+        #expect(watch.clickOutside() == .none)
+    }
+
+    /// The panel opened by hover grows under a pointer already on it: AppKit may report only the exit.
+    @Test func notesOpenedByHoverCloseOnTheFirstExit() {
+        var watch = PanelPointerWatch()
+        watch.opened(on: .notes, holdsKeyboard: false)
+        #expect(watch.pointer(inside: false) == .armExit)
+    }
+
+    @Test func onlyNotesWithoutTheKeyboardAreGlancing() {
+        var watch = PanelPointerWatch()
+        #expect(!watch.isGlancing)
+        watch.opened(on: .notes, holdsKeyboard: false)
+        #expect(watch.isGlancing)
+        _ = watch.tookKeyboard()
+        #expect(!watch.isGlancing)
+        watch.opened(on: .notes, holdsKeyboard: false)
+        _ = watch.selected(.stats)
+        #expect(!watch.isGlancing)
+        watch.opened(on: .notes, holdsKeyboard: false)
+        watch.reset()
+        #expect(!watch.isGlancing)
+    }
+
+    @Test func notesWithoutTheKeyboardStepAsideForAlerts() {
+        #expect(PanelTabRules.closesForAlert(isOpen: true, tab: .notes, holdsKeyboard: false))
+        #expect(!PanelTabRules.closesForAlert(isOpen: true, tab: .notes, holdsKeyboard: true))
+        #expect(PanelTabRules.closesForAlert(isOpen: true, tab: .stats, holdsKeyboard: true))
+    }
+
+    @Test func onlyAHoverOpensNotesWithoutTheKeyboard() {
+        #expect(!PanelTabRules.takesKeyboard(.hover))
+        #expect(PanelTabRules.takesKeyboard(.shortcut))
+        #expect(PanelTabRules.takesKeyboard(.notchTab))
+        #expect(PanelTabRules.takesKeyboard(.popover))
+    }
+
+    @Test func onlyTheShortcutsSaveClosesThePanel() {
+        #expect(!PanelTabRules.returnsAfterSave(.shortcut))
+        #expect(PanelTabRules.returnsAfterSave(.hover))
+        #expect(PanelTabRules.returnsAfterSave(.notchTab))
+        #expect(PanelTabRules.returnsAfterSave(.popover))
+    }
+
+    @Test func hoverOpensTheNotchOnThePickedTab() {
+        #expect(PanelTabRules.hoverTab(picked: .sessions) == .sessions)
+        #expect(PanelTabRules.hoverTab(picked: .stats) == .stats)
+        // Notes are the panel's: the notch under it stays on Sessions.
+        #expect(PanelTabRules.hoverTab(picked: .notes) == .sessions)
+    }
+
     @Test func theShortcutOpensClosesOrComesBackToNotes() {
         #expect(PanelTabRules.toggle(isOpen: false, tab: .notes) == .open)
         #expect(PanelTabRules.toggle(isOpen: true, tab: .notes) == .close)
         #expect(PanelTabRules.toggle(isOpen: true, tab: .sessions) == .showNotes)
         #expect(PanelTabRules.toggle(isOpen: true, tab: .stats) == .showNotes)
+    }
+
+    /// Notes opened by hover hold no keyboard: the shortcut gives it to them instead of closing (polish batch spec §4.2).
+    @Test func theShortcutOnNotesWithoutTheKeyboardTakesIt() {
+        #expect(PanelTabRules.toggle(isOpen: true, tab: .notes, holdsKeyboard: false) == .takeKeyboard)
+        #expect(PanelTabRules.toggle(isOpen: true, tab: .notes, holdsKeyboard: true) == .close)
     }
 
     @Test func anAlertClosesThePanelOnlyAwayFromNotes() {

@@ -11,7 +11,7 @@ Decided with the user (2026-11-09):
 
 - **Three tabs** at the top of the expanded notch: Sessions (what the notch shows today), Notes (the quick notes panel's content), Stats (a card like the weekly recap, for the current week).
 - **Tab bar look (mockup B):** three icons on the left, the selected one on a rounded gray background; the selected tab's name on the right, dim.
-- **Hover always opens on Sessions.** The last tab is not remembered ("we'll see later how convenient it is").
+- **Hover always opens on Sessions.** The last tab is not remembered ("we'll see later how convenient it is"). *Superseded on 2026-11-11 (polish batch spec §4.1): hover opens on the tab last clicked.*
 - **Notes is the same thing as the panel:** the line to type in, the open notes, Done, the `#` list, the agent picker, the folder prompt and the confirmation, with every key working as it does now.
 - **The right Option opens the notch straight on Notes**, the cursor in the line. There is no separate-looking panel any more: from the outside it is one notch.
 - **Played back, no objection:**
@@ -71,7 +71,7 @@ When the notch was opened by the shortcut where nothing would show (every agent 
 - The content and behavior of the quick notes panel (quick notes spec §3, and the Return changes of 2026-11-09: Return in an open `#` list picks the row and does not save).
 - **Opened by hover, then a click on the Notes icon:** the tab shows and the line has the cursor at once; the notch takes the keyboard without activating Workdeck.
 - **Opened by the right Option** (or the user's recorded shortcut, or the popover's Notes row): the notch opens straight on Notes with the cursor in the line, as the panel opens today, on the screen with the pointer.
-- **Closing:** Esc, a click outside, the shortcut again, or the end of the confirmation after a save. Focus returns to the app that had it, as now. The next hover opens on Sessions.
+- **Closing:** Esc, a click outside, the shortcut again, or the end of the confirmation after a save. Focus returns to the app that had it, as now. The next hover opens on Sessions (since polish batch spec §4: on the tab last clicked; a save from a panel not opened by the shortcut comes back to the line).
 - **The draft:** as the panel does today, closing without saving keeps the typed text in memory (`NotesPanelModel.closed()`), and the next opening of Notes, by click or by shortcut, shows it again. Nothing new is persisted: a note's text never goes to `UserDefaults` or disk (quick notes spec §8).
 - The notes panel's demo (`NotesDemo`) plays in the Notes tab.
 - **Demo mode** (my call): Stats shows `RecapDemoScript`'s made-up days while the demo runs, as `RecapController` already swaps them in; the demo does not switch tabs by itself except where `NotesDemo` opens Notes, as it opens the panel today.
@@ -88,7 +88,7 @@ A card in the style of the Monday recap (`RecapView`), for the current week, Mon
 
 ## 6. Alerts and the notch's states
 
-- An alert opens the notch on Sessions, whatever tab was showing, unless Notes has the keyboard; then the alert waits and shows when the notes close (my call: in the order alerts already queue; nothing is dropped).
+- An alert opens the notch on Sessions, whatever tab was showing, unless Notes has the keyboard; then the alert waits and shows when the notes close (my call: in the order alerts already queue; nothing is dropped). Notes opened by hover hold no keyboard until clicked, so an alert closes them (polish batch spec §4.2).
 - **Alerts and the Monday recap card show without the tab bar** (my call): they are messages, not tabs, and look exactly as now. When an alert ends while the pointer is still on the notch, the notch shows Sessions with the tab bar.
 - **While last week's card waits for Got it**, a hover shows the card as now, without tabs (my call: the card is one click away from gone, and the recap spec's rule that it stays until Got it holds). After Got it, hovers show the tabs. The shortcut opens Notes even while the card waits; the card shows again on the next hover.
 - The Monday recap card is not shown while Notes has the keyboard; it waits.

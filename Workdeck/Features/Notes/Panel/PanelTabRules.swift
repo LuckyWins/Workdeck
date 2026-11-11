@@ -2,22 +2,53 @@ import Foundation
 
 /// The quick notes panel's decisions about its tabs (notch tabs spec §4, §6), apart from AppKit so they are tested.
 nonisolated enum PanelTabRules {
+    /// How the panel was opened (polish batch spec §4).
+    enum Opening: Equatable, Sendable {
+        /// Right Option, right Command or a recorded combination.
+        case shortcut
+        /// Hover on the notch while Notes is the picked tab.
+        case hover
+        /// The Notes icon in the expanded notch.
+        case notchTab
+        /// The popover's Notes row.
+        case popover
+    }
+
+    /// Only a hover opens Notes without the keyboard: the user's app keeps its keys until a click in the panel.
+    static func takesKeyboard(_ opening: Opening) -> Bool {
+        opening != .hover
+    }
+
+    /// A save ends with the panel closing only after the shortcut, a quick capture; opened any other way the panel
+    /// comes back to the line with the list.
+    static func returnsAfterSave(_ opening: Opening) -> Bool {
+        opening != .shortcut
+    }
+
+    /// The tab the hover notch opens on: the picked one, except Notes, which the panel shows over the notch.
+    static func hoverTab(picked: NotchTab) -> NotchTab {
+        picked == .notes ? .sessions : picked
+    }
+
     enum ToggleAction: Equatable, Sendable {
         case open
         case close
         /// The panel is up on Sessions or Stats: the shortcut brings Notes back instead of closing.
         case showNotes
+        /// Notes opened by hover, without the keyboard: the shortcut gives it to them.
+        case takeKeyboard
     }
 
-    static func toggle(isOpen: Bool, tab: NotchTab) -> ToggleAction {
+    static func toggle(isOpen: Bool, tab: NotchTab, holdsKeyboard: Bool = true) -> ToggleAction {
         guard isOpen else { return .open }
-        return tab == .notes ? .close : .showNotes
+        guard tab == .notes else { return .showNotes }
+        return holdsKeyboard ? .close : .takeKeyboard
     }
 
     /// An alert came while the panel holds the notch: it waits while Notes has the keyboard, otherwise the panel
     /// closes so the notch shows it.
-    static func closesForAlert(isOpen: Bool, tab: NotchTab) -> Bool {
-        isOpen && !tab.waitsForAlerts
+    static func closesForAlert(isOpen: Bool, tab: NotchTab, holdsKeyboard: Bool = true) -> Bool {
+        isOpen && !(tab.waitsForAlerts && holdsKeyboard)
     }
 
     /// The note asks the panel to close (Esc, a confirmation that ends): only while Notes shows. A save's
