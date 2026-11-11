@@ -324,6 +324,60 @@ struct ScreenshotTests {
         #expect(first.lidOpen == last.lidOpen && first.screenOn == last.screenOn && first.switchOn == last.switchOn)
         #expect(first.popover == last.popover && first.finished == last.finished && first.clock == last.clock && first.pointer == last.pointer)
         #expect(ClosedLidAnimation.notchProgress(lidFrames.last!) == 0)
+        let instancesFrames = SceneTimeline.frames(InstancesAnimation.phases)
+        #expect(InstancesAnimation.shown(instancesFrames.last!) == InstancesAnimation.shown(instancesFrames.first!))
+        #expect(InstancesAnimation.shown(instancesFrames.first!).popover == 1)
+        for frame in [instancesFrames.first!, instancesFrames.last!] {
+            #expect(InstancesAnimation.pointer.point(at: frame.time) == nil)
+        }
+    }
+
+    /// Pure: runs in every test run. The Instances scene's clicks land, in order, on the popover's Instances… button,
+    /// the missing cell, the menu's item, Confirm and Close (measured places in the snapshots, `InstancesAnimation.Layout`).
+    @Test func instancesPointerTargetsTheButtonTheCellTheItemAndTheSheet() throws {
+        let layout = InstancesAnimation.layout
+        let track = InstancesAnimation.pointer
+        let targets = [layout.instancesButton, layout.addCell, layout.menuItem, layout.confirmButton, layout.closeButton]
+        #expect(track.clicks.count == targets.count)
+        for (time, target) in zip(track.clicks, targets) {
+            #expect(target.contains(try #require(track.point(at: time))), "click at \(time)")
+        }
+        // Each control shows as the pointer comes down on it.
+        let frames = SceneTimeline.frames(InstancesAnimation.phases)
+        func shown(at click: TimeInterval) -> InstancesAnimation.Shown {
+            InstancesAnimation.shown(frames.last { $0.time <= click - PointerTrack.clickLength / 2 }!)
+        }
+        #expect(shown(at: track.clicks[0]).popover == 1)
+        #expect(shown(at: track.clicks[1]).window == 1 && !shown(at: track.clicks[1]).menu)
+        #expect(shown(at: track.clicks[2]).menu && shown(at: track.clicks[2]).itemHighlighted)
+        #expect(shown(at: track.clicks[3]).sheet == 1 && !shown(at: track.clicks[3]).done)
+        #expect(shown(at: track.clicks[4]).sheet == 1 && shown(at: track.clicks[4]).done)
+        // The menu hangs below the cell, inside the window.
+        #expect(layout.menuItem.minY > layout.addCell.maxY)
+        #expect(layout.window.contains(layout.menu))
+        #expect(layout.window.contains(layout.sheet))
+    }
+
+    /// Writes made-up skills into temporary folders, renders nothing: runs in every test run. The scene's story holds in
+    /// the real controller: main lacks write-docs, its cell offers one copy, and the copy makes the cell present.
+    @Test func theInstancesSceneCopiesAMissingSkill() async throws {
+        let controller = try await fixtures.instancesCompare()
+        let item = try #require(InstancesAnimation.prepare(controller))
+        let rowsBefore = controller.rows.map(\.id)
+        // The measured `+ Add` cell is this row and column: a fixture that adds a row above or reorders the
+        // accounts must fail here, not move the click beside the cell.
+        #expect(rowsBefore.firstIndex(of: InstancesAnimation.rowID) == InstancesAnimation.Layout.rowIndex)
+        #expect(controller.setups.map(\.instance.name) == InstancesAnimation.Layout.columns)
+        #expect(item.title == InstancesAnimation.menuTitle)
+        let row = try #require(controller.row(withID: InstancesAnimation.rowID))
+        #expect(row.cells[InstancesAnimation.target] == .missing)
+        #expect(controller.menu(for: row, instance: InstancesAnimation.target).flatMap { $0 } == [item])
+        try await InstancesAnimation.copy(item, in: controller)
+        #expect(controller.result == "Done")
+        let after = try #require(controller.row(withID: InstancesAnimation.rowID))
+        #expect(after.cells[InstancesAnimation.target] == .present(detail: nil))
+        // The row keeps its place, so the present cell shows where the missing one was.
+        #expect(controller.rows.map(\.id) == rowsBefore)
     }
 
     @Test(.enabled(if: ScreenshotRenderer.isEnabled))
@@ -385,6 +439,23 @@ struct ScreenshotTests {
     }
 
     @Test(.enabled(if: ScreenshotRenderer.isEnabled))
+    func instancesAnimation() async throws {
+        let animation = try await InstancesAnimation.make(fixtures: fixtures)
+        // The measured places hold for these renders (`InstancesAnimation.Layout`).
+        let layout = InstancesAnimation.layout
+        typealias Layout = InstancesAnimation.Layout
+        func points(_ image: CGImage) -> CGSize { CGSize(width: image.width / 2, height: image.height / 2) }
+        let margin = 2 * ScreenshotRenderer.windowMargin
+        let window = CGSize(width: Layout.windowSize.width + margin, height: Layout.windowSize.height + Layout.chrome + margin)
+        #expect(points(animation.before) == window, "the window snapshot is \(points(animation.before)): update Layout.chrome")
+        #expect(points(animation.reviewSheet) == Layout.reviewSheetSize, "the review sheet is \(points(animation.reviewSheet))")
+        #expect(points(animation.doneSheet) == Layout.doneSheetSize, "the done sheet is \(points(animation.doneSheet))")
+        #expect(animation.itemTitle == InstancesAnimation.menuTitle)
+        #expect(!animation.claudeCode.limits.extras.isEmpty, "the popover's Claude Code row shows Instances… only with a second instance")
+        try expectAnimation(try await animation.write(), canvas: layout.canvas, limit: 8_000_000)
+    }
+
+    @Test(.enabled(if: ScreenshotRenderer.isEnabled))
     func weekScene() throws {
         let scene = try WeekScene.make(fixtures: fixtures)
         // site/index.html's Your week slide has these numbers written in (the week CSS): a different screen or layout
@@ -409,7 +480,7 @@ struct ScreenshotTests {
                              "statistics-light", "statistics-dark", "chats-light", "chats-dark", "instances-light", "instances-dark",
                              "notch-hover-animated", "notch-alert-animated", "notes-capture", "notes-capture-animated",
                              "alert-session-animated", "alert-session", "switch-account-animated",
-                             "closed-lid-animated", "closed-lid", "week-frame", "week-body", "week-grid-empty"]
+                             "closed-lid-animated", "closed-lid", "instances-animated", "week-frame", "week-body", "week-grid-empty"]
         #expect(expected.isSubset(of: ScreenshotRenderer.writtenThisRun), "missing: \(expected.subtracting(ScreenshotRenderer.writtenThisRun).sorted())")
     }
 }

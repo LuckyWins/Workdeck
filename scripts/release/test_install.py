@@ -188,7 +188,7 @@ class PageTests(unittest.TestCase):
         for still, animated in [
             ("notch-expanded", "notch-hover-animated"), ("alert-session", "alert-session-animated"),
             ("chats-dark", "switch-account-animated"), ("closed-lid", "closed-lid-animated"),
-            ("notes-capture", "notes-capture-animated"),
+            ("notes-capture", "notes-capture-animated"), ("instances-dark", "instances-animated"),
         ]:
             source = f'<source media="(prefers-reduced-motion: reduce)" srcset="screenshots/{still}.png">'
             # The still loads with the page; the script swaps in the animation once the page has loaded.
@@ -206,7 +206,7 @@ class PageTests(unittest.TestCase):
 
     def test_animations_load_with_their_tab_not_all_at_once(self):
         page = (ROOT / "site" / "index.html").read_text()
-        # Five animations are about 15 MB: each is fetched when its tab (or the one before it) shows.
+        # Six animations are about 19 MB: each is fetched when its tab (or the one before it) shows.
         self.assertNotIn("document.querySelectorAll('img[data-animated]').forEach", page)
         self.assertIn("window.tourAnimations.prepare(slides[i])", page)
         self.assertIn("window.tourAnimations.prepare(slides[(i + 1) % slides.length])", page)

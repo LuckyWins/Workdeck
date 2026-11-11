@@ -37,6 +37,17 @@ enum ScreenshotRenderer {
     /// Renders `view` at `width` points (or its fitting width), light or dark, and writes `<name>.png`.
     @discardableResult
     static func write<V: View>(_ view: V, name: String, dark: Bool, width: CGFloat?) throws -> URL {
+        try save(try rendered(view, name: name, dark: dark, width: width), name: name)
+    }
+
+    /// `view` drawn as `write` draws it, kept in memory at 2× for a scene of the landing tour (a sheet's content).
+    static func snapshot<V: View>(_ view: V, dark: Bool, width: CGFloat?) throws -> CGImage {
+        let name = "snapshot of a view"
+        guard let image = try rendered(view, name: name, dark: dark, width: width).cgImage else { throw Failure.noBitmap(name) }
+        return image
+    }
+
+    private static func rendered<V: View>(_ view: V, name: String, dark: Bool, width: CGFloat?) throws -> NSBitmapImageRep {
         ActiveAppearance.install()
         let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)!
         let host = NSHostingView(rootView: view
@@ -70,7 +81,7 @@ enum ScreenshotRenderer {
         guard rep.pixelsWide == Int((size.width * 2).rounded()) else {
             throw Failure.notRetina(name, rep.pixelsWide, size.width)
         }
-        return try save(rep, name: name)
+        return rep
     }
 
     /// The margin around a window for its shadow, in points.
@@ -97,15 +108,28 @@ enum ScreenshotRenderer {
     /// loop alone does not resume them.
     @discardableResult
     static func writeWindowYielding<V: View>(_ view: V, title: String, size: CGSize, name: String, dark: Bool) async throws -> URL {
-        let shown = openWindow(view, title: title, size: size, dark: dark)
+        let shown = try await openSettled(view, title: title, size: size, dark: dark)
         defer { shown.window.orderOut(nil) }
+        return try capture(shown, size: size, name: name, dark: dark)
+    }
+
+    /// Opens `view` in a window and yields while its own work settles (a reload when it appears), the glass removed.
+    private static func openSettled<V: View>(
+        _ view: V, title: String, size: CGSize, dark: Bool
+    ) async throws -> (window: NSWindow, host: NSView, appearance: NSAppearance) {
+        let shown = openWindow(view, title: title, size: size, dark: dark)
         spin(0.4)
-        try await pause(until: Date().addingTimeInterval(0.25))
+        do {
+            try await pause(until: Date().addingTimeInterval(0.25))
+        } catch {
+            shown.window.orderOut(nil)
+            throw error
+        }
         shown.window.makeKey()
         spin(0.1)
         removeGlass(of: shown)
         spin(0.4)
-        return try capture(shown, size: size, name: name, dark: dark)
+        return shown
     }
 
     /// An inspector sits on a glass panel whose content adapts to what is behind it: drawn offscreen there is nothing
@@ -175,6 +199,15 @@ enum ScreenshotRenderer {
         spin(0.5)
         removeGlass(of: shown)
         spin(0.4)
+        let name = "snapshot of \(title)"
+        guard let image = try capturedFrame(shown, size: size, name: name, dark: dark).cgImage else { throw Failure.noBitmap(name) }
+        return image
+    }
+
+    /// `snapshotWindow` for a view whose own tasks leave the main actor and come back, as `writeWindowYielding`.
+    static func snapshotWindowYielding<V: View>(_ view: V, title: String, size: CGSize, dark: Bool) async throws -> CGImage {
+        let shown = try await openSettled(view, title: title, size: size, dark: dark)
+        defer { shown.window.orderOut(nil) }
         let name = "snapshot of \(title)"
         guard let image = try capturedFrame(shown, size: size, name: name, dark: dark).cgImage else { throw Failure.noBitmap(name) }
         return image

@@ -94,8 +94,9 @@ final class ScreenshotFixtures {
         return HookEvent(time: monday.addingTimeInterval(seconds), name: name, sessionID: session, cwd: folder, projectDir: folder, pid: pid, action: action)
     }
 
-    /// Claude Code with a 5-hour window at 55 % and a weekly one at 61 %, and two working sessions.
-    func claudeCode() throws -> ClaudeCodeController {
+    /// Claude Code with a 5-hour window at 55 % and a weekly one at 61 %, and two working sessions. `extraInstance`
+    /// adds a second instance's account, so the row shows Instances… (the Instances scene).
+    func claudeCode(extraInstance: String? = nil) throws -> ClaudeCodeController {
         let presenter = FakePresenter()
         let connector = FakeConnector()
         connector.status = .connected
@@ -120,7 +121,22 @@ final class ScreenshotFixtures {
             try HookEventFile.append(event, to: sessionsFolder)
         }
         let usage = ClaudeUsageStore(fileURL: usageURL) { now }
-        let limits = ClaudeLimitsController(settings: settings, store: usage, connector: connector, poller: FakePoller(), activity: FakeActivity())
+        let support = url("popover/support")
+        let extraConnector = FakeConnector()
+        extraConnector.status = .connected
+        let limits = ClaudeLimitsController(
+            settings: settings, store: usage, connector: connector, poller: FakePoller(), activity: FakeActivity(),
+            makeAccount: { instance in
+                AccountLimits(
+                    name: instance.name, directory: instance.directory,
+                    store: ClaudeUsageStore(fileURL: support.appending(path: "claude-usage-\(instance.name).json")) { now },
+                    connector: extraConnector, poller: FakePoller()
+                )
+            }
+        )
+        if let extraInstance {
+            limits.setInstances([ClaudeInstance.extra(named: extraInstance, home: url("popover/home"))])
+        }
         let hooks = FakeHooksConnector()
         hooks.status = .connected
         // The sessions' processes are alive, as they would be.
