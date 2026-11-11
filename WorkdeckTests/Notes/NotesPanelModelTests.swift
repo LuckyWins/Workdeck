@@ -152,6 +152,31 @@ struct NotesPanelModelTests {
         #expect(!model.confirmationClosesPanel)
     }
 
+    /// The edit started from the list: its save comes back there however the panel opened (polish batch spec §4.3).
+    @Test func anEditSavedAfterTheShortcutReturnsToTheLine() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.returnsAfterSave = false
+        model.startEdit(item)
+        model.textChanged(model.draft.text.replacingOccurrences(of: "staging", with: "prod"))
+        #expect(await model.handle(.returnKey))
+        #expect(!model.confirmationClosesPanel)
+        #expect(model.typeDuringConfirmation("N"))
+        #expect(model.draft.text == "N")
+        #expect(recorder.closes == 0)
+    }
+
+    @Test func anUntouchedEditAfterTheShortcutReturnsToTheLine() async {
+        let item = note()
+        store.items = [item]
+        let (model, _) = await makeModel()
+        model.returnsAfterSave = false
+        model.startEdit(item)
+        #expect(await model.handle(.returnKey))
+        #expect(!model.confirmationClosesPanel)
+    }
+
     @Test func aHandOffClosesHoweverThePanelOpened() async {
         let item = note()
         store.items = [item]

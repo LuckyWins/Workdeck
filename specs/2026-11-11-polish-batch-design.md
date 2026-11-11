@@ -84,6 +84,7 @@ Today every save ends with "Saved · List" for 2 seconds, then the panel closes 
 - **Panel opened by the shortcut:** unchanged, it closes after the confirmation.
 - **Any other opening** (hover, a click on the Notes tab, the popover's Notes row) **(my call: everything but the shortcut)**: after the confirmation it comes back to the note field, empty, with the open notes listed and the new note among them. The keyboard stays in the field, so the next note can be typed at once **(my call)**.
 - **⌘↩ (hand-off to Claude Code or Codex):** closes the panel however it was opened, since the user goes to the terminal **(my call)**.
+- **Saving an edit** (a note opened for editing from the list, "Edit" in its menu): always comes back to the line with the list, also when the shortcut opened the panel, since the edit started from the list (decided with the user on 2026-11-11, after using it).
 - Failures ("Couldn't save") and the folder prompt behave as today.
 - The panel's way back from the confirmation to the field follows the notes polish spec's morph (one shape changing size, never the whole view scaled or faded).
 

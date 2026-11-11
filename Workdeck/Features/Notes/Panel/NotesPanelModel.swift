@@ -833,6 +833,8 @@ final class NotesPanelModel {
 
     /// ↩ (or ⌘↩, then the hand-off) during an edit: the same reminder takes the line's title, date and list. An
     /// untouched line writes nothing.
+    /// The edit started from the list, so ↩ comes back to the line with the list however the panel opened (polish
+    /// batch spec §4.3); the hand-off still closes it.
     private func saveEdit(handingOff: Bool) async {
         guard let item = editing else { return }
         if let built = editBuiltDraft, draft.text == built.text, draft.project == built.project {
@@ -842,7 +844,7 @@ final class NotesPanelModel {
             } else {
                 // Nothing to write, but it reads as a save: a second ↩ must not save the line that came back.
                 let listTitle = list(withID: item.listID)?.title ?? NotesController.unknownListTitle
-                confirm(NotesConfirmation(symbol: "checkmark", title: "Saved · \(listTitle)", subtitle: remindsText(item)), closesPanel: !returnsAfterSave, returnsToLine: returnsAfterSave)
+                confirm(NotesConfirmation(symbol: "checkmark", title: "Saved · \(listTitle)", subtitle: remindsText(item)), closesPanel: false, returnsToLine: true)
             }
             return
         }
@@ -869,7 +871,7 @@ final class NotesPanelModel {
             if handingOff {
                 await start(saved, savedNow: true)
             } else {
-                confirm(NotesConfirmation(symbol: "checkmark", title: "Saved · \(listTitle)", subtitle: remindsText(saved)), closesPanel: !returnsAfterSave, returnsToLine: returnsAfterSave)
+                confirm(NotesConfirmation(symbol: "checkmark", title: "Saved · \(listTitle)", subtitle: remindsText(saved)), closesPanel: false, returnsToLine: true)
             }
         case .needsAccess:
             needsAccess = true
