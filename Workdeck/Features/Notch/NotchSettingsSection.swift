@@ -5,6 +5,8 @@ struct NotchSettingsSection: View {
     @Bindable var settings: NotchSettings
     /// An agent is on, so the notch can show alerts.
     let isNotchEnabled: Bool
+    /// Claude Code's or Codex's session hooks are connected: "With sessions" can show the notch.
+    let hasSessionHooks: Bool
     let onChange: () -> Void
     /// Follows screen changes while Settings is open, e.g. the lid opening.
     @State private var hasCameraHousing = NotchPresenter.hasCameraHousingScreen()
@@ -15,6 +17,11 @@ struct NotchSettingsSection: View {
                 ForEach(LimitsDisplayMode.allCases) { mode in
                     Text(mode.title).tag(mode)
                 }
+            }
+            if let caption = settings.mode.caption(hasSessionHooks: hasSessionHooks) {
+                Text(caption)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             if !hasCameraHousing {
                 Picker("Without a notch", selection: $settings.notchlessDisplay) {

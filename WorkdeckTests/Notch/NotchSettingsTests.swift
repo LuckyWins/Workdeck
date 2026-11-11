@@ -8,7 +8,7 @@ struct NotchSettingsTests {
 
     @Test func defaultsMatchTheOldClaudeDefaults() {
         let settings = NotchSettings(defaults: defaults)
-        #expect(settings.mode == .always)
+        #expect(settings.mode == .withSessions)
         #expect(settings.thresholds == [80, 95])
         #expect(settings.notifyOnReset)
         #expect(settings.showForecast)
@@ -47,7 +47,7 @@ struct NotchSettingsTests {
         defaults.set(15, forKey: "claudeSessions.finishedAfterMinutes")
         defaults.set(true, forKey: "claudeSessions.notifyNeedsYou")
         let settings = NotchSettings(defaults: defaults)
-        #expect(settings.mode == .whenActive)
+        #expect(settings.mode == .withSessions)
         #expect(settings.thresholds == [70, 90])
         #expect(!settings.notifyOnReset)
         #expect(!settings.showForecast)
@@ -64,8 +64,8 @@ struct NotchSettingsTests {
         let claude = ClaudeCodeSettings(defaults: defaults, notch: notch)
         claude.firstThreshold = 60
         #expect(notch.firstThreshold == 60)
-        notch.mode = .whenActive
-        #expect(claude.mode == .whenActive)
+        notch.mode = .withSessions
+        #expect(claude.mode == .withSessions)
         #expect(NotchSettings(defaults: defaults).firstThreshold == 60)
     }
 

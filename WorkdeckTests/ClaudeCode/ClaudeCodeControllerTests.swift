@@ -150,6 +150,8 @@ final class FakePresenter: LimitsPresenting {
     }
 
     private(set) var openNotesAction: (() -> Void)?
+    func setHoverNotesAction(_ action: @escaping () -> Bool) {}
+
     func setOpenNotesAction(_ action: @escaping () -> Void) {
         openNotesAction = action
     }
@@ -349,6 +351,7 @@ struct ClaudeCodeControllerTests {
     @Test func showsNotchWithUsage() throws {
         connector.status = .connected
         settings.isEnabled = true
+        settings.mode = .always
         try writeUsage(fiveHour: 42, sevenDay: 18)
         let (controller, store) = makeController()
         controller.start()
@@ -368,6 +371,24 @@ struct ClaudeCodeControllerTests {
         controller.start()
         store.reload()
         #expect(controller.menuBarText == "5h 85%")
+        #expect(controller.menuBarLevel == .warning)
+    }
+
+    /// "With sessions" hides the text with no session open, but the icon still warns of a limit past its threshold.
+    @Test func theMenuBarIconWarnsWithoutASession() throws {
+        connector.status = .connected
+        settings.isEnabled = true
+        settings.mode = .withSessions
+        settings.notchlessDisplay = .menuBarText
+        try writeUsage(fiveHour: 85)
+        var now = fixedNow
+        let (controller, store) = makeController(notch: false, clock: { now })
+        controller.start()
+        store.reload()
+        // Past the alert's minute.
+        now = fixedNow.addingTimeInterval(61)
+        controller.refresh()
+        #expect(controller.menuBarText == nil)
         #expect(controller.menuBarLevel == .warning)
     }
 
@@ -433,6 +454,7 @@ struct ClaudeCodeControllerTests {
 
     @Test func usageAPIAloneIsADataSource() throws {
         settings.isEnabled = true
+        settings.mode = .always
         settings.fetchFromAPI = true
         try writeUsage(fiveHour: 42)
         let (controller, store) = makeController()
@@ -610,11 +632,11 @@ struct ClaudeCodeControllerTests {
         #expect(controller.rowSubtitle == "5h 42% · 7d 0% · updated just now · no sessions")
     }
 
-    @Test func sessionsKeepTheNotchWhenActive() throws {
+    @Test func sessionsKeepTheNotchWithSessions() throws {
         connector.status = .connected
         hooksConnector.status = .connected
         settings.isEnabled = true
-        settings.mode = .whenActive
+        settings.mode = .withSessions
         try writeUsage(fiveHour: 10)
         addLiveSession()
         writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "s1"), to: sessionsDirectory)
@@ -628,11 +650,11 @@ struct ClaudeCodeControllerTests {
         #expect(state.sessions.rows.first?.projectName == "Workdeck")
     }
 
-    @Test func theNotchLingersAMinuteAfterWorkEnds() throws {
+    @Test func theNotchLingersAMinuteAfterTheLastSessionCloses() throws {
         connector.status = .connected
         hooksConnector.status = .connected
         settings.isEnabled = true
-        settings.mode = .whenActive
+        settings.mode = .withSessions
         try writeUsage(fiveHour: 10)
         addLiveSession()
         writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "s1"), to: sessionsDirectory)
@@ -641,7 +663,7 @@ struct ClaudeCodeControllerTests {
         controller.start()
         store.reload()
         #expect(controller.state.display == .notch(.normal))
-        writeSessionEvent(hookEvent(.stop, at: 2, session: "s1"), to: sessionsDirectory)
+        writeSessionEvent(hookEvent(.sessionEnd, at: 2, session: "s1"), to: sessionsDirectory)
         controller.sessions.store.reload()
         controller.refresh()
         #expect(controller.state.display == .notch(.normal))
@@ -658,7 +680,7 @@ struct ClaudeCodeControllerTests {
         connector.status = .connected
         hooksConnector.status = .connected
         settings.isEnabled = true
-        settings.mode = .whenActive
+        settings.mode = .withSessions
         try writeUsage(fiveHour: 10)
         addLiveSession()
         writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "s1"), to: sessionsDirectory)
@@ -666,13 +688,13 @@ struct ClaudeCodeControllerTests {
         let (controller, store) = makeController(clock: { now })
         controller.start()
         store.reload()
-        writeSessionEvent(hookEvent(.stop, at: 2, session: "s1"), to: sessionsDirectory)
+        writeSessionEvent(hookEvent(.sessionEnd, at: 2, session: "s1"), to: sessionsDirectory)
         controller.sessions.store.reload()
         controller.refresh()
         now = fixedNow.addingTimeInterval(30)
         controller.refresh()
         #expect(controller.state.display == .notch(.normal))
-        writeSessionEvent(hookEvent(.userPromptSubmit, at: 31, session: "s1"), to: sessionsDirectory)
+        writeSessionEvent(hookEvent(.sessionStart, at: 31, session: "s2") { $0.pid = 42 }, to: sessionsDirectory)
         controller.sessions.store.reload()
         controller.refresh()
         now = fixedNow.addingTimeInterval(75)
@@ -680,11 +702,28 @@ struct ClaudeCodeControllerTests {
         #expect(controller.state.display == .notch(.normal))
     }
 
+    /// A session just started, cleared or resumed waits at its prompt with nothing to list: it is open all the same
+    /// (polish batch spec §3).
+    @Test func aBlankSessionKeepsTheNotchWithSessions() throws {
+        connector.status = .connected
+        hooksConnector.status = .connected
+        settings.isEnabled = true
+        settings.mode = .withSessions
+        try writeUsage(fiveHour: 10)
+        writeSessionEvent(hookEvent(.sessionStart, at: 0, session: "s1") { $0.pid = 42; $0.source = "startup" }, to: sessionsDirectory)
+        liveness.startTimes[42] = fixedNow.addingTimeInterval(-60)
+        let (controller, store) = makeController()
+        controller.start()
+        store.reload()
+        #expect(controller.sessions.store.sessions.isEmpty)
+        #expect(controller.state.display == .notch(.normal))
+    }
+
     @Test func aLingerRunsOnThroughTheDemo() throws {
         connector.status = .connected
         hooksConnector.status = .connected
         settings.isEnabled = true
-        settings.mode = .whenActive
+        settings.mode = .withSessions
         try writeUsage(fiveHour: 10)
         addLiveSession()
         writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "s1"), to: sessionsDirectory)
@@ -693,8 +732,8 @@ struct ClaudeCodeControllerTests {
         controller.start()
         store.reload()
         controller.demoDidStart()
-        // The real session stops during the demo; the demo ends more than a minute later.
-        writeSessionEvent(hookEvent(.stop, at: 2, session: "s1"), to: sessionsDirectory)
+        // The real session closes during the demo; the demo ends more than a minute later.
+        writeSessionEvent(hookEvent(.sessionEnd, at: 2, session: "s1"), to: sessionsDirectory)
         controller.sessions.store.reload()
         controller.refresh()
         now = fixedNow.addingTimeInterval(65)
@@ -707,14 +746,14 @@ struct ClaudeCodeControllerTests {
         connector.status = .connected
         hooksConnector.status = .connected
         settings.isEnabled = true
-        settings.mode = .whenActive
+        settings.mode = .withSessions
         try writeUsage(fiveHour: 10)
         addLiveSession()
         writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "s1"), to: sessionsDirectory)
         let (controller, store) = makeController(clock: { Date() }, linger: 0.05)
         controller.start()
         store.reload()
-        writeSessionEvent(hookEvent(.stop, at: 2, session: "s1"), to: sessionsDirectory)
+        writeSessionEvent(hookEvent(.sessionEnd, at: 2, session: "s1"), to: sessionsDirectory)
         controller.sessions.store.reload()
         controller.refresh()
         #expect(controller.state.display == .notch(.normal))
@@ -726,7 +765,7 @@ struct ClaudeCodeControllerTests {
     @Test func peekingShowsTheHiddenNotch() throws {
         connector.status = .connected
         settings.isEnabled = true
-        settings.mode = .whenActive
+        settings.mode = .withSessions
         try writeUsage(fiveHour: 10)
         let (controller, store) = makeController()
         controller.start()
@@ -744,7 +783,7 @@ struct ClaudeCodeControllerTests {
         connector.status = .connected
         hooksConnector.status = .connected
         settings.isEnabled = true
-        settings.mode = .whenActive
+        settings.mode = .withSessions
         try writeUsage(fiveHour: 10)
         addLiveSession()
         writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "s1"), to: sessionsDirectory)
@@ -752,7 +791,7 @@ struct ClaudeCodeControllerTests {
         let (controller, store) = makeController(clock: { now })
         controller.start()
         store.reload()
-        writeSessionEvent(hookEvent(.stop, at: 2, session: "s1"), to: sessionsDirectory)
+        writeSessionEvent(hookEvent(.sessionEnd, at: 2, session: "s1"), to: sessionsDirectory)
         controller.sessions.store.reload()
         controller.refresh()
         // The user reads the notch when the linger runs out.
@@ -769,7 +808,7 @@ struct ClaudeCodeControllerTests {
     @Test func switchingToAlwaysEndsAPeek() throws {
         connector.status = .connected
         settings.isEnabled = true
-        settings.mode = .whenActive
+        settings.mode = .withSessions
         try writeUsage(fiveHour: 10)
         let (controller, store) = makeController()
         controller.start()
@@ -784,6 +823,7 @@ struct ClaudeCodeControllerTests {
     @Test func alwaysDoesNotLingerForSessionsAlone() throws {
         hooksConnector.status = .connected
         settings.isEnabled = true
+        settings.mode = .always
         addLiveSession()
         writeSessionEvent(hookEvent(.userPromptSubmit, at: 1, session: "s1"), to: sessionsDirectory)
         let (controller, _) = makeController()
@@ -800,6 +840,7 @@ struct ClaudeCodeControllerTests {
     @Test func alwaysIsNeverPeekable() throws {
         connector.status = .connected
         settings.isEnabled = true
+        settings.mode = .always
         try writeUsage(fiveHour: 10)
         let (controller, store) = makeController()
         controller.start()
@@ -888,12 +929,13 @@ struct ClaudeCodeControllerTests {
         #expect(presenter.alerts == [.sessionFinished(project: "Workdeck", worked: 595)])
     }
 
-    @Test func anAlertShowsAHiddenWhenActiveNotch() throws {
+    @Test func anAlertShowsAHiddenWithSessionsNotchThenItHidesAgain() throws {
         connector.status = .connected
         settings.isEnabled = true
-        settings.mode = .whenActive
+        settings.mode = .withSessions
         try writeUsage(fiveHour: 10)
-        let (controller, store) = makeController()
+        var now = fixedNow
+        let (controller, store) = makeController(clock: { now })
         controller.start()
         store.reload()
         #expect(controller.state.display == .hidden)
@@ -901,12 +943,16 @@ struct ClaudeCodeControllerTests {
         store.reload()
         #expect(controller.state.display == .notch(.warning))
         #expect(presenter.flashes.last == [.threshold(window(.fiveHour, 82), threshold: 80)])
+        // No session: past the alert's minute the notch is empty again, at 82 % too (polish batch spec §3).
+        now = fixedNow.addingTimeInterval(61)
+        controller.refresh()
+        #expect(controller.state.display == .hidden)
     }
 
     @Test func aResetFlashesAndLingers() throws {
         connector.status = .connected
         settings.isEnabled = true
-        settings.mode = .whenActive
+        settings.mode = .withSessions
         try writeUsage(fiveHour: 85)
         var now = fixedNow
         let (controller, store) = makeController(clock: { now })
@@ -926,7 +972,7 @@ struct ClaudeCodeControllerTests {
         connector.status = .connected
         hooksConnector.status = .connected
         settings.isEnabled = true
-        settings.mode = .whenActive
+        settings.mode = .withSessions
         settings.notifyWhenFinished = true
         settings.finishedAfterMinutes = 1
         addLiveSession()
@@ -963,17 +1009,17 @@ struct ClaudeCodeControllerTests {
         #expect(!sleepPreventer.isPreventing)
     }
 
-    @Test func idleSessionsAloneDoNotKeepTheNotch() throws {
+    @Test func anIdleSessionKeepsTheNotchWithSessions() throws {
         connector.status = .connected
         hooksConnector.status = .connected
         settings.isEnabled = true
-        settings.mode = .whenActive
+        settings.mode = .withSessions
         try writeUsage(fiveHour: 10)
         addLiveSession()
         let (controller, store) = makeController()
         controller.start()
         store.reload()
-        #expect(presenter.shown.last?.display == .hidden)
+        #expect(presenter.shown.last?.display == .notch(.normal))
         #expect(presenter.shown.last?.sessions.totalCount == 1)
     }
 

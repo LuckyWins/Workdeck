@@ -2,16 +2,26 @@ import Foundation
 
 nonisolated enum LimitsDisplayMode: String, CaseIterable, Identifiable, Sendable {
     case always
-    /// Visible while something happens, for a minute after, and while peeked at (spec §3). Keeps the raw value of
-    /// the "Only near limits" mode it replaced, so a saved choice carries over.
-    case whenActive = "nearLimits"
+    /// Visible while a session is open, for a minute after, and while peeked at (polish batch spec §3); the default.
+    /// Keeps the raw value of the "Only near limits" mode it replaced, so a saved choice carries over.
+    case withSessions = "nearLimits"
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .always: "Always"
-        case .whenActive: "When active"
+        case .withSessions: "With sessions"
+        }
+    }
+
+    /// Under the Show picker; without session hooks no session ever opens, so it says how to see the notch.
+    func caption(hasSessionHooks: Bool) -> String? {
+        switch self {
+        case .always: nil
+        case .withSessions: hasSessionHooks
+            ? "While a Claude Code or Codex session is open, and for a minute after. Point at the notch to see your limits."
+            : "Shows while a session is open, which needs the session hooks: connect them below, or choose Always."
         }
     }
 }
@@ -96,7 +106,7 @@ nonisolated struct LimitsViewState: Equatable, Sendable {
     var refresh = LimitsRefreshState.hidden
     /// False when the notch is shown only for sessions (no limits source).
     var showsLimits = true
-    /// "When active" hides the notch for now, so pointing at its place may show it (spec §5).
+    /// "With sessions" hides the notch for now, so pointing at its place may show it (spec §5).
     var isPeekable = false
     /// The notch is shown because the pointer is at its place (spec §5).
     var isPeeking = false
@@ -213,7 +223,7 @@ nonisolated enum LimitsPresentation {
         return .normal
     }
 
-    /// `hasSessions`: a session is active, or worked less than a minute ago ("When active" linger).
+    /// `hasSessions`: a session is active (in "With sessions", open), or was less than a minute ago (the linger).
     /// `isPeeking`: the pointer points at the hidden notch's place.
     static func display(
         isEnabled: Bool,
@@ -233,7 +243,7 @@ nonisolated enum LimitsPresentation {
         if hasNotchScreen {
             return limitsVisible || hasSessions || isPeeking ? .notch(level) : .hidden
         }
-        guard limitsVisible else { return .hidden }
+        guard limitsVisible || (isConnected && hasSessions) else { return .hidden }
         return .menuBar(text: (label.map { "\($0) " } ?? "") + compactText(pressing: pressing, hasData: hasData), level: level)
     }
 
@@ -243,11 +253,10 @@ nonisolated enum LimitsPresentation {
         return level == .noData && hasData ? .normal : level
     }
 
-    /// Whether the limits alone keep the indicator visible: a source is on and "When active" is not keeping it
-    /// quiet below the first threshold.
+    /// Whether the limits alone keep the indicator visible: a source is on and the mode is "Always". "With sessions"
+    /// shows nothing without a session, at any percent (polish batch spec §3).
     static func showsLimits(isConnected: Bool, mode: LimitsDisplayMode, level: LimitsLevel) -> Bool {
-        guard isConnected else { return false }
-        return !(mode == .whenActive && (level == .noData || level == .normal))
+        isConnected && mode == .always
     }
 
     /// Next to the ring in the compact notch (agent marks spec §4): until the first threshold the ring alone tells,

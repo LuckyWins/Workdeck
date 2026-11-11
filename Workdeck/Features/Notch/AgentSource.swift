@@ -55,7 +55,7 @@ nonisolated struct AgentNotchPart: Equatable, Sendable {
     var agent: AgentKind
     /// The tool's popover switch.
     var isEnabled: Bool
-    /// Limits or sessions are connected: "When active" may peek at a hidden notch.
+    /// Limits or sessions are connected: "With sessions" may peek at a hidden notch.
     var hasSource: Bool
     /// A limits source is on.
     var showsLimits: Bool
@@ -75,8 +75,10 @@ nonisolated struct AgentNotchPart: Equatable, Sendable {
     var showsAccounts: Bool
     /// Session hooks are connected; without them there is no sessions list at all.
     var sessionsConnected: Bool
-    /// Real sessions at work, for "When active" (the demo shows its own but keeps timing real work).
+    /// Real sessions at work (the demo shows its own but keeps timing real work).
     var activeCount: Int
+    /// Real sessions open, working or not: "With sessions" shows the notch while there is one (polish batch spec §3).
+    var openCount = 0
     /// The demo plays: the notch shows whatever the mode.
     var isDemo = false
     /// When the agent's limits last changed; without sessions anywhere, the latest takes the compact notch.

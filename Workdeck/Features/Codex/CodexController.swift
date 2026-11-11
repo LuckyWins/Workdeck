@@ -127,6 +127,7 @@ final class CodexController: AgentSource {
             showsAccounts: false,
             sessionsConnected: sessions.isHooksConnected,
             activeCount: SessionsPresentation.viewState(sessions: listed, now: sessions.store.now).activeCount,
+            openCount: sessions.openSessionCount,
             limitsChangedAt: limits.limitsChangedAt
         )
     }

@@ -64,6 +64,7 @@ struct SettingsView: View {
             NotchSettingsSection(
                 settings: claudeCode.settings.notch,
                 isNotchEnabled: claudeCode.settings.isEnabled || codex.settings.isEnabled,
+                hasSessionHooks: claudeCode.sessions.isHooksConnected || codex.sessions.isHooksConnected,
                 onChange: {
                     claudeCode.notchSettingsChanged()
                     codex.refresh()

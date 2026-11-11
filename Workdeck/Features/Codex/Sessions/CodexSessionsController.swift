@@ -145,6 +145,11 @@ final class CodexSessionsController {
         onChange?()
     }
 
+    /// Sessions open, listed or still blank: "With sessions" keeps the notch while there is one.
+    var openSessionCount: Int {
+        isHooksConnected ? store.sessions.count + store.blankSessions.count : 0
+    }
+
     private func updateListedSessions() {
         listedSessions = isHooksConnected ? store.sessions : []
     }

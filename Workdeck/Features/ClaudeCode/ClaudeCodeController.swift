@@ -207,8 +207,9 @@ final class ClaudeCodeController {
             sessionsNow: now,
             showsAccounts: true,
             sessionsConnected: true,
-            // "When active" keeps timing real work, so its linger is right after the stop.
+            // The notch's mode keeps timing real sessions, so its linger is right after the real ones.
             activeCount: sessions.viewState.activeCount,
+            openCount: sessions.openSessionCount,
             isDemo: true
         )
     }
@@ -233,9 +234,9 @@ final class ClaudeCodeController {
         return LimitsText.pollerStatusText(account.poller.status, now: account.store.now)
     }
 
-    /// "When active": the account closest to its limit; otherwise the account of the latest session (spec §4.3).
+    /// "With sessions": the account closest to its limit; otherwise the account of the latest session (spec §4.3).
     private func compactAccount(among shown: [AccountLimits]) -> AccountLimits {
-        if settings.mode == .whenActive {
+        if settings.mode == .withSessions {
             let closest = shown.max { lhs, rhs in
                 (UsageFormatting.mostPressing(lhs.store.currentWindows)?.usedPercent ?? -1)
                     < (UsageFormatting.mostPressing(rhs.store.currentWindows)?.usedPercent ?? -1)
@@ -351,6 +352,7 @@ extension ClaudeCodeController: AgentSource {
             showsAccounts: sessions.showsAccounts,
             sessionsConnected: sessions.isHooksConnected,
             activeCount: sessions.viewState.activeCount,
+            openCount: sessions.openSessionCount,
             limitsChangedAt: compact.store.age.map { compact.store.now.addingTimeInterval(-$0) }
         )
     }

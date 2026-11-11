@@ -100,8 +100,8 @@ struct AccountsCompositionTests {
         #expect(controller.state.accounts.map(\.name) == ["main", "personal"])
     }
 
-    @Test func whenActiveShowsTheWorkingAccountBelowTheThreshold() throws {
-        let controller = makeController(mode: .whenActive)
+    @Test func withSessionsShowsTheWorkingAccountBelowTheThreshold() throws {
+        let controller = makeController(mode: .withSessions)
         try usage(30, account: nil)
         try usage(10, account: "personal")
         session("p1", instance: "personal", pid: 2, at: 20)
@@ -138,7 +138,7 @@ struct AccountsCompositionTests {
     }
 
     @Test func nearLimitsShowsTheAccountClosestToItsLimit() throws {
-        let controller = makeController(mode: .whenActive)
+        let controller = makeController(mode: .withSessions)
         try usage(90, account: nil)
         try usage(30, account: "personal")
         session("p1", instance: "personal", pid: 2, at: 20)

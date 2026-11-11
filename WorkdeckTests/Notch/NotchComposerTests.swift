@@ -25,6 +25,10 @@ final class FakeAgentSource: AgentSource {
     func refreshNow() { refreshes += 1 }
 }
 
+final class NotchTestClock: @unchecked Sendable {
+    var now = fixedNow
+}
+
 @MainActor
 final class HeldSources {
     var sources: [FakeAgentSource] = []
@@ -64,7 +68,8 @@ struct NotchComposerTests {
             sessionsNow: fixedNow,
             showsAccounts: false,
             sessionsConnected: true,
-            activeCount: sessions.filter { $0.status != .idle }.count
+            activeCount: sessions.filter { $0.status != .idle }.count,
+            openCount: sessions.count
         )
     }
 
@@ -114,7 +119,7 @@ struct NotchComposerTests {
     }
 
     @Test func aDisabledSourceNeitherHoldsNorPeeks() {
-        settings.mode = .whenActive
+        settings.mode = .withSessions
         let composer = makeComposer()
         let off = part(.claudeCode, enabled: false)
         var on = part(.codex, account: "codex")
@@ -180,8 +185,8 @@ struct NotchComposerTests {
         #expect(second.refreshes == 1)
     }
 
-    @Test func aPendingRecapHoldsAWhenActiveNotch() {
-        settings.mode = .whenActive
+    @Test func aPendingRecapHoldsAWithSessionsNotch() {
+        settings.mode = .withSessions
         let composer = makeComposer()
         let source = FakeAgentSource(part(.claudeCode))
         composer.register(source)
@@ -192,8 +197,55 @@ struct NotchComposerTests {
         #expect(composer.state.display == .notch(.normal))
     }
 
+    @Test func withSessionsShowsWhileASessionIsOpenEvenIdle() {
+        settings.mode = .withSessions
+        let composer = makeComposer()
+        var idle = part(.claudeCode, percent: 10)
+        idle.openCount = 1
+        add(idle, to: composer)
+        composer.refresh()
+        #expect(composer.state.display == .notch(.normal))
+    }
+
+    @Test func withSessionsIsEmptyWithoutAnOpenSessionAtAnyPercent() {
+        settings.mode = .withSessions
+        let composer = makeComposer()
+        add(part(.claudeCode, percent: 90), to: composer)
+        composer.refresh()
+        #expect(composer.state.display == .hidden)
+    }
+
+    @Test func withSessionsLingersAMinuteAfterTheLastSessionCloses() {
+        settings.mode = .withSessions
+        let clock = NotchTestClock()
+        let composer = NotchComposer(settings: settings, presenter: presenter, cameraHousings: { [true] }, clock: { clock.now }, linger: 60)
+        var open = part(.claudeCode, percent: 90)
+        open.openCount = 1
+        let source = add(open, to: composer)
+        composer.refresh()
+        source.notchPart.openCount = 0
+        composer.refresh()
+        clock.now = fixedNow.addingTimeInterval(59)
+        composer.refresh()
+        #expect(composer.state.display == .notch(.warning))
+        clock.now = fixedNow.addingTimeInterval(61)
+        composer.refresh()
+        #expect(composer.state.display == .hidden)
+    }
+
+    @Test func alwaysWithoutLimitsStillFollowsWorkingSessions() {
+        settings.mode = .always
+        let composer = makeComposer()
+        var idle = part(.claudeCode)
+        idle.showsLimits = false
+        idle.openCount = 1
+        add(idle, to: composer)
+        composer.refresh()
+        #expect(composer.state.display == .hidden)
+    }
+
     @Test func theDemoShowsTheNotchWhateverTheMode() {
-        settings.mode = .whenActive
+        settings.mode = .withSessions
         let composer = makeComposer()
         var demo = part(.claudeCode, enabled: false)
         demo.isDemo = true

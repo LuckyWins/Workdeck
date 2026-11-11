@@ -149,9 +149,9 @@ struct RecapControllerTests {
         #expect(presenter.recaps.compactMap { $0 }.count == 1)
     }
 
-    @Test func theRecapKeepsAWhenActiveNotchVisible() throws {
+    @Test func theRecapKeepsAWithSessionsNotchVisible() throws {
         try saveLastWeek(seconds: 3600)
-        notch.mode = .whenActive
+        notch.mode = .withSessions
         let (controller, composer) = makeController()
         controller.start()
         #expect(composer.state.display != .hidden)
@@ -335,7 +335,7 @@ struct RecapControllerTests {
             RecapDay(date: "2026-10-07", projects: ["Workdeck": RecapProjectDay(seconds: 3600, sessionIDs: ["s"])]),
             RecapDay(date: "2026-10-14", projects: ["Workdeck": RecapProjectDay(seconds: 300, sessionIDs: ["s"])]),
         ], now: monday, calendar: calendar)
-        notch.mode = .whenActive
+        notch.mode = .withSessions
         let (controller, composer) = makeController()
         controller.start()
         #expect(presenter.recaps.last??.seconds == 3600)

@@ -76,6 +76,12 @@ final class ClaudeSessionsController {
         return store.sessions.filter { $0.instance.map { extraConnectors[$0] != nil } ?? true }
     }
 
+    /// Sessions open on a connected instance, listed or still blank: "With sessions" keeps the notch while there is one.
+    var openSessionCount: Int {
+        guard isHooksConnected else { return 0 }
+        return (store.sessions + store.blankSessions).filter { $0.instance.map { extraConnectors[$0] != nil } ?? true }.count
+    }
+
     /// Session rows carry the account tag once there is an extra instance.
     var showsAccounts: Bool {
         !extraConnectors.isEmpty

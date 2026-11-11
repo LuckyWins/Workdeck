@@ -37,6 +37,7 @@ struct CodexControllerTests {
     }
 
     @Test func itsBlockShowsInTheNotch() async throws {
+        defaults.set("always", forKey: "claudeLimits.mode")
         let controller = await makeController(weekly)
         let block = try #require(controller.notchPart.accounts.first)
         #expect(block.name == "codex")

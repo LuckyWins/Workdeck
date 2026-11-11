@@ -17,7 +17,7 @@ final class NotchComposer {
     @ObservationIgnored private let cameraHousings: @MainActor () -> [Bool]
     @ObservationIgnored private let clock: () -> Date
     @ObservationIgnored private let linger: TimeInterval
-    /// When the last active session went idle; "When active" keeps the notch `linger` seconds after it.
+    /// When the last session that kept the notch stopped keeping it; the notch stays `linger` seconds after it.
     @ObservationIgnored private var workEndedAt: Date?
     @ObservationIgnored private var wasActive = false
     @ObservationIgnored private var lingerTask: Task<Void, Never>?
@@ -42,6 +42,8 @@ final class NotchComposer {
     /// The quick notes panel is open where the notch is: the notch hides and alerts wait (quick notes spec §3).
     @ObservationIgnored private(set) var isSuspended = false
     @ObservationIgnored private var suspendedAlerts: [LimitsAlert] = []
+    /// The limits' level while the menu bar text would show them but the mode hides it; `.noData` otherwise.
+    private(set) var iconLevel = LimitsLevel.noData
 
     /// Alerts wait for the quick notes panel to close.
     var hasWaitingAlerts: Bool {
@@ -80,8 +82,10 @@ final class NotchComposer {
         if case let .menuBar(text, _) = state.display { text } else { nil }
     }
 
+    /// The icon's level where the menu bar text stands in for the notch: it warns of a limit past its threshold even
+    /// while "With sessions" hides the text (polish batch spec §3).
     var menuBarLevel: LimitsLevel {
-        if case let .menuBar(_, level) = state.display { level } else { .noData }
+        if case let .menuBar(_, level) = state.display { level } else { iconLevel }
     }
 
     /// What each agent tool reports to the recap.
@@ -147,7 +151,7 @@ final class NotchComposer {
         }
     }
 
-    /// An alert restarts the "When active" linger, as if work had just ended (flash spec §2.3).
+    /// An alert restarts the linger, as if work had just ended (flash spec §2.3).
     func noteAlerts() {
         workEndedAt = clock()
         lingerTask?.cancel()
@@ -169,7 +173,7 @@ final class NotchComposer {
     }
 
     /// Recomposes the notch from every source; `alerts` happened just now and flash after it shows. Limit alerts come
-    /// first: in "When active" an alert counts as activity, so a hidden notch shows (flash spec §2.3).
+    /// first: in "With sessions" an alert counts as activity, so a hidden notch shows (flash spec §2.3).
     func refresh(alerts: [LimitsAlert] = []) {
         onRefresh?()
         let parts = sources.map(\.notchPart)
@@ -195,8 +199,11 @@ final class NotchComposer {
         let hasData = block?.age != nil
         let thresholds = settings.thresholds
         let isDemo = shown.contains(where: \.isDemo)
-        let isActive = shown.contains { $0.activeCount > 0 }
-        let isLingering = lingers(isActive: isActive)
+        // "With sessions" keeps the notch while any session is open, idle ones too (polish batch spec §3).
+        let keepsShowing = settings.mode == .withSessions
+            ? shown.contains { $0.openCount > 0 }
+            : shown.contains { $0.activeCount > 0 }
+        let isLingering = lingers(isActive: keepsShowing)
         let isEnabled = parts.contains(where: \.isEnabled)
         let showsLimits = shown.contains(where: \.showsLimits)
         let hasNotchScreen = hasNotchScreen
@@ -211,18 +218,22 @@ final class NotchComposer {
                 pressing: pressing,
                 hasData: hasData,
                 thresholds: thresholds,
-                hasSessions: isActive || (settings.mode == .whenActive && isLingering) || keepsVisible,
+                hasSessions: keepsShowing || (settings.mode == .withSessions && isLingering) || keepsVisible,
                 isPeeking: isPeeking,
                 label: menuBarLabel
             )
         }
+        // Without a notch screen the icon keeps warning while "With sessions" hides the text.
+        iconLevel = !isDemo && isEnabled && showsLimits && !hasNotchScreen
+            ? LimitsPresentation.displayLevel(pressing: pressing, hasData: hasData, thresholds: thresholds)
+            : .noData
         var display: LimitsDisplay
         var isPeekable = false
         if isDemo {
             display = .notch(LimitsPresentation.displayLevel(pressing: pressing, hasData: true, thresholds: thresholds))
         } else {
             display = decide()
-            let canPeek = settings.mode == .whenActive && isEnabled && hasNotchScreen && shown.contains(where: \.hasSource)
+            let canPeek = settings.mode == .withSessions && isEnabled && hasNotchScreen && shown.contains(where: \.hasSource)
             if !canPeek {
                 isPeeking = false
             }
@@ -321,7 +332,7 @@ final class NotchComposer {
         return lists.flatMap { $0 }.sorted(by: ClaudeSessionStore.displayOrder)
     }
 
-    /// "When active" keeps the notch `linger` seconds after the last active session goes idle (spec §3).
+    /// "With sessions" keeps the notch `linger` seconds after the last session closes (spec §3, polish batch spec §3).
     private func lingers(isActive: Bool) -> Bool {
         let now = clock()
         if isActive {

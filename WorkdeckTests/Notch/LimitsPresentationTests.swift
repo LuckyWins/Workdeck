@@ -39,14 +39,31 @@ struct LimitsPresentationTests {
         #expect(state.showsNothing)
     }
 
-    @Test func whenActiveShowsTheNotchWhileSomethingHappens() {
+    @Test func withSessionsShowsTheNotchWhileASessionIsOpen() {
         let normal = window(.fiveHour, 10)
-        #expect(display(mode: .whenActive, pressing: normal) == .hidden)
-        #expect(display(mode: .whenActive, pressing: normal, active: true) == .notch(.normal))
-        #expect(display(mode: .whenActive, pressing: normal, peeking: true) == .notch(.normal))
-        #expect(display(mode: .whenActive, pressing: window(.fiveHour, 81)) == .notch(.warning))
+        #expect(display(mode: .withSessions, pressing: normal) == .hidden)
+        #expect(display(mode: .withSessions, pressing: normal, active: true) == .notch(.normal))
+        #expect(display(mode: .withSessions, pressing: normal, peeking: true) == .notch(.normal))
         // Peeking never shows text in the menu bar.
-        #expect(display(mode: .whenActive, notch: false, pressing: normal, peeking: true) == .hidden)
+        #expect(display(mode: .withSessions, notch: false, pressing: normal, peeking: true) == .hidden)
+    }
+
+    @Test func withSessionsIsEmptyWithoutSessionsAtAnyPercent() {
+        #expect(display(mode: .withSessions, pressing: window(.fiveHour, 81)) == .hidden)
+        #expect(display(mode: .withSessions, pressing: window(.fiveHour, 97)) == .hidden)
+        #expect(display(mode: .withSessions, pressing: window(.fiveHour, 81), active: true) == .notch(.warning))
+    }
+
+    /// Without session hooks no session ever opens: the caption says how to see the notch (polish batch spec §3).
+    @Test func theCaptionPointsToHooksOrAlways() {
+        #expect(LimitsDisplayMode.always.caption(hasSessionHooks: false) == nil)
+        #expect(LimitsDisplayMode.withSessions.caption(hasSessionHooks: true) == "While a Claude Code or Codex session is open, and for a minute after. Point at the notch to see your limits.")
+        #expect(LimitsDisplayMode.withSessions.caption(hasSessionHooks: false) == "Shows while a session is open, which needs the session hooks: connect them below, or choose Always.")
+    }
+
+    @Test func withSessionsIsTheTitle() {
+        #expect(LimitsDisplayMode.withSessions.title == "With sessions")
+        #expect(LimitsDisplayMode.withSessions.rawValue == "nearLimits")
     }
 
     @Test(arguments: [(nil as Double?, LimitsLevel.noData), (10, .normal), (79.9, .normal), (80, .warning), (94, .warning), (95, .critical), (100, .critical)])
@@ -64,23 +81,24 @@ struct LimitsPresentationTests {
         #expect(display(pressing: nil) == .notch(.noData))
     }
 
-    @Test func nearLimitsModeHidesBelowFirstThreshold() {
-        #expect(display(mode: .whenActive, pressing: window(.fiveHour, 79)) == .hidden)
-        #expect(display(mode: .whenActive, pressing: nil) == .hidden)
-        #expect(display(mode: .whenActive, pressing: window(.fiveHour, 81)) == .notch(.warning))
+    @Test func withSessionsHidesWithoutSessions() {
+        #expect(display(mode: .withSessions, pressing: window(.fiveHour, 79)) == .hidden)
+        #expect(display(mode: .withSessions, pressing: nil) == .hidden)
     }
 
     @Test func menuBarFallbackWithoutNotch() {
         #expect(display(notch: false, pressing: window(.sevenDay, 96)) == .menuBar(text: "7d 96%", level: .critical))
         #expect(display(notch: false, pressing: nil) == .menuBar(text: "—", level: .noData))
-        #expect(display(mode: .whenActive, notch: false, pressing: window(.fiveHour, 40)) == .hidden)
+        #expect(display(mode: .withSessions, notch: false, pressing: window(.fiveHour, 40)) == .hidden)
+        #expect(display(mode: .withSessions, notch: false, pressing: window(.fiveHour, 96)) == .hidden)
+        #expect(display(mode: .withSessions, notch: false, pressing: window(.fiveHour, 40), active: true) == .menuBar(text: "5h 40%", level: .normal))
     }
 
     @Test func noRunningWindowWithDataMeansNotStarted() {
         // After a reset, or before the first message, the next window starts at 0%.
         #expect(display(pressing: nil, hasData: true) == .notch(.normal))
         #expect(display(notch: false, pressing: nil, hasData: true) == .menuBar(text: "5h 0%", level: .normal))
-        #expect(display(mode: .whenActive, pressing: nil, hasData: true) == .hidden)
+        #expect(display(mode: .withSessions, pressing: nil, hasData: true) == .hidden)
     }
 
     @Test(arguments: [
@@ -100,7 +118,7 @@ struct LimitsPresentationTests {
         )
         #expect(onlySessions == .notch(.noData))
         let nearLimits = LimitsPresentation.display(
-            isEnabled: true, isConnected: true, mode: .whenActive, hasNotchScreen: true,
+            isEnabled: true, isConnected: true, mode: .withSessions, hasNotchScreen: true,
             pressing: window(.fiveHour, 10), hasData: true, thresholds: [80, 95], hasSessions: true
         )
         #expect(nearLimits == .notch(.normal))
@@ -119,8 +137,9 @@ struct LimitsPresentationTests {
     @Test func limitsShowOnlyWithASourceAndOutsideQuietNearLimitsMode() {
         #expect(!LimitsPresentation.showsLimits(isConnected: false, mode: .always, level: .warning))
         #expect(LimitsPresentation.showsLimits(isConnected: true, mode: .always, level: .normal))
-        #expect(!LimitsPresentation.showsLimits(isConnected: true, mode: .whenActive, level: .normal))
-        #expect(LimitsPresentation.showsLimits(isConnected: true, mode: .whenActive, level: .warning))
+        #expect(!LimitsPresentation.showsLimits(isConnected: true, mode: .withSessions, level: .normal))
+        #expect(!LimitsPresentation.showsLimits(isConnected: true, mode: .withSessions, level: .warning))
+        #expect(!LimitsPresentation.showsLimits(isConnected: true, mode: .withSessions, level: .critical))
     }
 
     @Test func activeAccountsGetBlocksAndTheOthersLines() {

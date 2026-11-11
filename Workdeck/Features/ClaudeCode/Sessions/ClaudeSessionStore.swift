@@ -20,6 +20,9 @@ final class ClaudeSessionStore {
 
     /// Live sessions: waiting first, then working, then idle; the newest state change first within a group.
     private(set) var sessions: [ClaudeSession] = []
+    /// Live sessions not listed yet: started, cleared or resumed, waiting for their first prompt. Open all the same,
+    /// so "With sessions" keeps the notch for them (polish batch spec §3).
+    private(set) var blankSessions: [ClaudeSession] = []
     private(set) var now: Date
 
     @ObservationIgnored var onChange: (() -> Void)?
@@ -174,11 +177,15 @@ final class ClaudeSessionStore {
 
         // A blank session stays tracked and is listed with its first prompt.
         let sorted = live.filter { !$0.isBlank }.sorted(by: Self.displayOrder)
+        let blank = live.filter(\.isBlank).sorted(by: Self.displayOrder)
         // Durations are shown in minutes, so a new minute is worth a redraw even without new events.
         let minute = Int(now.timeIntervalSince1970 / 60)
-        guard sorted != sessions || minute != lastNotifiedMinute else { return }
+        guard sorted != sessions || blank != blankSessions || minute != lastNotifiedMinute else { return }
         if sorted != sessions {
             sessions = sorted
+        }
+        if blank != blankSessions {
+            blankSessions = blank
         }
         lastNotifiedMinute = minute
         onChange?()

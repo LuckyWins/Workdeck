@@ -6,6 +6,7 @@ What changed in each version of Workdeck, for the people using it. New lines go 
 
 ### Improved
 - The notch shows what a Claude Code command is for, as the terminal does ("Run the tests"), instead of the command itself.
+- The notch stays empty while no Claude Code or Codex session is open, whatever your limits. The new default "With sessions" replaces "When active"; choose "Always" in Settings → Notch to keep the limit ring on screen.
 
 ## 1.4.1 — 2026-11-10
 
